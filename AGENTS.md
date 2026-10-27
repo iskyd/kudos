@@ -8,17 +8,17 @@ KudOS is a free, open-source (MIT), self-hosted training platform: a Go monolith
 
 ## 1. Commands
 
-Always use these targets. Never skip `make check` before declaring work done.
+Always use these recipes. Never skip `just check` before declaring work done.
 
 ```bash
-make generate   # go generate ./... and npm --prefix web run generate
-make lint       # golangci-lint run ./... and npm --prefix web run lint
-make test       # go test -race ./... and npm --prefix web run test
-make check      # generate, then git diff --exit-code, then lint, then test
-make dev        # docker compose up for TimescaleDB + app with live reload
+just generate   # go generate ./... and npm --prefix web run generate
+just lint       # golangci-lint run ./... and npm --prefix web run lint
+just test       # go test -race ./... and npm --prefix web run test
+just check      # generate, then git diff --exit-code, then lint, then test
+just dev        # docker compose up for TimescaleDB + app with live reload
 ```
 
-`make check` must pass with a clean `git diff` after generation. If generation changes files you did not expect, you edited a generated file or forgot to regenerate.
+`just check` must pass with a clean `git diff` after generation. If generation changes files you did not expect, you edited a generated file or forgot to regenerate.
 
 ---
 
@@ -118,7 +118,7 @@ make dev        # docker compose up for TimescaleDB + app with live reload
   go get -tool github.com/riverqueue/river/cmd/river
   go get -tool go.uber.org/mock/mockgen
   ```
-- Generation is triggered only through `//go:generate` directives, run with `go generate ./...` (via `make generate`). Example:
+- Generation is triggered only through `//go:generate` directives, run with `go generate ./...` (via `just generate`). Example:
   ```go
   // internal/store/generate.go
   package store
@@ -135,7 +135,7 @@ make dev        # docker compose up for TimescaleDB + app with live reload
 - New migrations are created with `go tool goose -dir migrations create <name> sql`, never by hand-naming files.
 - River's schema migrations are produced with the River CLI (`go tool river migrate-get ...`) into goose migration files, never written by hand.
 - Mocks, when needed, come from `mockgen` via `//go:generate`. Prefer real implementations or small fakes; never mock the database (use testcontainers).
-- Generated code is committed. CI runs `make generate` and fails on any diff.
+- Generated code is committed. CI runs `just generate` and fails on any diff.
 
 ### 5.2 Database and SQL
 - All SQL lives in `internal/store/queries/*.sql` and is compiled by sqlc. No ORM, no query builders, no `fmt.Sprintf` SQL, no raw `pgx` queries outside generated code.
@@ -199,13 +199,13 @@ make dev        # docker compose up for TimescaleDB + app with live reload
 ## 7. Workflow
 
 1. Read the relevant spec section before changing behavior. If the change alters behavior described in the spec, say so in the PR description.
-2. API changes start in `api/openapi.yaml`, then `make generate`, then implement handlers and frontend hooks.
-3. Schema changes start with a goose migration, then sqlc queries, then `make generate`.
+2. API changes start in `api/openapi.yaml`, then `just generate`, then implement handlers and frontend hooks.
+3. Schema changes start with a goose migration, then sqlc queries, then `just generate`.
 4. Keep changes small and focused; one concern per PR. Use Conventional Commits (`feat:`, `fix:`, `test:`, `refactor:`, `chore:`, `docs:`).
 5. Never commit secrets, `.env` files, real user exports or database dumps.
 
 ### Definition of done
-- [ ] `make check` passes locally (generation diff clean, lint clean, all tests green with `-race`).
+- [ ] `just check` passes locally (generation diff clean, lint clean, all tests green with `-race`).
 - [ ] New or changed Go functions have tests; coverage gates hold.
 - [ ] New repository methods have cross-user isolation tests.
 - [ ] No hand-edited generated files.

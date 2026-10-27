@@ -109,7 +109,7 @@ Contributions are welcome. Before opening a pull request:
 
 1. Read [AGENTS.md](AGENTS.md). Its rules apply to humans and coding agents alike, including mandatory code generation and tests for every new or changed function.
 2. Keep the change focused.
-3. Run `make check` and make sure it passes.
+3. Run `just check` and make sure it passes.
 4. Use [Conventional Commits](https://www.conventionalcommits.org) for commit messages.
 
 When reporting a parsing bug, attach the FIT file if you can, but remove or crop any GPS track you don't want to share.
