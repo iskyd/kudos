@@ -83,6 +83,11 @@ web/playwright/.cache/
 .claude/settings.local.json
 CLAUDE.local.md
 
+# ---------- Nix / direnv ----------
+.direnv/
+result
+result-*
+
 # ---------- Editors and OS ----------
 .idea/
 .vscode/*
