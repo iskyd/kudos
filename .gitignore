@@ -1,0 +1,94 @@
+# =========================================================
+# KudOS .gitignore — Go backend + React (Vite) frontend
+#
+# Generated code (sqlc, oapi-codegen, mockgen, the TypeScript
+# API client) is COMMITTED on purpose: CI regenerates it and
+# fails on any diff. Do not add it here.
+# =========================================================
+
+# ---------- Secrets and local configuration ----------
+.env
+.env.*
+!.env.example
+!**/.env.example
+encryption_key
+*.pem
+*.key
+*.p12
+
+# ---------- Local data (never commit real user data) ----------
+# Local DATA_DIR for original activity files during development
+/data/
+/.data/
+# Raw, un-anonymized samples and Garmin exports; only files
+# processed by cmd/fitanon go into testdata/fit/
+/private/
+testdata/**/raw/
+/*.zip
+/exports/
+# Database dumps (migrations/*.sql are tracked; only root dumps are ignored)
+/*.sql
+*.dump
+
+# ---------- Go ----------
+# Binaries
+/bin/
+/server
+/kudos
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+# Test binaries, coverage and profiles
+*.test
+*.out
+coverage.*
+*.coverprofile
+*.prof
+*.pprof
+# Workspace files (single-module repository)
+go.work
+go.work.sum
+# Live-reload (air) output
+/tmp/
+build-errors.log
+# Note: testdata/fuzz/ holds fuzz regression inputs and IS tracked.
+
+# ---------- Frontend (web/) ----------
+node_modules/
+# Vite build output, embedded into the Go binary at build time.
+# Keep the placeholder so go:embed compiles before the first build.
+web/dist/*
+!web/dist/.gitkeep
+web/.vite/
+*.tsbuildinfo
+*.local
+# Package manager logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+# Vitest coverage
+web/coverage/
+# Playwright
+web/test-results/
+web/playwright-report/
+web/blob-report/
+web/playwright/.cache/
+
+# ---------- Coding agents ----------
+# Personal Claude Code settings and notes (shared ones stay tracked)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# ---------- Editors and OS ----------
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
