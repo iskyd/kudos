@@ -13,6 +13,7 @@ generate:
 
 # Lint Go and frontend code.
 lint:
+    go mod tidy -diff
     golangci-lint run ./...
     {{ if web == "true" { "npm --prefix web run lint" } else { "" } }}
 

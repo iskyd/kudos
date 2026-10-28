@@ -21,6 +21,9 @@
         default = pkgs.mkShell {
           packages = with pkgs; [
             just
+            pre-commit
+            python3Packages.pre-commit-hooks # hook executables, so no hook env is downloaded
+            gitleaks
             go
             gopls
             golangci-lint
@@ -34,6 +37,11 @@
           PLAYWRIGHT_BROWSERS_PATH = "${pkgs.playwright-driver.browsers}";
           PLAYWRIGHT_SKIP_VALIDATE_HOST_REQUIREMENTS = "true";
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = "1";
+
+          # Re-installed on every entry: the hook script pins a Nix store path that changes on updates.
+          shellHook = ''
+            if [ -d .git ]; then pre-commit install >/dev/null; fi
+          '';
         };
       });
 

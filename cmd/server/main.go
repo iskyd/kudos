@@ -13,25 +13,31 @@ import (
 	"time"
 
 	"github.com/iskyd/kudos/internal/api"
+	"github.com/iskyd/kudos/internal/config"
 )
-
-// shortcut: hard-coded listen address, replaced by LISTEN_ADDR config in T0.2.
-const listenAddr = ":8080"
 
 const shutdownTimeout = 10 * time.Second
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	if err := run(logger); err != nil {
+	level := new(slog.LevelVar)
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: level}))
+	if err := run(logger, level); err != nil {
 		logger.Error("server stopped", "error", err)
 		os.Exit(1)
 	}
 }
 
-func run(logger *slog.Logger) error {
+func run(logger *slog.Logger, level *slog.LevelVar) error {
+	cfg, err := config.Load(os.Getenv)
+	if err != nil {
+		return fmt.Errorf("loading config: %w", err)
+	}
+	level.Set(cfg.LogLevel)
+
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
 
+	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
 		Addr:              listenAddr,
 		Handler:           api.NewRouter(),

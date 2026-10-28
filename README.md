@@ -112,6 +112,8 @@ Contributions are welcome. Before opening a pull request:
 3. Run `just check` and make sure it passes.
 4. Use [Conventional Commits](https://www.conventionalcommits.org) for commit messages.
 
+The Nix dev shell installs [pre-commit](https://pre-commit.com) hooks automatically (outside Nix: install pre-commit, pre-commit-hooks and gitleaks, then run `pre-commit install`). On every commit they fix whitespace, block merge markers, large files and leaked secrets (gitleaks), check the commit message format and run `just check`. Run them on the whole tree with `pre-commit run --all-files`.
+
 When reporting a parsing bug, attach the FIT file if you can, but remove or crop any GPS track you don't want to share.
 
 ---
