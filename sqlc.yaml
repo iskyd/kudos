@@ -8,3 +8,4 @@ sql:
         package: db
         out: internal/store/db
         sql_package: pgx/v5
+        omit_unused_structs: true
