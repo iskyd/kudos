@@ -12,6 +12,9 @@ import (
 
 func discard() *slog.Logger { return slog.New(slog.DiscardHandler) }
 
+// spaStub stands in for the embedded frontend.
+var spaStub = http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte("spa")) })
+
 func decodeProblem(t *testing.T, rec *httptest.ResponseRecorder) Problem {
 	t.Helper()
 	if ct := rec.Header().Get("Content-Type"); ct != "application/problem+json" {
@@ -37,10 +40,14 @@ func TestRouter(t *testing.T) {
 	}{
 		{name: "healthz ok", method: http.MethodGet, path: "/healthz", wantCode: http.StatusOK, wantBody: "ok"},
 		{name: "method not allowed", method: http.MethodPost, path: "/healthz", wantCode: http.StatusMethodNotAllowed, wantType: "urn:kudos:problem:method-not-allowed"},
-		{name: "unknown route", method: http.MethodGet, path: "/nope", wantCode: http.StatusNotFound, wantType: "urn:kudos:problem:not-found"},
+		{name: "unknown path serves the app", method: http.MethodGet, path: "/activities/42", wantCode: http.StatusOK, wantBody: "spa"},
+		{name: "head serves the app", method: http.MethodHead, path: "/plans", wantCode: http.StatusOK, wantBody: "spa"},
+		{name: "unknown api route", method: http.MethodGet, path: "/api/nope", wantCode: http.StatusNotFound, wantType: "urn:kudos:problem:not-found"},
+		{name: "api root", method: http.MethodGet, path: "/api", wantCode: http.StatusNotFound, wantType: "urn:kudos:problem:not-found"},
+		{name: "unknown path with post", method: http.MethodPost, path: "/nope", wantCode: http.StatusNotFound, wantType: "urn:kudos:problem:not-found"},
 	}
 
-	h := NewRouter(discard())
+	h := NewRouter(discard(), spaStub)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -74,7 +81,7 @@ func TestAccessLogOmitsQueryAndBody(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	h := NewRouter(slog.New(slog.NewJSONHandler(&buf, nil)))
+	h := NewRouter(slog.New(slog.NewJSONHandler(&buf, nil)), spaStub)
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/healthz?token=s3cret", strings.NewReader("body-s3cret"))
 	h.ServeHTTP(httptest.NewRecorder(), req)
 

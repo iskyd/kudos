@@ -16,6 +16,7 @@ import (
 	"github.com/iskyd/kudos/internal/config"
 	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store"
+	"github.com/iskyd/kudos/web"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -55,10 +56,15 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 		return fmt.Errorf("starting job client: %w", err)
 	}
 
+	spa, err := web.Handler()
+	if err != nil {
+		return fmt.Errorf("loading frontend: %w", err)
+	}
+
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
 		Addr:              listenAddr,
-		Handler:           api.NewRouter(logger),
+		Handler:           api.NewRouter(logger, spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

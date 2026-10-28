@@ -1,26 +1,24 @@
 # KudOS task runner. See AGENTS.md section 1.
 
-# Frontend steps run only once web/ exists (T0.6).
-web := if path_exists("web/package.json") == "true" { "true" } else { "false" }
-
 default:
     @just --list
 
 # Run all code generators.
 generate:
     go generate ./...
-    {{ if web == "true" { "npm --prefix web run generate" } else { "" } }}
+    npm --prefix web run generate
 
 # Lint Go and frontend code.
 lint:
     go mod tidy -diff
     golangci-lint run ./...
-    {{ if web == "true" { "npm --prefix web run lint" } else { "" } }}
+    npm --prefix web run lint
+    npm --prefix web run typecheck
 
 # Run all tests with the race detector.
 test:
     go test -race ./...
-    {{ if web == "true" { "npm --prefix web run test" } else { "" } }}
+    npm --prefix web run test
 
 # Generate, verify a clean diff, lint and test. Must pass before work is done.
 check: generate
@@ -28,8 +26,13 @@ check: generate
     just lint
     just test
 
-# Build the server binary into bin/.
+# Run the Playwright end-to-end tests against a production build.
+e2e:
+    npm --prefix web run test:e2e
+
+# Build the frontend, then the server binary (embedding it) into bin/.
 build:
+    npm --prefix web run build
     go build -o bin/kudos ./cmd/server
 
 # Start TimescaleDB and the app with live reload.

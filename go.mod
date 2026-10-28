@@ -2,6 +2,9 @@ module github.com/iskyd/kudos
 
 go 1.26.10
 
+// npm packages may ship .go files; they are not part of this module.
+ignore ./web/node_modules
+
 tool (
 	github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen
 	github.com/pressly/goose/v3/cmd/goose
