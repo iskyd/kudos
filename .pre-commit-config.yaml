@@ -58,7 +58,7 @@ repos:
         stages: [commit-msg]
 
       - id: just-check
-        name: just check (generate, diff, lint, test)
+        name: just check (generate, diff, lint, test, coverage)
         entry: just check
         language: system
         pass_filenames: false

@@ -1,0 +1,22 @@
+# Development database for `just dev`. The app runs on the host (air + Vite).
+name: kudos-dev
+
+services:
+  db:
+    image: timescale/timescaledb:2.31.0-pg18
+    environment:
+      POSTGRES_USER: kudos
+      POSTGRES_PASSWORD: kudos
+      POSTGRES_DB: kudos
+    ports:
+      - "127.0.0.1:${KUDOS_DB_PORT:-5432}:5432"
+    volumes:
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kudos", "-d", "kudos"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  db:
