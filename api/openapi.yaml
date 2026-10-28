@@ -1,0 +1,82 @@
+openapi: 3.0.3
+info:
+  title: KudOS API
+  version: 0.1.0
+  description: |
+    REST API of KudOS. Errors use application/problem+json (RFC 9457) with a
+    stable `type` per error kind. Every list endpoint is cursor-paginated:
+    pass `nextCursor` from a page as `cursor` to get the next one; a missing
+    `nextCursor` means the last page. Cursors are opaque.
+  license:
+    name: MIT
+paths:
+  /healthz:
+    get:
+      operationId: getHealthz
+      summary: Liveness probe
+      tags: [system]
+      responses:
+        "200":
+          description: The server is up.
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: ok
+        default:
+          $ref: "#/components/responses/Problem"
+components:
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor from a previous page's `nextCursor`.
+      schema:
+        type: string
+        maxLength: 1024
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Maximum number of items to return.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 50
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 problem details.
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          description: Stable URI identifying the error kind, e.g. urn:kudos:problem:not-found.
+        title:
+          type: string
+          description: Short summary of the error kind.
+        status:
+          type: integer
+          description: HTTP status code.
+        detail:
+          type: string
+          description: Explanation of this occurrence.
+        requestId:
+          type: string
+          description: ID of the request, also sent as the X-Request-Id header.
+    Page:
+      type: object
+      description: Pagination envelope. List responses add an `items` array with allOf.
+      properties:
+        nextCursor:
+          type: string
+          description: Cursor for the next page; absent on the last page.
+  responses:
+    Problem:
+      description: Error.
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"

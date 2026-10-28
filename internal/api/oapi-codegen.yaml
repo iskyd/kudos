@@ -1,0 +1,9 @@
+package: api
+output: api.gen.go
+generate:
+  chi-server: true
+  strict-server: true
+  models: true
+output-options:
+  # Shared components (Page) must exist before the first list endpoint uses them.
+  skip-prune: true

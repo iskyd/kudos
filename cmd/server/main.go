@@ -58,7 +58,7 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
 		Addr:              listenAddr,
-		Handler:           api.NewRouter(),
+		Handler:           api.NewRouter(logger),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
