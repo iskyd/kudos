@@ -47,7 +47,7 @@ func TestRouter(t *testing.T) {
 		{name: "unknown path with post", method: http.MethodPost, path: "/nope", wantCode: http.StatusNotFound, wantType: "urn:kudos:problem:not-found"},
 	}
 
-	h := NewRouter(discard(), spaStub)
+	h := NewRouter(discard(), &Server{}, spaStub)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
@@ -81,7 +81,7 @@ func TestAccessLogOmitsQueryAndBody(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
-	h := NewRouter(slog.New(slog.NewJSONHandler(&buf, nil)), spaStub)
+	h := NewRouter(slog.New(slog.NewJSONHandler(&buf, nil)), &Server{}, spaStub)
 	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/healthz?token=s3cret", strings.NewReader("body-s3cret"))
 	h.ServeHTTP(httptest.NewRecorder(), req)
 

@@ -19,12 +19,25 @@ const (
 	KindNotFound         Kind = "not-found"
 	KindMethodNotAllowed Kind = "method-not-allowed"
 	KindInternal         Kind = "internal"
+
+	KindUnauthorized         Kind = "unauthorized"
+	KindInvalidCredentials   Kind = "invalid-credentials" //nolint:gosec // G101: an error kind name, not a credential
+	KindCSRF                 Kind = "csrf"
+	KindCrossOrigin          Kind = "cross-origin"
+	KindRegistrationDisabled Kind = "registration-disabled"
+	KindUsernameTaken        Kind = "username-taken"
 )
 
 func (k Kind) status() int {
 	switch k {
 	case KindInvalidRequest:
 		return http.StatusBadRequest
+	case KindUnauthorized, KindInvalidCredentials:
+		return http.StatusUnauthorized
+	case KindCSRF, KindCrossOrigin, KindRegistrationDisabled:
+		return http.StatusForbidden
+	case KindUsernameTaken:
+		return http.StatusConflict
 	case KindNotFound:
 		return http.StatusNotFound
 	case KindMethodNotAllowed:
@@ -42,6 +55,18 @@ func (k Kind) title() string {
 		return "Not found"
 	case KindMethodNotAllowed:
 		return "Method not allowed"
+	case KindUnauthorized:
+		return "Not logged in"
+	case KindInvalidCredentials:
+		return "Invalid username or password"
+	case KindCSRF:
+		return "Missing or invalid CSRF token"
+	case KindCrossOrigin:
+		return "Cross-origin request rejected"
+	case KindRegistrationDisabled:
+		return "Registration is disabled"
+	case KindUsernameTaken:
+		return "Username already taken"
 	default:
 		return "Internal error"
 	}

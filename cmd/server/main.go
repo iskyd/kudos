@@ -11,11 +11,13 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // timezone validation must not depend on the container having zoneinfo
 
 	"github.com/iskyd/kudos/internal/api"
 	"github.com/iskyd/kudos/internal/config"
 	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store"
+	"github.com/iskyd/kudos/internal/store/db"
 	"github.com/iskyd/kudos/web"
 )
 
@@ -64,7 +66,7 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
 		Addr:              listenAddr,
-		Handler:           api.NewRouter(logger, spa),
+		Handler:           api.NewRouter(logger, api.NewServer(db.New(pool), cfg.RegistrationEnabled), spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
