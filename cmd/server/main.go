@@ -14,6 +14,7 @@ import (
 
 	"github.com/iskyd/kudos/internal/api"
 	"github.com/iskyd/kudos/internal/config"
+	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store"
 )
 
@@ -45,6 +46,15 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	defer pool.Close()
 	logger.Info("database ready")
 
+	jobClient, err := jobs.NewClient(pool, logger)
+	if err != nil {
+		return fmt.Errorf("creating job client: %w", err)
+	}
+	// Detached from the signal context: canceling it would hard-stop running jobs; Stop below drains them.
+	if err := jobClient.Start(context.WithoutCancel(ctx)); err != nil {
+		return fmt.Errorf("starting job client: %w", err)
+	}
+
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
 		Addr:              listenAddr,
@@ -71,7 +81,10 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		return fmt.Errorf("shutting down: %w", err)
+		return fmt.Errorf("shutting down http server: %w", err)
+	}
+	if err := jobClient.Stop(shutdownCtx); err != nil {
+		return fmt.Errorf("stopping job client: %w", err)
 	}
 	return nil
 }
