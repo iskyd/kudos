@@ -14,6 +14,7 @@ import (
 
 	"github.com/iskyd/kudos/internal/api"
 	"github.com/iskyd/kudos/internal/config"
+	"github.com/iskyd/kudos/internal/store"
 )
 
 const shutdownTimeout = 10 * time.Second
@@ -36,6 +37,13 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, os.Interrupt)
 	defer stop()
+
+	pool, err := store.Open(ctx, cfg.DatabaseURL.Reveal())
+	if err != nil {
+		return fmt.Errorf("opening database: %w", err)
+	}
+	defer pool.Close()
+	logger.Info("database ready")
 
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
