@@ -9,7 +9,7 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
   server: {
-    proxy: { '/api': 'http://localhost:8080' },
+    proxy: { '/api': process.env.KUDOS_API_URL ?? 'http://localhost:8080' },
   },
   test: {
     environment: 'jsdom',

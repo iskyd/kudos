@@ -17,7 +17,7 @@ lint:
 
 # Run all tests with the race detector.
 test:
-    go test -race ./...
+    go test -race -coverprofile=coverage.out ./...
     npm --prefix web run test
 
 # Generate, verify a clean diff, lint and test. Must pass before work is done.
@@ -25,6 +25,11 @@ check: generate
     git diff --exit-code
     just lint
     just test
+    just coverage
+
+# Enforce the Go coverage gates on the profile written by `just test`.
+coverage:
+    scripts/check-coverage.sh coverage.out
 
 # Run the Playwright end-to-end tests against a production build.
 e2e:
@@ -35,6 +40,23 @@ build:
     npm --prefix web run build
     go build -o bin/kudos ./cmd/server
 
-# Start TimescaleDB and the app with live reload.
+DEV_PORT := env("KUDOS_PORT", "8080")
+DEV_DB_PORT := env("KUDOS_DB_PORT", "5432")
+
+# Start TimescaleDB, the Go server with live reload and the Vite dev server (http://localhost:5173).
 dev:
-    @echo "just dev is wired up in T0.7 (deploy/compose.dev.yml + air + Vite)"; exit 1
+    #!/usr/bin/env bash
+    set -euo pipefail
+    docker compose -f deploy/compose.dev.yml up -d --wait
+    mkdir -p .data/files
+    # Per-checkout dev key, never committed (.data/ is ignored).
+    [ -s .data/encryption_key ] || head -c 32 /dev/urandom | base64 > .data/encryption_key
+    export DATABASE_URL=postgres://kudos:kudos@127.0.0.1:{{DEV_DB_PORT}}/kudos ENCRYPTION_KEY_FILE=.data/encryption_key DATA_DIR=.data/files LISTEN_ADDR=127.0.0.1:{{DEV_PORT}} LOG_LEVEL=debug
+    trap "kill 0" EXIT
+    air &
+    KUDOS_API_URL=http://127.0.0.1:{{DEV_PORT}} npm --prefix web run dev &
+    wait
+
+# Stop the development database (data is kept in a Docker volume).
+dev-down:
+    docker compose -f deploy/compose.dev.yml down

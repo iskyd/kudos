@@ -1,0 +1,14 @@
+# Live reload for `just dev`. The frontend is served by Vite, not by this build.
+root = "."
+tmp_dir = "tmp"
+
+[build]
+  cmd = "go build -o ./tmp/kudos ./cmd/server"
+  entrypoint = ["./tmp/kudos"]
+  include_ext = ["go", "sql"]
+  exclude_dir = ["web", "tmp", "bin", "deploy", "docs", "testdata", ".data", ".direnv"]
+  exclude_regex = ["_test\\.go$"]
+  delay = 500
+
+[misc]
+  clean_on_exit = true

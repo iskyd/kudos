@@ -109,8 +109,10 @@ Contributions are welcome. Before opening a pull request:
 
 1. Read [AGENTS.md](AGENTS.md). Its rules apply to humans and coding agents alike, including mandatory code generation and tests for every new or changed function.
 2. Keep the change focused.
-3. Install frontend dependencies once with `npm --prefix web ci`, then run `just check` and make sure it passes. `just e2e` runs the Playwright tests against a production build.
+3. Install frontend dependencies once with `npm --prefix web ci`, then run `just check` (generation diff, lint, tests and coverage gates) and make sure it passes. `just e2e` runs the Playwright tests against a production build.
 4. Use [Conventional Commits](https://www.conventionalcommits.org) for commit messages.
+
+For local development, `just dev` starts TimescaleDB (`deploy/compose.dev.yml`), the Go server with live reload and the Vite dev server: open http://localhost:5173. Ctrl-C stops the app; `just dev-down` stops the database. Set `KUDOS_PORT` or `KUDOS_DB_PORT` if 8080 or 5432 is taken. A per-checkout encryption key is created in `.data/`.
 
 The Nix dev shell installs [pre-commit](https://pre-commit.com) hooks automatically (outside Nix: install pre-commit, pre-commit-hooks and gitleaks, then run `pre-commit install`). On every commit they fix whitespace, block merge markers, large files and leaked secrets (gitleaks), check the commit message format and run `just check`. Run them on the whole tree with `pre-commit run --all-files`.
 
