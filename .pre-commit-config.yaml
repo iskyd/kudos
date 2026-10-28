@@ -1,0 +1,65 @@
+# Installed automatically by the Nix dev shell (flake.nix shellHook).
+# Manual install: pre-commit install. Run on everything: pre-commit run --all-files.
+#
+# Every tool comes from the Nix dev shell (language: system), so hooks run offline
+# at the versions pinned by flake.lock. Outside Nix, put the tools on PATH yourself.
+default_install_hook_types: [pre-commit, commit-msg]
+default_stages: [pre-commit]
+
+# Generated code must stay byte-identical to the generator output.
+exclude: ^web/src/api/generated/
+
+repos:
+  - repo: local
+    hooks:
+      - id: trailing-whitespace
+        name: trim trailing whitespace
+        entry: trailing-whitespace-fixer --markdown-linebreak-ext=md
+        language: system
+        types: [text]
+        exclude_types: [go]
+      - id: end-of-file-fixer
+        name: fix end of files
+        entry: end-of-file-fixer
+        language: system
+        types: [text]
+        exclude_types: [go]
+      - id: check-yaml
+        name: check yaml
+        entry: check-yaml
+        language: system
+        types: [yaml]
+      - id: check-merge-conflict
+        name: check for merge conflicts
+        entry: check-merge-conflict
+        language: system
+        types: [text]
+      - id: check-added-large-files
+        name: check for added large files
+        entry: check-added-large-files --maxkb=1024
+        language: system
+      - id: detect-private-key
+        name: detect private key
+        entry: detect-private-key
+        language: system
+        types: [text]
+
+      - id: gitleaks
+        name: gitleaks (no secrets in staged changes)
+        entry: gitleaks git --pre-commit --staged --redact --no-banner
+        language: system
+        pass_filenames: false
+
+      - id: conventional-commit
+        name: conventional commit message
+        language: pygrep
+        entry: '\A(Merge |Revert "|(feat|fix|test|refactor|chore|docs|build|ci|perf|style|revert)(\([\w./-]+\))?!?: \S)'
+        args: [--multiline, --negate]
+        stages: [commit-msg]
+
+      - id: just-check
+        name: just check (generate, diff, lint, test)
+        entry: just check
+        language: system
+        pass_filenames: false
+        always_run: true
