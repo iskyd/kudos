@@ -9,12 +9,17 @@ info:
     `nextCursor` means the last page. Cursors are opaque.
   license:
     name: MIT
+# Every operation needs a session unless it sets `security: []`. Authenticated
+# requests other than GET/HEAD must also send the session's CSRF token in X-CSRF-Token.
+security:
+  - sessionCookie: []
 paths:
   /healthz:
     get:
       operationId: getHealthz
       summary: Liveness probe
       tags: [system]
+      security: []
       responses:
         "200":
           description: The server is up.
@@ -25,7 +30,111 @@ paths:
                 example: ok
         default:
           $ref: "#/components/responses/Problem"
+  /api/auth/register:
+    post:
+      operationId: register
+      summary: Create an account and log in
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterRequest"
+      responses:
+        "201":
+          description: Account created; the session cookie is set.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/auth/login:
+    post:
+      operationId: login
+      summary: Log in
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Logged in; the session cookie is set.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/auth/logout:
+    post:
+      operationId: logout
+      summary: Log out and end the session
+      tags: [auth]
+      responses:
+        "204":
+          description: Logged out; the session cookie is cleared.
+          headers:
+            Set-Cookie:
+              $ref: "#/components/headers/SetSessionCookie"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/me:
+    get:
+      operationId: getMe
+      summary: Current user and CSRF token
+      tags: [auth]
+      responses:
+        "200":
+          description: The logged-in user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      operationId: updateMe
+      summary: Update profile settings
+      tags: [auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMeRequest"
+      responses:
+        "200":
+          description: The updated user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Me"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: kudos_session
+  headers:
+    SetSessionCookie:
+      description: The HttpOnly session cookie.
+      schema:
+        type: string
   parameters:
     Cursor:
       name: cursor
@@ -46,6 +155,60 @@ components:
         maximum: 100
         default: 50
   schemas:
+    Username:
+      type: string
+      description: 3 to 32 characters among a-z, 0-9, ".", "_" and "-". Case-insensitive; stored lowercase.
+      minLength: 3
+      maxLength: 32
+      pattern: "^[A-Za-z0-9._-]+$"
+    Password:
+      type: string
+      format: password
+      minLength: 8
+      maxLength: 256
+    Timezone:
+      type: string
+      description: IANA time zone name.
+      example: Europe/Rome
+    RegisterRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          $ref: "#/components/schemas/Username"
+        password:
+          $ref: "#/components/schemas/Password"
+        timezone:
+          $ref: "#/components/schemas/Timezone"
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          format: password
+    UpdateMeRequest:
+      type: object
+      required: [timezone]
+      properties:
+        timezone:
+          $ref: "#/components/schemas/Timezone"
+    Me:
+      type: object
+      required: [id, username, timezone, csrfToken]
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        timezone:
+          $ref: "#/components/schemas/Timezone"
+        csrfToken:
+          type: string
+          description: Send as X-CSRF-Token on every authenticated request other than GET or HEAD.
     Problem:
       type: object
       description: RFC 9457 problem details.
