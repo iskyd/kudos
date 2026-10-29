@@ -37,7 +37,7 @@ type golden struct {
 
 func TestDecodeGolden(t *testing.T) {
 	t.Parallel()
-	for _, name := range []string{"half_marathon", "intervals", "zwift", "bike", "hike"} {
+	for _, name := range []string{"half_marathon", "intervals", "zwift", "bike", "hike", "pool_swim", "strength"} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			acts := decodeFile(t, filepath.Join(corpus, name+".fit"))
@@ -375,8 +375,6 @@ func FuzzDecodeActivity(f *testing.F) {
 		}
 	})
 }
-
-func ptr[T any](v T) *T { return &v }
 
 func deref(p *float64) any {
 	if p == nil {

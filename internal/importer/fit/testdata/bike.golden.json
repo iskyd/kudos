@@ -25,6 +25,25 @@
       "MaxCadence": null,
       "AvgTemperature": null,
       "Calories": 457,
+      "PoolLength": null,
+      "RPE": 3,
+      "Feel": 75,
+      "Thresholds": {
+        "FTP": null,
+        "ThresholdHR": 185,
+        "MaxHR": 205,
+        "RestingHR": 58,
+        "HRZones": [
+          97,
+          116,
+          135,
+          154,
+          174,
+          205
+        ],
+        "PowerZones": null
+      },
+      "Workout": null,
       "Laps": [
         {
           "StartTime": "2026-08-07T16:34:46Z",
@@ -43,7 +62,8 @@
           "MaxCadence": null,
           "AvgTemperature": null,
           "Calories": 49,
-          "Intensity": "active"
+          "Intensity": "active",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-08-07T16:44:45Z",
@@ -62,7 +82,8 @@
           "MaxCadence": null,
           "AvgTemperature": null,
           "Calories": 55,
-          "Intensity": "active"
+          "Intensity": "active",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-08-07T16:53:46Z",
@@ -81,7 +102,8 @@
           "MaxCadence": null,
           "AvgTemperature": null,
           "Calories": 108,
-          "Intensity": "active"
+          "Intensity": "active",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-08-07T17:07:29Z",
@@ -100,7 +122,8 @@
           "MaxCadence": null,
           "AvgTemperature": null,
           "Calories": 144,
-          "Intensity": "active"
+          "Intensity": "active",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-08-07T17:22:44Z",
@@ -119,9 +142,12 @@
           "MaxCadence": null,
           "AvgTemperature": null,
           "Calories": 100,
-          "Intensity": "active"
+          "Intensity": "active",
+          "WorkoutStepIndex": null
         }
       ],
+      "Lengths": null,
+      "Sets": null,
       "Samples": [
         {
           "Time": "2026-08-07T16:34:46Z",

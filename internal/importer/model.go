@@ -39,7 +39,16 @@ type Activity struct {
 	UTCOffset *time.Duration
 	Device    Device
 	Summary
+	PoolLength *float64 // m, pool swims only
+	RPE        *float64 // 0–10
+	Feel       *float64 // 0–100, higher is better
+	// Thresholds are those the device recorded as valid on the day; nil for third-party files.
+	Thresholds *Thresholds
+	// Workout is the structured workout run on the device, if any.
+	Workout *Workout
 	Laps    []Lap
+	Lengths []Length
+	Sets    []Set
 	Samples []Sample
 }
 
@@ -75,6 +84,89 @@ type Lap struct {
 	Summary
 	// Intensity is active, rest, warmup, cooldown, recovery, interval or other; empty when not recorded.
 	Intensity string
+	// WorkoutStepIndex points into Workout.Steps.
+	WorkoutStepIndex *int
+}
+
+// Length is one pool length.
+type Length struct {
+	StartTime   time.Time // UTC
+	ElapsedTime *float64  // s
+	TimerTime   *float64  // s
+	// Active is false for idle (rest) lengths.
+	Active bool
+	// Stroke is freestyle, backstroke, breaststroke, butterfly, drill, mixed or im; empty when not recorded.
+	Stroke   string
+	Strokes  *float64
+	AvgSpeed *float64 // m/s
+}
+
+// SWOLF is the length time in seconds plus its strokes, for active lengths.
+// Watches leave it empty, so it is computed.
+func (l Length) SWOLF() *float64 {
+	if !l.Active || l.TimerTime == nil || l.Strokes == nil {
+		return nil
+	}
+	v := *l.TimerTime + *l.Strokes
+	return &v
+}
+
+// Set is one strength set.
+type Set struct {
+	StartTime time.Time // UTC
+	Duration  *float64  // s
+	// Active is false for rest sets.
+	Active bool
+	Reps   *float64
+	// Weight is 0 when the user did not enter one.
+	Weight *float64 // kg
+	// ExerciseCategory and ExerciseNumber are the FIT exercise identifiers; ExerciseName
+	// is resolved from the file's exercise titles, empty when it has none.
+	ExerciseCategory *int
+	ExerciseNumber   *int
+	ExerciseName     string
+	WorkoutStepIndex *int
+}
+
+// Thresholds are the device's thresholds and zone upper bounds, ascending.
+type Thresholds struct {
+	FTP         *float64 // W, for the activity's sport
+	ThresholdHR *float64 // bpm
+	MaxHR       *float64 // bpm
+	RestingHR   *float64 // bpm
+	HRZones     []float64
+	PowerZones  []float64
+}
+
+// Workout is a structured workout as recorded by the device.
+type Workout struct {
+	Name  string
+	Steps []WorkoutStep
+}
+
+// WorkoutStep is one step with its values converted to SI units.
+type WorkoutStep struct {
+	Index int
+	Name  string `json:",omitempty"`
+	// Intensity is active, rest, warmup, cooldown, recovery, interval or other; empty for repeats.
+	Intensity string `json:",omitempty"`
+	// DurationType is the FIT duration type, e.g. time, distance, reps, open, repeat_until_steps_cmplt.
+	DurationType string
+	// Duration is in s for time, m for distance, a count for reps, kcal for calories; nil otherwise.
+	Duration *float64 `json:",omitempty"`
+	// TargetType is speed (m/s), heart_rate (bpm), heart_rate_percent (of max HR),
+	// power (W), power_percent (of FTP), cadence, or empty for no target.
+	TargetType string   `json:",omitempty"`
+	TargetLow  *float64 `json:",omitempty"`
+	TargetHigh *float64 `json:",omitempty"`
+	// TargetZone is set when the target is a zone number instead of a range.
+	TargetZone *int `json:",omitempty"`
+	// RepeatFrom and RepeatCount describe a repeat step: run steps RepeatFrom..Index-1 RepeatCount times.
+	RepeatFrom       *int     `json:",omitempty"`
+	RepeatCount      *int     `json:",omitempty"`
+	ExerciseCategory *int     `json:",omitempty"`
+	ExerciseNumber   *int     `json:",omitempty"`
+	Weight           *float64 `json:",omitempty"` // kg
 }
 
 // Sample is one stream sample.
