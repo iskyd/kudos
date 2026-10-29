@@ -3,3 +3,135 @@
 //   sqlc v1.31.1
 
 package db
+
+import (
+	"time"
+)
+
+type Activity struct {
+	ID                  int64
+	UserID              int64
+	Source              string
+	SourceActivityID    string
+	Sport               string
+	Subtype             string
+	StartTime           time.Time
+	UtcOffsetS          int32
+	OriginalFileID      *int64
+	MultisportGroupID   *int64
+	ElapsedTimeS        *float64
+	TimerTimeS          *float64
+	DistanceM           *float64
+	AscentM             *float32
+	DescentM            *float32
+	AvgSpeedMS          *float32
+	MaxSpeedMS          *float32
+	AvgHrBpm            *int16
+	MaxHrBpm            *int16
+	AvgPowerW           *int16
+	MaxPowerW           *int16
+	AvgCadence          *float32
+	MaxCadence          *float32
+	AvgTemperatureC     *float32
+	PoolLengthM         *float32
+	CaloriesKcal        *int32
+	Rpe                 *float32
+	Feel                *int16
+	Notes               *string
+	WeatherTemperatureC *float32
+	WeatherCondition    *string
+	Overrides           []byte
+}
+
+type ActivityStream struct {
+	UserID       int64
+	ActivityID   int64
+	Time         time.Time
+	LatDeg       *float64
+	LonDeg       *float64
+	AltitudeM    *float32
+	HrBpm        *int16
+	PowerW       *int16
+	Cadence      *float32
+	SpeedMS      *float32
+	DistanceM    *float64
+	TemperatureC *float32
+	Extras       []byte
+}
+
+type ActivityThreshold struct {
+	UserID         int64
+	ActivityID     int64
+	FtpW           *int16
+	ThresholdHrBpm *int16
+	MaxHrBpm       *int16
+	RestingHrBpm   *int16
+	HrZonesBpm     []int16
+	PowerZonesW    []int16
+}
+
+type Lap struct {
+	UserID           int64
+	ActivityID       int64
+	LapIndex         int32
+	StartTime        time.Time
+	ElapsedTimeS     *float64
+	TimerTimeS       *float64
+	DistanceM        *float64
+	AscentM          *float32
+	DescentM         *float32
+	AvgSpeedMS       *float32
+	MaxSpeedMS       *float32
+	AvgHrBpm         *int16
+	MaxHrBpm         *int16
+	AvgPowerW        *int16
+	MaxPowerW        *int16
+	AvgCadence       *float32
+	Intensity        *string
+	WorkoutStepIndex *int32
+}
+
+type OriginalFile struct {
+	ID         int64
+	UserID     int64
+	Format     string
+	Sha256     []byte
+	SizeBytes  int64
+	Path       string
+	ReceivedAt time.Time
+}
+
+type RecordedWorkout struct {
+	UserID     int64
+	ActivityID int64
+	Name       *string
+	Steps      []byte
+}
+
+type StrengthSet struct {
+	UserID           int64
+	ActivityID       int64
+	SetIndex         int32
+	StartTime        time.Time
+	DurationS        *float64
+	Active           bool
+	Reps             *int16
+	WeightKg         *float32
+	ExerciseCategory *int32
+	ExerciseNumber   *int32
+	ExerciseName     *string
+	WorkoutStepIndex *int32
+}
+
+type SwimLength struct {
+	UserID       int64
+	ActivityID   int64
+	LengthIndex  int32
+	StartTime    time.Time
+	ElapsedTimeS *float64
+	TimerTimeS   *float64
+	Active       bool
+	Stroke       *string
+	Strokes      *int16
+	AvgSpeedMS   *float32
+}
