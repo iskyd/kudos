@@ -70,6 +70,31 @@ type ActivityThreshold struct {
 	PowerZonesW    []int16
 }
 
+type DailyMetric struct {
+	UserID         int64
+	Day            time.Time
+	RestingHrBpm   *int16
+	HrvMs          *float32
+	SleepS         *int32
+	SleepDeepS     *int32
+	SleepLightS    *int32
+	SleepRemS      *int32
+	SleepAwakeS    *int32
+	SleepScore     *int16
+	Stress         *int16
+	BodyBatteryMax *int16
+	BodyBatteryMin *int16
+	Steps          *int32
+	WeightKg       *float32
+	BodyFatPct     *float32
+	BodyWaterPct   *float32
+	MuscleMassKg   *float32
+	BoneMassKg     *float32
+	Spo2Pct        *float32
+	HydrationL     *float32
+	UpdatedAt      time.Time
+}
+
 type Lap struct {
 	UserID           int64
 	ActivityID       int64

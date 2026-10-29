@@ -218,3 +218,23 @@ func deref(p *float64) any {
 	}
 	return *p
 }
+
+func TestDecodeDropsImplausibleTimes(t *testing.T) {
+	t.Parallel()
+	// Valid RFC 3339, but year -1 and 10000 in UTC: unstorable and unencodable.
+	const doc = `<gpx><trk><trkseg>
+		<trkpt lat="45" lon="-30"><time>0000-01-01T00:00:00+01:00</time></trkpt>
+		<trkpt lat="45" lon="-30"><time>2026-05-01T06:00:00Z</time></trkpt>
+		<trkpt lat="45" lon="-30"><time>9999-12-31T23:00:00-02:00</time></trkpt>
+	</trkseg></trk></gpx>`
+	acts, err := Decode(strings.NewReader(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(acts[0].Samples); n != 1 {
+		t.Fatalf("got %d samples, want only the plausible one", n)
+	}
+	if _, err := json.Marshal(acts); err != nil {
+		t.Fatal(err)
+	}
+}

@@ -260,3 +260,35 @@ func deref(p *float64) any {
 	}
 	return *p
 }
+
+func TestDecodeDropsImplausibleTimes(t *testing.T) {
+	t.Parallel()
+	// Valid xs:dateTime, but year -1 and 10000 in UTC: unstorable and unencodable.
+	const doc = `<TrainingCenterDatabase><Activities>
+		<Activity Sport="Running"><Id>0000-01-01T00:00:00+01:00</Id>
+			<Lap StartTime="2026-05-05T06:00:00Z"><Track>
+				<Trackpoint><Time>2026-05-05T06:00:00Z</Time></Trackpoint>
+				<Trackpoint><Time>9999-12-31T23:00:00-02:00</Time></Trackpoint>
+			</Track></Lap>
+			<Lap StartTime="9999-12-31T23:00:00-02:00"></Lap>
+		</Activity>
+		<Activity Sport="Biking"><Lap StartTime="0000-01-01T00:00:00+01:00"></Lap></Activity>
+	</Activities></TrainingCenterDatabase>`
+	acts, err := Decode(strings.NewReader(doc))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(acts) != 1 {
+		t.Fatalf("got %d activities, want 1 (the other has no plausible start)", len(acts))
+	}
+	a := acts[0]
+	if want := time.Date(2026, 5, 5, 6, 0, 0, 0, time.UTC); !a.StartTime.Equal(want) {
+		t.Errorf("start = %v, want the first lap's %v", a.StartTime, want)
+	}
+	if len(a.Laps) != 1 || len(a.Samples) != 1 {
+		t.Errorf("got %d laps and %d samples, want 1 and 1", len(a.Laps), len(a.Samples))
+	}
+	if _, err := json.Marshal(acts); err != nil {
+		t.Fatal(err)
+	}
+}

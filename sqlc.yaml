@@ -13,3 +13,6 @@ sql:
         overrides:
           - db_type: timestamptz
             go_type: time.Time
+          # Calendar days; pgx reads and writes them as midnight UTC.
+          - db_type: date
+            go_type: time.Time

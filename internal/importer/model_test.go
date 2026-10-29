@@ -3,6 +3,7 @@ package importer
 import (
 	"math"
 	"testing"
+	"time"
 )
 
 func TestLengthSWOLF(t *testing.T) {
@@ -51,5 +52,21 @@ func TestFinite(t *testing.T) {
 	}
 	if got := Finite(f(1.5)); got == nil || *got != 1.5 {
 		t.Errorf("Finite(1.5) = %v", got)
+	}
+}
+
+func TestPlausibleTime(t *testing.T) {
+	t.Parallel()
+	for in, want := range map[time.Time]bool{
+		time.Date(2026, 10, 29, 7, 0, 0, 0, time.UTC):                     true,
+		time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC):                       true,
+		time.Date(1969, 12, 31, 23, 59, 59, 0, time.UTC):                  false,
+		time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC):                       false,
+		time.Date(0, 1, 1, 0, 0, 0, 0, time.FixedZone("", 3600)):          false,
+		time.Date(9999, 12, 31, 23, 0, 0, 0, time.FixedZone("", -2*3600)): false,
+	} {
+		if got := PlausibleTime(in); got != want {
+			t.Errorf("PlausibleTime(%v) = %v, want %v", in, got, want)
+		}
 	}
 }

@@ -56,7 +56,7 @@ func Decode(r io.Reader) ([]importer.Activity, error) {
 		for _, seg := range trk.Segments {
 			for _, p := range seg.Points {
 				// Samples are keyed by time: keep the first of any repeated or out-of-order timestamp.
-				if p.Time == nil || (prev != nil && !p.Time.After(prev.Time)) {
+				if p.Time == nil || !importer.PlausibleTime(*p.Time) || (prev != nil && !p.Time.After(prev.Time)) {
 					continue
 				}
 				s := sample(p, act.Sport.InStrides())
