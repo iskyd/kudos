@@ -201,3 +201,9 @@ func Finite(v *float64) *float64 {
 	}
 	return v
 }
+
+// PlausibleTime reports whether t can be an activity time. Text formats can hold
+// any year, and times outside years 0–9999 cannot even be encoded.
+func PlausibleTime(t time.Time) bool {
+	return !t.Before(time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)) && t.Before(time.Date(2100, 1, 1, 0, 0, 0, 0, time.UTC))
+}

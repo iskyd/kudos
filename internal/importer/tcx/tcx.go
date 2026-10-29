@@ -8,12 +8,13 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/iskyd/kudos/internal/importer"
 )
 
-// ErrNoActivity is returned when the file has no activity with a start time.
+// ErrNoActivity is returned when the file has no activity with a plausible start time.
 var ErrNoActivity = errors.New("tcx has no activity")
 
 // Element names without a namespace match any namespace, so ns3:, ax: and
@@ -71,11 +72,12 @@ func Decode(r io.Reader) ([]importer.Activity, error) {
 	}
 	var acts []importer.Activity
 	for _, a := range f.Activities {
+		a.Laps = slices.DeleteFunc(a.Laps, func(l lap) bool { return !importer.PlausibleTime(l.StartTime) })
 		start := a.ID
-		if start == nil && len(a.Laps) > 0 {
+		if (start == nil || !importer.PlausibleTime(*start)) && len(a.Laps) > 0 {
 			start = &a.Laps[0].StartTime
 		}
-		if start == nil {
+		if start == nil || !importer.PlausibleTime(*start) {
 			continue
 		}
 		act := importer.Activity{
@@ -89,7 +91,7 @@ func Decode(r io.Reader) ([]importer.Activity, error) {
 			act.Laps = append(act.Laps, lapOf(l, strides))
 			for _, tp := range l.Trackpoints {
 				// Samples are keyed by time: keep the first of any repeated or out-of-order timestamp.
-				if n := len(act.Samples); tp.Time == nil || (n > 0 && !tp.Time.After(act.Samples[n-1].Time)) {
+				if n := len(act.Samples); tp.Time == nil || !importer.PlausibleTime(*tp.Time) || (n > 0 && !tp.Time.After(act.Samples[n-1].Time)) {
 					continue
 				}
 				act.Samples = append(act.Samples, sample(tp, strides))
