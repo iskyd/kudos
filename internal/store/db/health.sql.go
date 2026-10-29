@@ -7,7 +7,110 @@ package db
 
 import (
 	"context"
+	"time"
 )
+
+const getDailyMetrics = `-- name: GetDailyMetrics :one
+SELECT user_id, day, resting_hr_bpm, hrv_ms, sleep_s, sleep_deep_s, sleep_light_s, sleep_rem_s, sleep_awake_s, sleep_score, stress, body_battery_max, body_battery_min, steps, weight_kg, body_fat_pct, body_water_pct, muscle_mass_kg, bone_mass_kg, spo2_pct, hydration_l, updated_at FROM daily_metrics WHERE user_id = $1 AND day = $2
+`
+
+type GetDailyMetricsParams struct {
+	UserID int64
+	Day    time.Time
+}
+
+func (q *Queries) GetDailyMetrics(ctx context.Context, arg GetDailyMetricsParams) (DailyMetric, error) {
+	row := q.db.QueryRow(ctx, getDailyMetrics, arg.UserID, arg.Day)
+	var i DailyMetric
+	err := row.Scan(
+		&i.UserID,
+		&i.Day,
+		&i.RestingHrBpm,
+		&i.HrvMs,
+		&i.SleepS,
+		&i.SleepDeepS,
+		&i.SleepLightS,
+		&i.SleepRemS,
+		&i.SleepAwakeS,
+		&i.SleepScore,
+		&i.Stress,
+		&i.BodyBatteryMax,
+		&i.BodyBatteryMin,
+		&i.Steps,
+		&i.WeightKg,
+		&i.BodyFatPct,
+		&i.BodyWaterPct,
+		&i.MuscleMassKg,
+		&i.BoneMassKg,
+		&i.Spo2Pct,
+		&i.HydrationL,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listDailyMetrics = `-- name: ListDailyMetrics :many
+SELECT user_id, day, resting_hr_bpm, hrv_ms, sleep_s, sleep_deep_s, sleep_light_s, sleep_rem_s, sleep_awake_s, sleep_score, stress, body_battery_max, body_battery_min, steps, weight_kg, body_fat_pct, body_water_pct, muscle_mass_kg, bone_mass_kg, spo2_pct, hydration_l, updated_at FROM daily_metrics
+WHERE user_id = $1 AND day > $2::date AND day <= $3::date
+ORDER BY day
+LIMIT $4
+`
+
+type ListDailyMetricsParams struct {
+	UserID  int64
+	After   time.Time
+	Until   time.Time
+	MaxRows int32
+}
+
+// Oldest first, from the day after @after up to @until. Pass the last row's day as @after for the next page.
+func (q *Queries) ListDailyMetrics(ctx context.Context, arg ListDailyMetricsParams) ([]DailyMetric, error) {
+	rows, err := q.db.Query(ctx, listDailyMetrics,
+		arg.UserID,
+		arg.After,
+		arg.Until,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []DailyMetric
+	for rows.Next() {
+		var i DailyMetric
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Day,
+			&i.RestingHrBpm,
+			&i.HrvMs,
+			&i.SleepS,
+			&i.SleepDeepS,
+			&i.SleepLightS,
+			&i.SleepRemS,
+			&i.SleepAwakeS,
+			&i.SleepScore,
+			&i.Stress,
+			&i.BodyBatteryMax,
+			&i.BodyBatteryMin,
+			&i.Steps,
+			&i.WeightKg,
+			&i.BodyFatPct,
+			&i.BodyWaterPct,
+			&i.MuscleMassKg,
+			&i.BoneMassKg,
+			&i.Spo2Pct,
+			&i.HydrationL,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
 
 const timescaleVersion = `-- name: TimescaleVersion :one
 SELECT extversion FROM pg_catalog.pg_extension WHERE extname = 'timescaledb'
@@ -18,4 +121,88 @@ func (q *Queries) TimescaleVersion(ctx context.Context) (string, error) {
 	var extversion string
 	err := row.Scan(&extversion)
 	return extversion, err
+}
+
+const upsertDailyMetrics = `-- name: UpsertDailyMetrics :exec
+INSERT INTO daily_metrics (
+    user_id, day, resting_hr_bpm, hrv_ms, sleep_s, sleep_deep_s, sleep_light_s, sleep_rem_s,
+    sleep_awake_s, sleep_score, stress, body_battery_max, body_battery_min, steps, weight_kg,
+    body_fat_pct, body_water_pct, muscle_mass_kg, bone_mass_kg, spo2_pct, hydration_l
+) VALUES (
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
+)
+ON CONFLICT (user_id, day) DO UPDATE SET
+    resting_hr_bpm = COALESCE(EXCLUDED.resting_hr_bpm, daily_metrics.resting_hr_bpm),
+    hrv_ms = COALESCE(EXCLUDED.hrv_ms, daily_metrics.hrv_ms),
+    sleep_s = COALESCE(EXCLUDED.sleep_s, daily_metrics.sleep_s),
+    sleep_deep_s = COALESCE(EXCLUDED.sleep_deep_s, daily_metrics.sleep_deep_s),
+    sleep_light_s = COALESCE(EXCLUDED.sleep_light_s, daily_metrics.sleep_light_s),
+    sleep_rem_s = COALESCE(EXCLUDED.sleep_rem_s, daily_metrics.sleep_rem_s),
+    sleep_awake_s = COALESCE(EXCLUDED.sleep_awake_s, daily_metrics.sleep_awake_s),
+    sleep_score = COALESCE(EXCLUDED.sleep_score, daily_metrics.sleep_score),
+    stress = COALESCE(EXCLUDED.stress, daily_metrics.stress),
+    body_battery_max = COALESCE(EXCLUDED.body_battery_max, daily_metrics.body_battery_max),
+    body_battery_min = COALESCE(EXCLUDED.body_battery_min, daily_metrics.body_battery_min),
+    steps = COALESCE(EXCLUDED.steps, daily_metrics.steps),
+    weight_kg = COALESCE(EXCLUDED.weight_kg, daily_metrics.weight_kg),
+    body_fat_pct = COALESCE(EXCLUDED.body_fat_pct, daily_metrics.body_fat_pct),
+    body_water_pct = COALESCE(EXCLUDED.body_water_pct, daily_metrics.body_water_pct),
+    muscle_mass_kg = COALESCE(EXCLUDED.muscle_mass_kg, daily_metrics.muscle_mass_kg),
+    bone_mass_kg = COALESCE(EXCLUDED.bone_mass_kg, daily_metrics.bone_mass_kg),
+    spo2_pct = COALESCE(EXCLUDED.spo2_pct, daily_metrics.spo2_pct),
+    hydration_l = COALESCE(EXCLUDED.hydration_l, daily_metrics.hydration_l),
+    updated_at = now()
+`
+
+type UpsertDailyMetricsParams struct {
+	UserID         int64
+	Day            time.Time
+	RestingHrBpm   *int16
+	HrvMs          *float32
+	SleepS         *int32
+	SleepDeepS     *int32
+	SleepLightS    *int32
+	SleepRemS      *int32
+	SleepAwakeS    *int32
+	SleepScore     *int16
+	Stress         *int16
+	BodyBatteryMax *int16
+	BodyBatteryMin *int16
+	Steps          *int32
+	WeightKg       *float32
+	BodyFatPct     *float32
+	BodyWaterPct   *float32
+	MuscleMassKg   *float32
+	BoneMassKg     *float32
+	Spo2Pct        *float32
+	HydrationL     *float32
+}
+
+// Values the source sends replace stored ones; values it leaves out (nil) are kept,
+// so a day can be filled from several endpoints.
+func (q *Queries) UpsertDailyMetrics(ctx context.Context, arg UpsertDailyMetricsParams) error {
+	_, err := q.db.Exec(ctx, upsertDailyMetrics,
+		arg.UserID,
+		arg.Day,
+		arg.RestingHrBpm,
+		arg.HrvMs,
+		arg.SleepS,
+		arg.SleepDeepS,
+		arg.SleepLightS,
+		arg.SleepRemS,
+		arg.SleepAwakeS,
+		arg.SleepScore,
+		arg.Stress,
+		arg.BodyBatteryMax,
+		arg.BodyBatteryMin,
+		arg.Steps,
+		arg.WeightKg,
+		arg.BodyFatPct,
+		arg.BodyWaterPct,
+		arg.MuscleMassKg,
+		arg.BoneMassKg,
+		arg.Spo2Pct,
+		arg.HydrationL,
+	)
+	return err
 }
