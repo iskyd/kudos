@@ -22,13 +22,13 @@ INSERT INTO activities (
     original_file_id, multisport_group_id,
     elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m,
     avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w,
-    avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel
+    avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes
 ) VALUES (
     $1, $2, $3, $4, $5, $6, $7,
     $8, $9,
     $10, $11, $12, $13, $14,
     $15, $16, $17, $18, $19, $20,
-    $21, $22, $23, $24, $25, $26, $27
+    $21, $22, $23, $24, $25, $26, $27, $28
 )
 ON CONFLICT (user_id, source, source_activity_id) DO UPDATE SET
     sport = EXCLUDED.sport,

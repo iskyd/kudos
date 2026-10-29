@@ -90,6 +90,48 @@ export interface paths {
         patch: operations["updateMe"];
         trace?: never;
     };
+    "/api/activities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create a manual activity
+         * @description Submitting the same sport and start time again updates that activity.
+         */
+        post: operations["createActivity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activities/uploads": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a FIT, GPX or TCX file
+         * @description Stores the file's activities and keeps the original. Uploading the same
+         *     activity again replaces it. The format comes from the file name's extension.
+         *     Files over 64 MiB are rejected.
+         */
+        post: operations["uploadActivity"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -123,6 +165,40 @@ export interface components {
             timezone: components["schemas"]["Timezone"];
             /** @description Send as X-CSRF-Token on every authenticated request other than GET or HEAD. */
             csrfToken: string;
+        };
+        /** @enum {string} */
+        Sport: "running" | "trail_running" | "cycling" | "pool_swimming" | "open_water_swimming" | "hiking" | "strength" | "other";
+        ManualActivityRequest: {
+            sport: components["schemas"]["Sport"];
+            /**
+             * @description Start in the user's timezone, as YYYY-MM-DDTHH:MM.
+             * @example 2026-10-29T07:30
+             */
+            localStartTime: string;
+            /**
+             * Format: double
+             * @description Duration in seconds, up to 7 days.
+             */
+            durationS: number;
+            /**
+             * Format: double
+             * @description Distance in metres.
+             */
+            distanceM?: number;
+            /**
+             * Format: double
+             * @description Rating of perceived exertion, 0 to 10.
+             */
+            rpe?: number;
+            notes?: string;
+        };
+        CreatedActivity: {
+            /** Format: int64 */
+            id: number;
+        };
+        UploadResult: {
+            /** @description The stored activities; several for a multisport file. */
+            activityIds: number[];
         };
         /** @description RFC 9457 problem details. */
         Problem: {
@@ -303,6 +379,59 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ManualActivityRequest"];
+            };
+        };
+        responses: {
+            /** @description The activity was stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CreatedActivity"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    uploadActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The file's activities were stored. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResult"];
                 };
             };
             default: components["responses"]["Problem"];

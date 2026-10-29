@@ -26,6 +26,10 @@ const (
 	KindCrossOrigin          Kind = "cross-origin"
 	KindRegistrationDisabled Kind = "registration-disabled"
 	KindUsernameTaken        Kind = "username-taken"
+
+	KindUnsupportedFile Kind = "unsupported-file"
+	KindInvalidFile     Kind = "invalid-file"
+	KindFileTooLarge    Kind = "file-too-large"
 )
 
 func (k Kind) status() int {
@@ -42,6 +46,12 @@ func (k Kind) status() int {
 		return http.StatusNotFound
 	case KindMethodNotAllowed:
 		return http.StatusMethodNotAllowed
+	case KindUnsupportedFile:
+		return http.StatusUnsupportedMediaType
+	case KindInvalidFile:
+		return http.StatusUnprocessableEntity
+	case KindFileTooLarge:
+		return http.StatusRequestEntityTooLarge
 	default:
 		return http.StatusInternalServerError
 	}
@@ -67,6 +77,12 @@ func (k Kind) title() string {
 		return "Registration is disabled"
 	case KindUsernameTaken:
 		return "Username already taken"
+	case KindUnsupportedFile:
+		return "Unsupported file type"
+	case KindInvalidFile:
+		return "File could not be read"
+	case KindFileTooLarge:
+		return "File too large"
 	default:
 		return "Internal error"
 	}

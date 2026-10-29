@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -11,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iskyd/kudos/internal/importer/ingest"
+	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
@@ -27,12 +30,17 @@ type apiClient struct {
 
 func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *db.Queries) {
 	t.Helper()
-	q := db.New(pg.NewDB(t))
+	pool := pg.NewDB(t)
+	q := db.New(pool)
+	jobClient, err := jobs.NewClient(pool, discard())
+	if err != nil {
+		t.Fatal(err)
+	}
 	logger := discard()
 	if logs != nil {
 		logger = slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
-	h := NewRouter(logger, newServer(q, registration, cheapArgon()), spaStub)
+	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), registration, cheapArgon()), spaStub)
 	return &apiClient{t: t, h: h}, q
 }
 
@@ -44,8 +52,14 @@ func (c *apiClient) do(method, path string, body any, header map[string]string) 
 			c.t.Fatal(err)
 		}
 	}
-	req := httptest.NewRequestWithContext(c.t.Context(), method, path, &buf)
-	req.Header.Set("Content-Type", "application/json")
+	return c.send(method, path, &buf, "application/json", header)
+}
+
+// send makes a request with a raw body.
+func (c *apiClient) send(method, path string, body io.Reader, contentType string, header map[string]string) *httptest.ResponseRecorder {
+	c.t.Helper()
+	req := httptest.NewRequestWithContext(c.t.Context(), method, path, body)
+	req.Header.Set("Content-Type", contentType)
 	if c.cookie != nil {
 		req.AddCookie(c.cookie)
 	}
