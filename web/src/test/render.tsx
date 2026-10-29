@@ -29,11 +29,13 @@ export function problem(status: number, kind: string, title: string, detail?: st
   })
 }
 
-// loggedInAs answers GET /api/me with user, or with 401 when user is null.
+// loggedInAs answers GET /api/me with user, or with 401 when user is null. The
+// app shell's Garmin banner asks for the connection on every page: none by default.
 export function loggedInAs(user: Me | null) {
   server.use(
     http.get('/api/me', () =>
       user ? HttpResponse.json(user) : problem(401, 'unauthorized', 'Not logged in'),
     ),
+    http.get('/api/garmin', () => HttpResponse.json({ connected: false })),
   )
 }

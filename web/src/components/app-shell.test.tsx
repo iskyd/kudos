@@ -64,4 +64,43 @@ describe('AppShell', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Log out' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Missing or invalid CSRF token')
   })
+
+  it('shows the Garmin banner on every page with a link to Settings', async () => {
+    server.use(
+      http.get('/api/garmin', () =>
+        HttpResponse.json({ connected: true, status: 'key_rejected', keyExpiresOn: '2099-01-01' }),
+      ),
+      http.get('/api/garmin/backfill', () => HttpResponse.json({ started: false })),
+    )
+    renderApp('/activities')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Garmin rejected the key.')
+    await userEvent.click(screen.getByRole('link', { name: 'Open Settings' }))
+    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Garmin rejected the key.')
+    expect(screen.queryByRole('link', { name: 'Open Settings' })).not.toBeInTheDocument()
+  })
+
+  it('shows a failed sync as a warning', async () => {
+    server.use(
+      http.get('/api/garmin', () =>
+        HttpResponse.json({
+          connected: true,
+          status: 'connected',
+          keyExpiresOn: '2099-01-01',
+          lastError: 'Garmin failed: status 503',
+        }),
+      ),
+    )
+    renderApp('/')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The last Garmin sync failed: Garmin failed: status 503',
+    )
+  })
+
+  it('shows no banner when Garmin is fine or unreachable', async () => {
+    server.use(http.get('/api/garmin', () => problem(500, 'internal', 'Internal error')))
+    renderApp('/')
+    expect(await screen.findByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
 })

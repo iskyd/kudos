@@ -60,6 +60,7 @@ type fakeGarmin struct {
 	days      []connectors.DailyMetrics
 	errs      map[string]error
 	listErr   error
+	lists     int
 	downloads map[string]int
 	reMint    string // when set, the first call renews the session's token
 }
@@ -73,6 +74,7 @@ func (f *fakeGarmin) Authenticate(context.Context, connectors.Credentials) (*con
 func (f *fakeGarmin) FetchActivities(_ context.Context, s *connectors.Session, _, _ time.Time) ([]connectors.RawActivity, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.lists++
 	if f.reMint != "" {
 		s.Token, s.Expires = secret.New(f.reMint), time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	}
@@ -111,6 +113,7 @@ type env struct {
 	q      *db.Queries
 	svc    *Service
 	worker *Worker
+	sync   *SyncWorker
 	fake   *fakeGarmin
 	cipher *crypto.Cipher
 	alice  int64
@@ -130,8 +133,12 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	// Wired as in cmd/server: the worker is registered, then given the ingest service.
-	w := &Worker{Pool: pool, Cipher: cipher, Logger: logger}
-	client, err := jobs.NewClient(pool, logger, func(ws *river.Workers) { river.AddWorker(ws, w) })
+	w := &Worker{Deps: &Deps{Pool: pool, Cipher: cipher, Logger: logger}}
+	sw := &SyncWorker{Deps: w.Deps}
+	client, err := jobs.NewClient(pool, logger, func(ws *river.Workers) {
+		river.AddWorker(ws, w)
+		river.AddWorker(ws, sw)
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,7 +177,7 @@ func newEnv(t *testing.T) *env {
 		t.Fatal(err)
 	}
 	w.Connector = fake
-	return &env{pool: pool, q: q, svc: svc, worker: w, fake: fake, cipher: cipher, alice: alice.ID, bob: bob.ID}
+	return &env{pool: pool, q: q, svc: svc, worker: w, sync: sw, fake: fake, cipher: cipher, alice: alice.ID, bob: bob.ID}
 }
 
 func (e *env) work(t *testing.T) error {

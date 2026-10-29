@@ -33,10 +33,9 @@ const (
 
 var errBudget = errors.New("run budget spent")
 
-// Worker works BackfillArgs. Ingest is set after construction, since the
-// ingest service needs the River client this worker is registered with.
-type Worker struct {
-	river.WorkerDefaults[BackfillArgs]
+// Deps are what the Garmin workers share. Ingest is set after construction,
+// since the ingest service needs the River client the workers are registered with.
+type Deps struct {
 	Pool      *pgxpool.Pool
 	Connector connectors.Connector
 	Cipher    *crypto.Cipher
@@ -45,6 +44,12 @@ type Worker struct {
 
 	now    func() time.Time // for tests; time.Now when nil
 	budget time.Duration    // for tests; runBudget when zero
+}
+
+// Worker works BackfillArgs.
+type Worker struct {
+	river.WorkerDefaults[BackfillArgs]
+	*Deps
 }
 
 // Timeout implements river.Worker.
@@ -130,7 +135,7 @@ func (w *Worker) pause(ctx context.Context, q *db.Queries, userID int64, reason 
 	return nil
 }
 
-func (w *Worker) session(c db.GarminConnection) (*connectors.Session, error) {
+func (w *Deps) session(c db.GarminConnection) (*connectors.Session, error) {
 	key, err := w.Cipher.Open(c.KeyCiphertext)
 	if err != nil {
 		return nil, fmt.Errorf("decrypting the Garmin key: %w", err)
@@ -146,7 +151,7 @@ func (w *Worker) session(c db.GarminConnection) (*connectors.Session, error) {
 	return s, nil
 }
 
-func (w *Worker) saveToken(ctx context.Context, q *db.Queries, userID int64, s *connectors.Session, old string) {
+func (w *Deps) saveToken(ctx context.Context, q *db.Queries, userID int64, s *connectors.Session, old string) {
 	if s.Token.Reveal() == old || s.Token.Reveal() == "" {
 		return
 	}
@@ -177,17 +182,8 @@ func (w *Worker) run(ctx context.Context, q *db.Queries, b db.GarminBackfill, s 
 		if err != nil {
 			return fmt.Errorf("listing activities: %w", err)
 		}
-		for _, a := range acts {
-			var offset *int32
-			if a.LocalOffset != nil {
-				secs := int32(a.LocalOffset.Seconds())
-				offset = &secs
-			}
-			if err := q.AddGarminActivityImport(ctx, db.AddGarminActivityImportParams{
-				UserID: b.UserID, SourceActivityID: a.SourceID, StartTime: a.Start, UtcOffsetS: offset,
-			}); err != nil {
-				return fmt.Errorf("recording activity %s: %w", a.SourceID, err)
-			}
+		if err := w.addImports(ctx, q, b.UserID, acts); err != nil {
+			return err
 		}
 		if err := q.SetGarminBackfillListed(ctx, b.UserID); err != nil {
 			return fmt.Errorf("recording the listing: %w", err)
@@ -242,7 +238,7 @@ func (w *Worker) run(ctx context.Context, q *db.Queries, b db.GarminBackfill, s 
 
 // importActivity downloads and ingests one activity. A file Garmin cannot
 // deliver or KudOS cannot read is recorded as failed and the backfill goes on.
-func (w *Worker) importActivity(ctx context.Context, q *db.Queries, imp db.GarminActivityImport, loc *time.Location, s *connectors.Session) error {
+func (w *Deps) importActivity(ctx context.Context, q *db.Queries, imp db.GarminActivityImport, loc *time.Location, s *connectors.Session) error {
 	id := imp.SourceActivityID
 	f, err := w.Connector.DownloadActivityFile(ctx, s, id)
 	switch {
@@ -268,10 +264,8 @@ func (w *Worker) importActivity(ctx context.Context, q *db.Queries, imp db.Garmi
 	return nil
 }
 
-func (w *Worker) fail(ctx context.Context, q *db.Queries, imp db.GarminActivityImport, reason string) error {
-	if len(reason) > maxErrorLen {
-		reason = reason[:maxErrorLen]
-	}
+func (w *Deps) fail(ctx context.Context, q *db.Queries, imp db.GarminActivityImport, reason string) error {
+	reason = truncate(reason)
 	if err := q.SetGarminActivityImportFailed(ctx, db.SetGarminActivityImportFailedParams{
 		UserID: imp.UserID, SourceActivityID: imp.SourceActivityID, Error: &reason,
 	}); err != nil {
@@ -281,21 +275,21 @@ func (w *Worker) fail(ctx context.Context, q *db.Queries, imp db.GarminActivityI
 	return nil
 }
 
-func (w *Worker) clock() time.Time {
+func (w *Deps) clock() time.Time {
 	if w.now != nil {
 		return w.now()
 	}
 	return time.Now()
 }
 
-func (w *Worker) runBudget() time.Duration {
+func (w *Deps) runBudget() time.Duration {
 	if w.budget > 0 {
 		return w.budget
 	}
 	return runBudget
 }
 
-func (w *Worker) log() *slog.Logger {
+func (w *Deps) log() *slog.Logger {
 	if w.Logger != nil {
 		return w.Logger
 	}

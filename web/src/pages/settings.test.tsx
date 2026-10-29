@@ -181,6 +181,44 @@ describe('SettingsPage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent('Garmin is not connected')
     })
 
+    it.each([
+      [true, 'Sync queued.'],
+      [false, 'A sync is already running.'],
+    ])('syncs now (queued %s)', async (queued, text) => {
+      garminReturns(connected)
+      server.use(
+        http.post('/api/garmin/sync', () => HttpResponse.json({ queued }, { status: 202 })),
+      )
+      renderApp('/settings')
+      await userEvent.click(await screen.findByRole('button', { name: 'Sync now' }))
+      expect(await screen.findByText(text)).toBeInTheDocument()
+    })
+
+    it('shows sync errors', async () => {
+      garminReturns(connected)
+      server.use(
+        http.post('/api/garmin/sync', () =>
+          problem(
+            409,
+            'backfill-running',
+            'History import still running',
+            'sync starts when the history import finishes',
+          ),
+        ),
+      )
+      renderApp('/settings')
+      await userEvent.click(await screen.findByRole('button', { name: 'Sync now' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(
+        'sync starts when the history import finishes',
+      )
+    })
+
+    it('cannot sync with a rejected key', async () => {
+      garminReturns({ ...connected, status: 'key_rejected' })
+      renderApp('/settings')
+      expect(await screen.findByRole('button', { name: 'Sync now' })).toBeDisabled()
+    })
+
     it('disconnects', async () => {
       garminReturns(connected)
       server.use(http.delete('/api/garmin', () => new HttpResponse(null, { status: 204 })))

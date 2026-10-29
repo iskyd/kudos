@@ -47,7 +47,10 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 	pool := pg.NewDB(t)
 	q := db.New(pool)
 	// The backfill worker is registered so jobs can be queued; tests never work them.
-	jobClient, err := jobs.NewClient(pool, discard(), func(w *river.Workers) { river.AddWorker(w, &garminsync.Worker{}) })
+	jobClient, err := jobs.NewClient(pool, discard(), func(w *river.Workers) {
+		river.AddWorker(w, &garminsync.Worker{})
+		river.AddWorker(w, &garminsync.SyncWorker{})
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +63,7 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 		logger = slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
 	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), cursors, Garmin{
-		Auth: fakeGarmin{}, Cipher: testCipher(t), Backfill: garminsync.NewService(pool, jobClient),
+		Auth: fakeGarmin{}, Cipher: testCipher(t), Sync: garminsync.NewService(pool, jobClient),
 	}, registration, cheapArgon()), spaStub)
 	return &apiClient{t: t, h: h}, q
 }

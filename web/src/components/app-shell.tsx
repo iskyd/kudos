@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from 'react-router'
 import { useCurrentUser, useLogout } from '@/api/auth'
 import { problemMessage } from '@/api/problem'
+import { GarminBanner } from '@/components/garmin-banner'
 import { navItems } from '@/components/nav-items'
 import { Button, buttonVariants } from '@/components/ui/button'
 
@@ -47,6 +48,7 @@ export function AppShell() {
         </div>
       </nav>
       <main className="flex-1 p-6">
+        <GarminBanner />
         <Outlet />
       </main>
     </div>
