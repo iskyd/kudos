@@ -16,6 +16,7 @@ tool (
 require (
 	github.com/go-chi/chi/v5 v5.5.0
 	github.com/jackc/pgx/v5 v5.11.0
+	github.com/muktihari/fit v0.28.5
 	github.com/oapi-codegen/runtime v1.8.0
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/riverqueue/river v0.50.0
