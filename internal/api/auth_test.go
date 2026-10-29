@@ -12,6 +12,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/riverqueue/river"
+
+	"github.com/iskyd/kudos/internal/connectors/garminsync"
 	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/jobs"
@@ -43,7 +46,12 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 	t.Helper()
 	pool := pg.NewDB(t)
 	q := db.New(pool)
-	jobClient, err := jobs.NewClient(pool, discard())
+	// The backfill worker is registered so jobs can be queued; tests never work them.
+	jobClient, err := jobs.NewClient(pool, discard(), func(w *river.Workers) { river.AddWorker(w, &garminsync.Worker{}) })
+	if err != nil {
+		t.Fatal(err)
+	}
+	cursors, err := NewCursors(bytes.Repeat([]byte{9}, crypto.KeySize))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +59,9 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 	if logs != nil {
 		logger = slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
-	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), fakeGarmin{}, testCipher(t), registration, cheapArgon()), spaStub)
+	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), cursors, Garmin{
+		Auth: fakeGarmin{}, Cipher: testCipher(t), Backfill: garminsync.NewService(pool, jobClient),
+	}, registration, cheapArgon()), spaStub)
 	return &apiClient{t: t, h: h}, q
 }
 

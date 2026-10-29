@@ -11,6 +11,8 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
 	"github.com/iskyd/kudos/internal/connectors"
+	"github.com/iskyd/kudos/internal/connectors/garminsync"
+	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/secret"
 	"github.com/iskyd/kudos/internal/store/db"
 )
@@ -25,6 +27,13 @@ const (
 // the Garmin connector in production.
 type GarminAuthenticator interface {
 	Authenticate(ctx context.Context, creds connectors.Credentials) (*connectors.Session, error)
+}
+
+// Garmin holds what the Garmin endpoints need.
+type Garmin struct {
+	Auth     GarminAuthenticator
+	Cipher   *crypto.Cipher // seals the key and token
+	Backfill *garminsync.Service
 }
 
 // GetGarminConnection returns the connection state, never the key or token.
@@ -46,15 +55,14 @@ func (s *Server) SetGarminKey(ctx context.Context, req SetGarminKeyRequestObject
 	if key == "" || len(key) > maxGarminKeyLen {
 		return nil, &Error{Kind: KindInvalidRequest, Detail: fmt.Sprintf("key must be 1 to %d characters", maxGarminKeyLen)}
 	}
-	y, m, d := time.Now().In(location(sess.timezone)).Date()
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+	today := localToday(sess.timezone)
 	expires := req.Body.ExpiresOn.Time
 	// Garmin keys last at most a year; a day of slack covers timezones.
 	if !expires.After(today) || expires.After(today.AddDate(1, 0, 1)) {
 		return nil, &Error{Kind: KindInvalidRequest, Detail: "expiresOn must be after today and at most a year ahead"}
 	}
 
-	gs, err := s.garmin.Authenticate(ctx, connectors.Credentials{Key: secret.New(key)})
+	gs, err := s.garmin.Auth.Authenticate(ctx, connectors.Credentials{Key: secret.New(key)})
 	switch {
 	case errors.Is(err, connectors.ErrKeyRejected):
 		return nil, &Error{Kind: KindGarminKeyRejected, Detail: "check the key and that it has not expired or been revoked"}
@@ -62,11 +70,11 @@ func (s *Server) SetGarminKey(ctx context.Context, req SetGarminKeyRequestObject
 		// The connector's errors name the status, never the key.
 		return nil, &Error{Kind: KindGarminUnavailable, Detail: "Garmin could not check the key; try again later"}
 	}
-	keyCT, err := s.cipher.Seal([]byte(key))
+	keyCT, err := s.garmin.Cipher.Seal([]byte(key))
 	if err != nil {
 		return nil, fmt.Errorf("encrypting the Garmin key: %w", err)
 	}
-	tokenCT, err := s.cipher.Seal([]byte(gs.Token.Reveal()))
+	tokenCT, err := s.garmin.Cipher.Seal([]byte(gs.Token.Reveal()))
 	if err != nil {
 		return nil, fmt.Errorf("encrypting the Garmin token: %w", err)
 	}
@@ -75,6 +83,10 @@ func (s *Server) SetGarminKey(ctx context.Context, req SetGarminKeyRequestObject
 	})
 	if err != nil {
 		return nil, fmt.Errorf("storing the Garmin key: %w", err)
+	}
+	// A backfill paused by the old key continues with the new one.
+	if err := s.garmin.Backfill.Resume(ctx, sess.userID, false); err != nil && !errors.Is(err, garminsync.ErrNotFound) {
+		return nil, fmt.Errorf("resuming the backfill: %w", err)
 	}
 	return SetGarminKey200JSONResponse(garminConnection(c)), nil
 }
@@ -115,4 +127,10 @@ func garminConnection(c db.GarminConnection) GarminConnection {
 		out.SyncedThrough = &openapi_types.Date{Time: *c.SyncedThrough}
 	}
 	return out
+}
+
+// localToday is the user's current calendar day, at midnight UTC like stored dates.
+func localToday(tz string) time.Time {
+	y, m, d := time.Now().In(location(tz)).Date()
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 }

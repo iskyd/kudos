@@ -95,6 +95,29 @@ type DailyMetric struct {
 	UpdatedAt      time.Time
 }
 
+type GarminActivityImport struct {
+	UserID           int64
+	SourceActivityID string
+	StartTime        time.Time
+	UtcOffsetS       *int32
+	Status           string
+	Error            *string
+	Attempts         int32
+	UpdatedAt        time.Time
+}
+
+type GarminBackfill struct {
+	UserID           int64
+	WindowStart      time.Time
+	WindowEnd        time.Time
+	Status           string
+	PauseReason      *string
+	ActivitiesListed bool
+	HealthThrough    *time.Time
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+}
+
 type GarminConnection struct {
 	UserID          int64
 	KeyCiphertext   []byte

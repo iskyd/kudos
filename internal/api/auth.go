@@ -12,7 +12,6 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/store/db"
 )
@@ -30,8 +29,8 @@ const (
 type Server struct {
 	q                   *db.Queries
 	ingest              *ingest.Service
-	garmin              GarminAuthenticator
-	cipher              *crypto.Cipher
+	cursors             *Cursors
+	garmin              Garmin
 	registrationEnabled bool
 	argon               argonParams
 	// dummyHash is verified against when a username is unknown, so login takes
@@ -42,20 +41,16 @@ type Server struct {
 var _ StrictServerInterface = (*Server)(nil)
 
 // NewServer returns the API server backed by q, storing activities with ingester.
-func NewServer(q *db.Queries, ingester *ingest.Service, garmin GarminAuthenticator, cipher *crypto.Cipher,
-	registrationEnabled bool,
-) *Server {
-	return newServer(q, ingester, garmin, cipher, registrationEnabled, defaultArgon())
+func NewServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin Garmin, registrationEnabled bool) *Server {
+	return newServer(q, ingester, cursors, garmin, registrationEnabled, defaultArgon())
 }
 
-func newServer(q *db.Queries, ingester *ingest.Service, garmin GarminAuthenticator, cipher *crypto.Cipher,
-	registrationEnabled bool, p argonParams,
-) *Server {
+func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin Garmin, registrationEnabled bool, p argonParams) *Server {
 	return &Server{
 		q:                   q,
 		ingest:              ingester,
+		cursors:             cursors,
 		garmin:              garmin,
-		cipher:              cipher,
 		registrationEnabled: registrationEnabled,
 		argon:               p,
 		dummyHash:           hashPassword(p, "dummy password"),

@@ -33,6 +33,7 @@ const (
 
 	KindGarminKeyRejected Kind = "garmin-key-rejected"
 	KindGarminUnavailable Kind = "garmin-unavailable"
+	KindBackfillExists    Kind = "backfill-exists"
 )
 
 func (k Kind) status() int {
@@ -43,7 +44,7 @@ func (k Kind) status() int {
 		return http.StatusUnauthorized
 	case KindCSRF, KindCrossOrigin, KindRegistrationDisabled:
 		return http.StatusForbidden
-	case KindUsernameTaken:
+	case KindUsernameTaken, KindBackfillExists:
 		return http.StatusConflict
 	case KindNotFound:
 		return http.StatusNotFound
@@ -92,6 +93,8 @@ func (k Kind) title() string {
 		return "Garmin rejected the key"
 	case KindGarminUnavailable:
 		return "Garmin is unavailable"
+	case KindBackfillExists:
+		return "Backfill already started"
 	default:
 		return "Internal error"
 	}

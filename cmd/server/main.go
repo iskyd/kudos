@@ -13,9 +13,12 @@ import (
 	"time"
 	_ "time/tzdata" // timezone validation must not depend on the container having zoneinfo
 
+	"github.com/riverqueue/river"
+
 	"github.com/iskyd/kudos/internal/api"
 	"github.com/iskyd/kudos/internal/config"
 	"github.com/iskyd/kudos/internal/connectors/garmin"
+	"github.com/iskyd/kudos/internal/connectors/garminsync"
 	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/jobs"
@@ -52,20 +55,27 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	defer pool.Close()
 	logger.Info("database ready")
 
-	jobClient, err := jobs.NewClient(pool, logger)
-	if err != nil {
-		return fmt.Errorf("creating job client: %w", err)
-	}
-	// Detached from the signal context: canceling it would hard-stop running jobs; Stop below drains them.
-	if err := jobClient.Start(context.WithoutCancel(ctx)); err != nil {
-		return fmt.Errorf("starting job client: %w", err)
-	}
-
 	cipher, err := crypto.New(cfg.EncryptionKey.Reveal())
 	if err != nil {
 		return fmt.Errorf("creating cipher: %w", err)
 	}
+	cursors, err := api.NewCursors(cfg.EncryptionKey.Reveal())
+	if err != nil {
+		return fmt.Errorf("creating cursors: %w", err)
+	}
 	garminClient := garmin.New(garmin.DefaultBaseURL, &http.Client{Timeout: time.Minute})
+	backfill := &garminsync.Worker{Pool: pool, Connector: garminClient, Cipher: cipher, Logger: logger}
+
+	jobClient, err := jobs.NewClient(pool, logger, func(w *river.Workers) { river.AddWorker(w, backfill) })
+	if err != nil {
+		return fmt.Errorf("creating job client: %w", err)
+	}
+	ingester := ingest.New(pool, jobClient, cfg.DataDir)
+	backfill.Ingest = ingester
+	// Detached from the signal context: canceling it would hard-stop running jobs; Stop below drains them.
+	if err := jobClient.Start(context.WithoutCancel(ctx)); err != nil {
+		return fmt.Errorf("starting job client: %w", err)
+	}
 
 	spa, err := web.Handler()
 	if err != nil {
@@ -74,8 +84,10 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
-		Addr:              listenAddr,
-		Handler:           api.NewRouter(logger, api.NewServer(db.New(pool), ingest.New(pool, jobClient, cfg.DataDir), garminClient, cipher, cfg.RegistrationEnabled), spa),
+		Addr: listenAddr,
+		Handler: api.NewRouter(logger, api.NewServer(db.New(pool), ingester, cursors, api.Garmin{
+			Auth: garminClient, Cipher: cipher, Backfill: garminsync.NewService(pool, jobClient),
+		}, cfg.RegistrationEnabled), spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

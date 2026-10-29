@@ -61,7 +61,7 @@ func TestGarminConnection(t *testing.T) {
 	rec = c.do(http.MethodPut, "/api/garmin/key", SetGarminKeyRequest{Key: "  " + validKey + "\n", ExpiresOn: expires}, nil)
 	noSecrets(t, rec.Body.String())
 	got := decodeJSON[GarminConnection](t, rec, http.StatusOK)
-	if !got.Connected || *got.Status != Connected || !got.KeyExpiresOn.Equal(expires.Time) || *got.SyncIntervalHours != 1 ||
+	if !got.Connected || *got.Status != GarminConnectionStatusConnected || !got.KeyExpiresOn.Equal(expires.Time) || *got.SyncIntervalHours != 1 ||
 		got.LastSyncAt != nil || got.SyncedThrough != nil {
 		t.Errorf("connection = %+v", got)
 	}
@@ -186,7 +186,7 @@ func TestGarminConnectionMapping(t *testing.T) {
 		Status: "key_rejected", KeyExpiresOn: day, SyncIntervalH: 3, SyncedThrough: &day, LastSyncAt: &at,
 		KeyCiphertext: []byte("ct"), TokenCiphertext: []byte("ct"),
 	})
-	if *got.Status != KeyRejected || !got.SyncedThrough.Equal(day) || !got.LastSyncAt.Equal(at) || *got.SyncIntervalHours != 3 {
+	if *got.Status != GarminConnectionStatusKeyRejected || !got.SyncedThrough.Equal(day) || !got.LastSyncAt.Equal(at) || *got.SyncIntervalHours != 3 {
 		t.Errorf("mapping = %+v", got)
 	}
 }
