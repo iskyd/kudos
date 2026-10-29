@@ -15,6 +15,7 @@ import (
 
 	"github.com/iskyd/kudos/internal/api"
 	"github.com/iskyd/kudos/internal/config"
+	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store"
 	"github.com/iskyd/kudos/internal/store/db"
@@ -66,7 +67,7 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
 		Addr:              listenAddr,
-		Handler:           api.NewRouter(logger, api.NewServer(db.New(pool), cfg.RegistrationEnabled), spa),
+		Handler:           api.NewRouter(logger, api.NewServer(db.New(pool), ingest.New(pool, jobClient, cfg.DataDir), cfg.RegistrationEnabled), spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

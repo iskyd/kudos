@@ -21,6 +21,7 @@ func NewClient(pool *pgxpool.Pool, logger *slog.Logger) (*Client, error) {
 	workers := river.NewWorkers()
 	// AddWorker panics only on a duplicate registration: a programming error caught by any test.
 	river.AddWorker(workers, &PingWorker{})
+	river.AddWorker(workers, &DerivedWorker{})
 
 	client, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Logger:  logger,

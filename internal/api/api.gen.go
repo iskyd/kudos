@@ -8,16 +8,78 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for Sport.
+const (
+	Cycling           Sport = "cycling"
+	Hiking            Sport = "hiking"
+	OpenWaterSwimming Sport = "open_water_swimming"
+	Other             Sport = "other"
+	PoolSwimming      Sport = "pool_swimming"
+	Running           Sport = "running"
+	Strength          Sport = "strength"
+	TrailRunning      Sport = "trail_running"
+)
+
+// Valid indicates whether the value is a known member of the Sport enum.
+func (e Sport) Valid() bool {
+	switch e {
+	case Cycling:
+		return true
+	case Hiking:
+		return true
+	case OpenWaterSwimming:
+		return true
+	case Other:
+		return true
+	case PoolSwimming:
+		return true
+	case Running:
+		return true
+	case Strength:
+		return true
+	case TrailRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// CreatedActivity defines model for CreatedActivity.
+type CreatedActivity struct {
+	Id int64 `json:"id"`
+}
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Password string `json:"password"`
 	Username string `json:"username"`
+}
+
+// ManualActivityRequest defines model for ManualActivityRequest.
+type ManualActivityRequest struct {
+	// DistanceM Distance in metres.
+	DistanceM *float64 `json:"distanceM,omitempty"`
+
+	// DurationS Duration in seconds, up to 7 days.
+	DurationS float64 `json:"durationS"`
+
+	// LocalStartTime Start in the user's timezone, as YYYY-MM-DDTHH:MM.
+	//
+	// Example: 2026-10-29T07:30
+	LocalStartTime string  `json:"localStartTime"`
+	Notes          *string `json:"notes,omitempty"`
+
+	// Rpe Rating of perceived exertion, 0 to 10.
+	Rpe   *float64 `json:"rpe,omitempty"`
+	Sport Sport    `json:"sport"`
 }
 
 // Me defines model for Me.
@@ -73,6 +135,9 @@ type RegisterRequest struct {
 	Username Username `json:"username"`
 }
 
+// Sport defines model for Sport.
+type Sport string
+
 // Timezone IANA time zone name.
 //
 // Example: Europe/Rome
@@ -86,6 +151,12 @@ type UpdateMeRequest struct {
 	Timezone Timezone `json:"timezone"`
 }
 
+// UploadResult defines model for UploadResult.
+type UploadResult struct {
+	// ActivityIds The stored activities; several for a multisport file.
+	ActivityIds []int64 `json:"activityIds"`
+}
+
 // Username 3 to 32 characters among a-z, 0-9, ".", "_" and "-". Case-insensitive; stored lowercase.
 type Username = string
 
@@ -94,6 +165,17 @@ type Cursor = string
 
 // Limit defines model for Limit.
 type Limit = int
+
+// UploadActivityMultipartBody defines parameters for UploadActivity.
+type UploadActivityMultipartBody struct {
+	File openapi_types.File `json:"file"`
+}
+
+// CreateActivityJSONRequestBody defines body for CreateActivity for application/json ContentType.
+type CreateActivityJSONRequestBody = ManualActivityRequest
+
+// UploadActivityMultipartRequestBody defines body for UploadActivity for multipart/form-data ContentType.
+type UploadActivityMultipartRequestBody UploadActivityMultipartBody
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
@@ -106,6 +188,12 @@ type UpdateMeJSONRequestBody = UpdateMeRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// CreateActivity Create a manual activity
+	// (POST /api/activities)
+	CreateActivity(w http.ResponseWriter, r *http.Request)
+	// UploadActivity Upload a FIT, GPX or TCX file
+	// (POST /api/activities/uploads)
+	UploadActivity(w http.ResponseWriter, r *http.Request)
 	// Login Log in
 	// (POST /api/auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -129,6 +217,18 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// CreateActivity Create a manual activity
+// (POST /api/activities)
+func (_ Unimplemented) CreateActivity(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UploadActivity Upload a FIT, GPX or TCX file
+// (POST /api/activities/uploads)
+func (_ Unimplemented) UploadActivity(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Login Log in
 // (POST /api/auth/login)
@@ -174,6 +274,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// CreateActivity operation middleware
+func (siw *ServerInterfaceWrapper) CreateActivity(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateActivity(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadActivity operation middleware
+func (siw *ServerInterfaceWrapper) UploadActivity(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadActivity(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
@@ -390,11 +518,95 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Patch(options.BaseURL+"/api/me", wrapper.UpdateMe)
 	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/activities", wrapper.CreateActivity)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/activities/uploads", wrapper.UploadActivity)
+	})
 
 	return r
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type CreateActivityRequestObject struct {
+	Body *CreateActivityJSONRequestBody
+}
+
+type CreateActivityResponseObject interface {
+	VisitCreateActivityResponse(w http.ResponseWriter) error
+}
+
+type CreateActivity201JSONResponse CreatedActivity
+
+func (response CreateActivity201JSONResponse) VisitCreateActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateActivitydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateActivitydefaultApplicationProblemPlusJSONResponse) VisitCreateActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadActivityRequestObject struct {
+	Body *multipart.Reader
+}
+
+type UploadActivityResponseObject interface {
+	VisitUploadActivityResponse(w http.ResponseWriter) error
+}
+
+type UploadActivity201JSONResponse UploadResult
+
+func (response UploadActivity201JSONResponse) VisitUploadActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UploadActivitydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response UploadActivitydefaultApplicationProblemPlusJSONResponse) VisitUploadActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type LoginRequestObject struct {
 	Body *LoginJSONRequestBody
@@ -648,6 +860,12 @@ func (response GetHealthzdefaultApplicationProblemPlusJSONResponse) VisitGetHeal
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// CreateActivity Create a manual activity
+	// (POST /api/activities)
+	CreateActivity(ctx context.Context, request CreateActivityRequestObject) (CreateActivityResponseObject, error)
+	// UploadActivity Upload a FIT, GPX or TCX file
+	// (POST /api/activities/uploads)
+	UploadActivity(ctx context.Context, request UploadActivityRequestObject) (UploadActivityResponseObject, error)
 	// Login Log in
 	// (POST /api/auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
@@ -705,6 +923,68 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// CreateActivity operation middleware
+func (sh *strictHandler) CreateActivity(w http.ResponseWriter, r *http.Request) {
+	var request CreateActivityRequestObject
+
+	var body CreateActivityJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateActivity(ctx, request.(CreateActivityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateActivity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateActivityResponseObject); ok {
+		if err := validResponse.VisitCreateActivityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UploadActivity operation middleware
+func (sh *strictHandler) UploadActivity(w http.ResponseWriter, r *http.Request) {
+	var request UploadActivityRequestObject
+
+	if reader, err := r.MultipartReader(); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode multipart body: %w", err))
+		return
+	} else {
+		request.Body = reader
+	}
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UploadActivity(ctx, request.(UploadActivityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UploadActivity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UploadActivityResponseObject); ok {
+		if err := validResponse.VisitUploadActivityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Login operation middleware

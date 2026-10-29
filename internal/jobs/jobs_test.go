@@ -58,6 +58,27 @@ func TestPingWorker(t *testing.T) {
 	}
 }
 
+func TestDerivedWorker(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	pool := pg.NewDB(t)
+
+	w := rivertest.NewWorker(t, riverpgxv5.New(pool), &river.Config{}, &jobs.DerivedWorker{})
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // rollback after the test is best effort
+
+	res, err := w.Work(ctx, t, tx, jobs.DerivedArgs{UserID: 1, ActivityID: 2}, nil)
+	if err != nil {
+		t.Fatalf("Work: %v", err)
+	}
+	if res.EventKind != river.EventKindJobCompleted {
+		t.Fatalf("EventKind = %s, want %s", res.EventKind, river.EventKindJobCompleted)
+	}
+}
+
 func TestInsertTxCommitted(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
