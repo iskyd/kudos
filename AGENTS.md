@@ -43,7 +43,7 @@ just dev        # docker compose up for TimescaleDB + app with live reload
 6. Ingestion is idempotent: upserts keyed by source and source activity ID (fallback: start time + sport + device). Re-running a sync or backfill must never duplicate data.
 
 ### Units and time
-7. Store and compute in SI units only: metres, seconds, m/s, watts, bpm, kg, °C. Convert to display units (min/km, km/h, km) only in the frontend formatting layer.
+7. Store and compute in SI units only: metres, seconds, m/s, watts, bpm, kg, °C. The one exception is energy, stored in kcal as devices record it. Convert to display units (min/km, km/h, km) only in the frontend formatting layer.
 8. Store timestamps in UTC plus the activity's local UTC offset. Never use `time.Local` or the server's timezone. Display activities in the local time where they happened.
 9. Local offset = FIT `activity.local_timestamp − timestamp`. If missing or invalid (Zwift writes the FIT epoch, 1989-12-31), fall back to Garmin activity metadata, then the user's timezone.
 10. Never assume 1-second sampling. Some activities use smart recording (1–6 s gaps). All averages, time-in-zone and load calculations are time-weighted, never sample-count based.
