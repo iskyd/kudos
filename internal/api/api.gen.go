@@ -151,7 +151,10 @@ type GarminConnection struct {
 
 	// KeyExpiresOn The key's expiry date as entered by the user.
 	KeyExpiresOn *openapi_types.Date `json:"keyExpiresOn,omitempty"`
-	LastSyncAt   *time.Time          `json:"lastSyncAt,omitempty"`
+
+	// LastError Why the last sync failed; absent once a sync succeeds.
+	LastError  *string    `json:"lastError,omitempty"`
+	LastSyncAt *time.Time `json:"lastSyncAt,omitempty"`
 
 	// Status key_rejected when Garmin refused the key; sync is paused until a new key is set.
 	Status            *GarminConnectionStatus `json:"status,omitempty"`
@@ -283,6 +286,12 @@ type StartGarminBackfillRequest struct {
 	Days *int `json:"days,omitempty"`
 }
 
+// SyncQueued defines model for SyncQueued.
+type SyncQueued struct {
+	// Queued False when a sync was already queued or running.
+	Queued bool `json:"queued"`
+}
+
 // Timezone IANA time zone name.
 //
 // Example: Europe/Rome
@@ -390,6 +399,9 @@ type ServerInterface interface {
 	// SetGarminKey Set the Personal API key
 	// (PUT /api/garmin/key)
 	SetGarminKey(w http.ResponseWriter, r *http.Request)
+	// SyncGarmin Sync Garmin now
+	// (POST /api/garmin/sync)
+	SyncGarmin(w http.ResponseWriter, r *http.Request)
 	// SetGarminSyncInterval Set how often Garmin is synced
 	// (PUT /api/garmin/sync-interval)
 	SetGarminSyncInterval(w http.ResponseWriter, r *http.Request)
@@ -477,6 +489,12 @@ func (_ Unimplemented) ResumeGarminBackfill(w http.ResponseWriter, r *http.Reque
 // SetGarminKey Set the Personal API key
 // (PUT /api/garmin/key)
 func (_ Unimplemented) SetGarminKey(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SyncGarmin Sync Garmin now
+// (POST /api/garmin/sync)
+func (_ Unimplemented) SyncGarmin(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -713,6 +731,20 @@ func (siw *ServerInterfaceWrapper) SetGarminKey(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// SyncGarmin operation middleware
+func (siw *ServerInterfaceWrapper) SyncGarmin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SyncGarmin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // SetGarminSyncInterval operation middleware
 func (siw *ServerInterfaceWrapper) SetGarminSyncInterval(w http.ResponseWriter, r *http.Request) {
 
@@ -929,6 +961,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/garmin/backfill/failures", wrapper.ListGarminBackfillFailures)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/garmin/sync", wrapper.SyncGarmin)
 	})
 
 	return r
@@ -1416,6 +1451,44 @@ func (response SetGarminKeydefaultApplicationProblemPlusJSONResponse) VisitSetGa
 	return err
 }
 
+type SyncGarminRequestObject struct {
+}
+
+type SyncGarminResponseObject interface {
+	VisitSyncGarminResponse(w http.ResponseWriter) error
+}
+
+type SyncGarmin202JSONResponse SyncQueued
+
+func (response SyncGarmin202JSONResponse) VisitSyncGarminResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SyncGarmindefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response SyncGarmindefaultApplicationProblemPlusJSONResponse) VisitSyncGarminResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SetGarminSyncIntervalRequestObject struct {
 	Body *SetGarminSyncIntervalJSONRequestBody
 }
@@ -1605,6 +1678,9 @@ type StrictServerInterface interface {
 	// SetGarminKey Set the Personal API key
 	// (PUT /api/garmin/key)
 	SetGarminKey(ctx context.Context, request SetGarminKeyRequestObject) (SetGarminKeyResponseObject, error)
+	// SyncGarmin Sync Garmin now
+	// (POST /api/garmin/sync)
+	SyncGarmin(ctx context.Context, request SyncGarminRequestObject) (SyncGarminResponseObject, error)
 	// SetGarminSyncInterval Set how often Garmin is synced
 	// (PUT /api/garmin/sync-interval)
 	SetGarminSyncInterval(ctx context.Context, request SetGarminSyncIntervalRequestObject) (SetGarminSyncIntervalResponseObject, error)
@@ -1990,6 +2066,30 @@ func (sh *strictHandler) SetGarminKey(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetGarminKeyResponseObject); ok {
 		if err := validResponse.VisitSetGarminKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SyncGarmin operation middleware
+func (sh *strictHandler) SyncGarmin(w http.ResponseWriter, r *http.Request) {
+	var request SyncGarminRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SyncGarmin(ctx, request.(SyncGarminRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SyncGarmin")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SyncGarminResponseObject); ok {
+		if err := validResponse.VisitSyncGarminResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

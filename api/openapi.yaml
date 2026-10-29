@@ -317,6 +317,24 @@ paths:
                 $ref: "#/components/schemas/GarminImportFailurePage"
         default:
           $ref: "#/components/responses/Problem"
+  /api/garmin/sync:
+    post:
+      operationId: syncGarmin
+      summary: Sync Garmin now
+      description: |
+        Queues a sync of the recent days unless one is already queued or running.
+        Not available while the history import runs (backfill-running) or after
+        Garmin rejected the key (garmin-key-rejected).
+      tags: [garmin]
+      responses:
+        "202":
+          description: A sync is queued or already running.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SyncQueued"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -480,6 +498,9 @@ components:
           type: string
           format: date
           description: The last local day fully synced.
+        lastError:
+          type: string
+          description: Why the last sync failed; absent once a sync succeeds.
     SetGarminKeyRequest:
       type: object
       required: [key, expiresOn]
@@ -501,6 +522,13 @@ components:
           type: integer
           minimum: 1
           maximum: 24
+    SyncQueued:
+      type: object
+      required: [queued]
+      properties:
+        queued:
+          type: boolean
+          description: False when a sync was already queued or running.
     StartGarminBackfillRequest:
       type: object
       properties:

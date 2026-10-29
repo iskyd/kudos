@@ -34,6 +34,7 @@ func TestWriteProblem(t *testing.T) {
 		{name: "garmin key rejected", err: &Error{Kind: KindGarminKeyRejected}, wantStatus: 422, wantType: "urn:kudos:problem:garmin-key-rejected", wantTitle: "Garmin rejected the key"},
 		{name: "garmin unavailable", err: &Error{Kind: KindGarminUnavailable}, wantStatus: 502, wantType: "urn:kudos:problem:garmin-unavailable", wantTitle: "Garmin is unavailable"},
 		{name: "backfill exists", err: &Error{Kind: KindBackfillExists}, wantStatus: 409, wantType: "urn:kudos:problem:backfill-exists", wantTitle: "Backfill already started"},
+		{name: "backfill running", err: &Error{Kind: KindBackfillRunning}, wantStatus: 409, wantType: "urn:kudos:problem:backfill-running", wantTitle: "History import still running"},
 		{name: "internal hides detail", err: &Error{Kind: KindInternal, Detail: "db password wrong"}, wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error"},
 		{name: "wrapped error keeps kind", err: fmt.Errorf("listing: %w", &Error{Kind: KindNotFound, Detail: "no such activity"}), wantStatus: 404, wantType: "urn:kudos:problem:not-found", wantTitle: "Not found", wantDetail: "no such activity"},
 		{name: "plain error is internal and logged", err: errors.New("db password wrong"), wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error", wantLogged: true},

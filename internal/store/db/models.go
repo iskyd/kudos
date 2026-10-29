@@ -130,6 +130,8 @@ type GarminConnection struct {
 	LastSyncAt      *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
+	LastAttemptAt   *time.Time
+	LastError       *string
 }
 
 type Lap struct {

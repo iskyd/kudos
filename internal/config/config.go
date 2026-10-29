@@ -21,6 +21,8 @@ const (
 	DefaultListenAddr = ":8080"
 	DefaultDataDir    = "/data"
 	DefaultMapTileURL = "https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+	// DefaultGarminAPIURL is Garmin's Personal API host.
+	DefaultGarminAPIURL = "https://personal.connectapi.garmin.com"
 )
 
 // Config is the validated server configuration.
@@ -31,6 +33,7 @@ type Config struct {
 	ListenAddr          string
 	DataDir             string
 	MapTileURL          string
+	GarminAPIURL        string
 	LogLevel            slog.Level
 }
 
@@ -42,6 +45,7 @@ func Load(getenv func(string) string) (Config, error) {
 		ListenAddr:          or(getenv("LISTEN_ADDR"), DefaultListenAddr),
 		DataDir:             or(getenv("DATA_DIR"), DefaultDataDir),
 		MapTileURL:          or(getenv("MAP_TILE_URL"), DefaultMapTileURL),
+		GarminAPIURL:        or(getenv("GARMIN_API_URL"), DefaultGarminAPIURL),
 		LogLevel:            slog.LevelInfo,
 	}
 	var errs []error
@@ -69,6 +73,10 @@ func Load(getenv func(string) string) (Config, error) {
 
 	if err := validateTileURL(cfg.MapTileURL); err != nil {
 		errs = append(errs, err)
+	}
+
+	if u, err := url.Parse(cfg.GarminAPIURL); err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" {
+		errs = append(errs, errors.New("GARMIN_API_URL must be an http(s) URL"))
 	}
 
 	if v := getenv("LOG_LEVEL"); v != "" {

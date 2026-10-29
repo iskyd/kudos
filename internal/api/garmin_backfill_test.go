@@ -141,3 +141,33 @@ func TestNewKeyResumesBackfill(t *testing.T) {
 		t.Errorf("after a new key: %+v", got)
 	}
 }
+
+func TestSyncGarmin(t *testing.T) {
+	t.Parallel()
+	c, q, me := loggedIn(t, "UTC")
+	wantProblem(t, c.do(http.MethodPost, "/api/garmin/sync", nil, nil), KindNotFound)
+
+	connect(t, c)
+	if got := decodeJSON[SyncQueued](t, c.do(http.MethodPost, "/api/garmin/sync", nil, nil), http.StatusAccepted); !got.Queued {
+		t.Errorf("first sync = %+v", got)
+	}
+	if got := decodeJSON[SyncQueued](t, c.do(http.MethodPost, "/api/garmin/sync", nil, nil), http.StatusAccepted); got.Queued {
+		t.Errorf("a second sync was queued while one is pending")
+	}
+
+	reason := "Garmin failed: status 503"
+	if err := q.SetGarminSyncError(t.Context(), db.SetGarminSyncErrorParams{UserID: me.Id, LastError: &reason}); err != nil {
+		t.Fatal(err)
+	}
+	if got := decodeJSON[GarminConnection](t, c.do(http.MethodGet, "/api/garmin", nil, nil), http.StatusOK); got.LastError == nil || *got.LastError != reason {
+		t.Errorf("last error = %v", got.LastError)
+	}
+
+	decodeJSON[GarminBackfill](t, c.do(http.MethodPost, "/api/garmin/backfill", StartGarminBackfillRequest{}, nil), http.StatusAccepted)
+	wantProblem(t, c.do(http.MethodPost, "/api/garmin/sync", nil, nil), KindBackfillRunning)
+
+	if err := q.SetGarminKeyRejected(t.Context(), me.Id); err != nil {
+		t.Fatal(err)
+	}
+	wantProblem(t, c.do(http.MethodPost, "/api/garmin/sync", nil, nil), KindGarminKeyRejected)
+}

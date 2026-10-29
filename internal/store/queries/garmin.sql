@@ -31,7 +31,26 @@ WHERE user_id = $1;
 UPDATE garmin_connections SET status = 'key_rejected', updated_at = now() WHERE user_id = $1;
 
 -- name: SetGarminSynced :exec
-UPDATE garmin_connections SET synced_through = $2, last_sync_at = now(), updated_at = now() WHERE user_id = $1;
+UPDATE garmin_connections SET synced_through = $2, last_sync_at = now(), last_error = NULL, updated_at = now()
+WHERE user_id = $1;
+
+-- name: StartGarminSyncAttempt :exec
+UPDATE garmin_connections SET last_attempt_at = now(), updated_at = now() WHERE user_id = $1;
+
+-- name: SetGarminSyncError :exec
+UPDATE garmin_connections SET last_error = $2, updated_at = now() WHERE user_id = $1;
+
+-- name: ListDueGarminSyncs :many
+-- The scheduler's scan across users, like login the one query not keyed by a
+-- user: it returns only the IDs of connected users whose interval has passed and
+-- whose backfill, if any, is done.
+SELECT c.user_id FROM garmin_connections c
+LEFT JOIN garmin_backfills b ON b.user_id = c.user_id
+WHERE c.status = 'connected'
+    AND (b.user_id IS NULL OR b.status = 'done')
+    AND (c.last_attempt_at IS NULL OR c.last_attempt_at + make_interval(hours => c.sync_interval_h) <= now())
+ORDER BY c.user_id
+LIMIT $1;
 
 -- name: CreateGarminBackfill :one
 -- Returns no row when the user already has a backfill.

@@ -11,16 +11,15 @@ import {
   useSetGarminKey,
   useSetGarminSyncInterval,
   useStartGarminBackfill,
+  useSyncGarmin,
 } from '@/api/garmin'
 import { problemMessage } from '@/api/problem'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
-import { daysUntil, formatDateTime, formatDay, toISODay } from '@/lib/format/date'
+import { formatDateTime, formatDay, toISODay } from '@/lib/format/date'
 
-// Garmin warns about expiring keys a week ahead; so does KudOS.
-const expiryWarningDays = 7
 const syncIntervals = Array.from({ length: 24 }, (_, i) => i + 1)
 const defaultBackfillDays = 120
 const maxBackfillDays = 365
@@ -130,29 +129,12 @@ function GarminSection() {
 function GarminStatus({ connection }: { connection: GarminConnection }) {
   const interval = useSetGarminSyncInterval()
   const disconnect = useDisconnectGarmin()
+  const syncNow = useSyncGarmin()
   const expiresOn = connection.keyExpiresOn
-  const daysLeft = expiresOn ? daysUntil(expiresOn, new Date()) : null
 
+  // Warnings about the key and failed syncs show in the app-wide Garmin banner.
   return (
     <div className="flex flex-col gap-4">
-      {connection.status === 'key_rejected' ? (
-        <p role="alert" className="text-sm text-destructive">
-          Garmin rejected the key. Sync is paused until you enter a new key.
-        </p>
-      ) : daysLeft !== null && daysLeft < 0 ? (
-        <p role="alert" className="text-sm text-destructive">
-          The key expired. Sync is paused until you enter a new key.
-        </p>
-      ) : (
-        daysLeft !== null &&
-        daysLeft <= expiryWarningDays && (
-          <p role="alert" className="text-sm text-warning">
-            The key expires{' '}
-            {daysLeft === 0 ? 'today' : `in ${String(daysLeft)} ${daysLeft === 1 ? 'day' : 'days'}`}
-            . Create a new one in Garmin Connect and enter it below.
-          </p>
-        )
-      )}
       <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
         <dt className="text-muted-foreground">Key expires</dt>
         <dd>{expiresOn ? formatDay(expiresOn) : 'Unknown'}</dd>
@@ -178,6 +160,28 @@ function GarminStatus({ connection }: { connection: GarminConnection }) {
         {interval.isError && (
           <p role="alert" className="text-sm text-destructive">
             {problemMessage(interval.error)}
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={syncNow.isPending || connection.status === 'key_rejected'}
+          onClick={() => {
+            syncNow.mutate()
+          }}
+        >
+          Sync now
+        </Button>
+        {syncNow.isError && (
+          <p role="alert" className="text-sm text-destructive">
+            {problemMessage(syncNow.error)}
+          </p>
+        )}
+        {syncNow.isSuccess && (
+          <p role="status" className="text-sm text-muted-foreground">
+            {syncNow.data.queued ? 'Sync queued.' : 'A sync is already running.'}
           </p>
         )}
       </div>

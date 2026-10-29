@@ -31,9 +31,9 @@ type GarminAuthenticator interface {
 
 // Garmin holds what the Garmin endpoints need.
 type Garmin struct {
-	Auth     GarminAuthenticator
-	Cipher   *crypto.Cipher // seals the key and token
-	Backfill *garminsync.Service
+	Auth   GarminAuthenticator
+	Cipher *crypto.Cipher      // seals the key and token
+	Sync   *garminsync.Service // backfill and ongoing sync
 }
 
 // GetGarminConnection returns the connection state, never the key or token.
@@ -85,7 +85,7 @@ func (s *Server) SetGarminKey(ctx context.Context, req SetGarminKeyRequestObject
 		return nil, fmt.Errorf("storing the Garmin key: %w", err)
 	}
 	// A backfill paused by the old key continues with the new one.
-	if err := s.garmin.Backfill.Resume(ctx, sess.userID, false); err != nil && !errors.Is(err, garminsync.ErrNotFound) {
+	if err := s.garmin.Sync.Resume(ctx, sess.userID, false); err != nil && !errors.Is(err, garminsync.ErrNotFound) {
 		return nil, fmt.Errorf("resuming the backfill: %w", err)
 	}
 	return SetGarminKey200JSONResponse(garminConnection(c)), nil
@@ -121,7 +121,7 @@ func garminConnection(c db.GarminConnection) GarminConnection {
 	hours := int(c.SyncIntervalH)
 	out := GarminConnection{
 		Connected: true, Status: &status, KeyExpiresOn: &openapi_types.Date{Time: c.KeyExpiresOn},
-		SyncIntervalHours: &hours, LastSyncAt: c.LastSyncAt,
+		SyncIntervalHours: &hours, LastSyncAt: c.LastSyncAt, LastError: c.LastError,
 	}
 	if c.SyncedThrough != nil {
 		out.SyncedThrough = &openapi_types.Date{Time: *c.SyncedThrough}
@@ -133,4 +133,20 @@ func garminConnection(c db.GarminConnection) GarminConnection {
 func localToday(tz string) time.Time {
 	y, m, d := time.Now().In(location(tz)).Date()
 	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
+}
+
+// SyncGarmin queues a sync now, unless one is already queued or running.
+func (s *Server) SyncGarmin(ctx context.Context, _ SyncGarminRequestObject) (SyncGarminResponseObject, error) {
+	queued, err := s.garmin.Sync.SyncNow(ctx, sessionFrom(ctx).userID)
+	switch {
+	case errors.Is(err, garminsync.ErrNotConnected):
+		return nil, &Error{Kind: KindNotFound, Detail: "Garmin is not connected"}
+	case errors.Is(err, garminsync.ErrBackfillRunning):
+		return nil, &Error{Kind: KindBackfillRunning, Detail: "sync starts when the history import finishes"}
+	case errors.Is(err, connectors.ErrKeyRejected):
+		return nil, &Error{Kind: KindGarminKeyRejected, Detail: "enter a new key to sync again"}
+	case err != nil:
+		return nil, fmt.Errorf("queueing a sync: %w", err)
+	}
+	return SyncGarmin202JSONResponse{Queued: queued}, nil
 }

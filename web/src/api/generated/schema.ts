@@ -254,6 +254,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/garmin/sync": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sync Garmin now
+         * @description Queues a sync of the recent days unless one is already queued or running.
+         *     Not available while the history import runs (backfill-running) or after
+         *     Garmin rejected the key (garmin-key-rejected).
+         */
+        post: operations["syncGarmin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -342,6 +364,8 @@ export interface components {
              * @description The last local day fully synced.
              */
             syncedThrough?: string;
+            /** @description Why the last sync failed; absent once a sync succeeds. */
+            lastError?: string;
         };
         SetGarminKeyRequest: {
             /** Format: password */
@@ -354,6 +378,10 @@ export interface components {
         };
         SetGarminSyncIntervalRequest: {
             hours: number;
+        };
+        SyncQueued: {
+            /** @description False when a sync was already queued or running. */
+            queued: boolean;
         };
         StartGarminBackfillRequest: {
             /**
@@ -815,6 +843,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GarminImportFailurePage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    syncGarmin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A sync is queued or already running. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SyncQueued"];
                 };
             };
             default: components["responses"]["Problem"];

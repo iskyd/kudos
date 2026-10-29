@@ -60,7 +60,8 @@ func TestLoadDefaults(t *testing.T) {
 	if !cfg.RegistrationEnabled {
 		t.Errorf("RegistrationEnabled = false, want true")
 	}
-	if cfg.ListenAddr != DefaultListenAddr || cfg.DataDir != DefaultDataDir || cfg.MapTileURL != DefaultMapTileURL {
+	if cfg.ListenAddr != DefaultListenAddr || cfg.DataDir != DefaultDataDir || cfg.MapTileURL != DefaultMapTileURL ||
+		cfg.GarminAPIURL != DefaultGarminAPIURL {
 		t.Errorf("defaults = %q %q %q", cfg.ListenAddr, cfg.DataDir, cfg.MapTileURL)
 	}
 	if cfg.LogLevel != slog.LevelInfo {
@@ -80,6 +81,7 @@ func TestLoadOverrides(t *testing.T) {
 		"DATA_DIR", "/srv/kudos",
 		"MAP_TILE_URL", "http://tiles.lan/{z}/{x}/{y}.png?key=abc",
 		"LOG_LEVEL", "DEBUG",
+		"GARMIN_API_URL", "http://127.0.0.1:4174",
 	)
 
 	cfg, err := Load(env(m))
@@ -94,6 +96,9 @@ func TestLoadOverrides(t *testing.T) {
 	}
 	if cfg.ListenAddr != "127.0.0.1:9000" || cfg.DataDir != "/srv/kudos" || cfg.MapTileURL != m["MAP_TILE_URL"] {
 		t.Errorf("overrides = %q %q %q", cfg.ListenAddr, cfg.DataDir, cfg.MapTileURL)
+	}
+	if cfg.GarminAPIURL != "http://127.0.0.1:4174" {
+		t.Errorf("GarminAPIURL = %q", cfg.GarminAPIURL)
 	}
 	if cfg.LogLevel != slog.LevelDebug {
 		t.Errorf("LogLevel = %v, want debug", cfg.LogLevel)
@@ -121,6 +126,8 @@ func TestLoadInvalid(t *testing.T) {
 		{name: "bad registration flag", env: with("REGISTRATION_ENABLED", "maybe"), wantErr: "REGISTRATION_ENABLED must be true or false"},
 		{name: "tile url not http", env: with("MAP_TILE_URL", "ftp://tiles/{z}/{x}/{y}.png"), wantErr: "MAP_TILE_URL must be an http(s) URL"},
 		{name: "tile url no host", env: with("MAP_TILE_URL", "https:///{z}/{x}/{y}.png"), wantErr: "MAP_TILE_URL must be an http(s) URL"},
+		{name: "garmin url not http", env: with("GARMIN_API_URL", "ftp://garmin"), wantErr: "GARMIN_API_URL must be an http(s) URL"},
+		{name: "garmin url unparsable", env: with("GARMIN_API_URL", "://bad"), wantErr: "GARMIN_API_URL must be an http(s) URL"},
 		{name: "tile url unparsable", env: with("MAP_TILE_URL", "://bad"), wantErr: "MAP_TILE_URL must be an http(s) URL"},
 		{name: "tile url missing placeholder", env: with("MAP_TILE_URL", "https://tiles/{z}/{x}.png"), wantErr: "MAP_TILE_URL must contain {y}"},
 		{name: "bad log level", env: with("LOG_LEVEL", "verbose"), wantErr: "LOG_LEVEL must be debug, info, warn or error"},

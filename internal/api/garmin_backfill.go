@@ -21,7 +21,7 @@ const (
 
 // GetGarminBackfill returns the backfill's progress.
 func (s *Server) GetGarminBackfill(ctx context.Context, _ GetGarminBackfillRequestObject) (GetGarminBackfillResponseObject, error) {
-	p, err := s.garmin.Backfill.Progress(ctx, sessionFrom(ctx).userID)
+	p, err := s.garmin.Sync.Progress(ctx, sessionFrom(ctx).userID)
 	if errors.Is(err, garminsync.ErrNotFound) {
 		return GetGarminBackfill200JSONResponse{Started: false}, nil
 	}
@@ -42,7 +42,7 @@ func (s *Server) StartGarminBackfill(ctx context.Context, req StartGarminBackfil
 		return nil, &Error{Kind: KindInvalidRequest, Detail: fmt.Sprintf("days must be 1 to %d", maxBackfillDays)}
 	}
 	today := localToday(sess.timezone)
-	err := s.garmin.Backfill.Start(ctx, sess.userID, today.AddDate(0, 0, 1-days), today)
+	err := s.garmin.Sync.Start(ctx, sess.userID, today.AddDate(0, 0, 1-days), today)
 	switch {
 	case errors.Is(err, garminsync.ErrNotConnected):
 		return nil, &Error{Kind: KindNotFound, Detail: "Garmin is not connected"}
@@ -51,7 +51,7 @@ func (s *Server) StartGarminBackfill(ctx context.Context, req StartGarminBackfil
 	case err != nil:
 		return nil, fmt.Errorf("starting the backfill: %w", err)
 	}
-	p, err := s.garmin.Backfill.Progress(ctx, sess.userID)
+	p, err := s.garmin.Sync.Progress(ctx, sess.userID)
 	if err != nil {
 		return nil, fmt.Errorf("reading the backfill: %w", err)
 	}
@@ -62,14 +62,14 @@ func (s *Server) StartGarminBackfill(ctx context.Context, req StartGarminBackfil
 func (s *Server) ResumeGarminBackfill(ctx context.Context, req ResumeGarminBackfillRequestObject) (ResumeGarminBackfillResponseObject, error) {
 	userID := sessionFrom(ctx).userID
 	retry := req.Body.RetryFailed != nil && *req.Body.RetryFailed
-	err := s.garmin.Backfill.Resume(ctx, userID, retry)
+	err := s.garmin.Sync.Resume(ctx, userID, retry)
 	if errors.Is(err, garminsync.ErrNotFound) {
 		return nil, &Error{Kind: KindNotFound, Detail: "no backfill was started"}
 	}
 	if err != nil {
 		return nil, fmt.Errorf("resuming the backfill: %w", err)
 	}
-	p, err := s.garmin.Backfill.Progress(ctx, userID)
+	p, err := s.garmin.Sync.Progress(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("reading the backfill: %w", err)
 	}
@@ -99,7 +99,7 @@ func (s *Server) ListGarminBackfillFailures(ctx context.Context, req ListGarminB
 		}
 	}
 	// One extra row tells whether another page follows.
-	rows, err := s.garmin.Backfill.Failures(ctx, sessionFrom(ctx).userID, after.Start, after.ID, int32(limit+1))
+	rows, err := s.garmin.Sync.Failures(ctx, sessionFrom(ctx).userID, after.Start, after.ID, int32(limit+1))
 	if err != nil {
 		return nil, fmt.Errorf("listing backfill failures: %w", err)
 	}

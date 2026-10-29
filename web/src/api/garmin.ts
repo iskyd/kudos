@@ -135,3 +135,18 @@ export function useGarminBackfillFailures(enabled: boolean) {
     getNextPageParam: (page) => page.nextCursor,
   })
 }
+
+export function useSyncGarmin() {
+  const queryClient = useQueryClient()
+  const { csrfToken } = useCurrentUser()
+  return useMutation({
+    mutationFn: async () => {
+      const { data, error } = await api.POST('/api/garmin/sync', {
+        headers: { 'X-CSRF-Token': csrfToken },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: garminKey, exact: true }),
+  })
+}

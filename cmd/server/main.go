@@ -63,15 +63,24 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	if err != nil {
 		return fmt.Errorf("creating cursors: %w", err)
 	}
-	garminClient := garmin.New(garmin.DefaultBaseURL, &http.Client{Timeout: time.Minute})
-	backfill := &garminsync.Worker{Pool: pool, Connector: garminClient, Cipher: cipher, Logger: logger}
-
-	jobClient, err := jobs.NewClient(pool, logger, func(w *river.Workers) { river.AddWorker(w, backfill) })
+	garminClient := garmin.New(cfg.GarminAPIURL, &http.Client{Timeout: time.Minute})
+	// The Garmin workers need the ingest service and the sync service, which need
+	// the job client the workers are registered with: both are set once it exists.
+	garminDeps := &garminsync.Deps{Pool: pool, Connector: garminClient, Cipher: cipher, Logger: logger}
+	scheduler := &garminsync.ScheduleWorker{Pool: pool}
+	jobClient, err := jobs.NewClient(pool, logger, func(w *river.Workers) {
+		river.AddWorker(w, &garminsync.Worker{Deps: garminDeps})
+		river.AddWorker(w, &garminsync.SyncWorker{Deps: garminDeps})
+		river.AddWorker(w, scheduler)
+	})
 	if err != nil {
 		return fmt.Errorf("creating job client: %w", err)
 	}
 	ingester := ingest.New(pool, jobClient, cfg.DataDir)
-	backfill.Ingest = ingester
+	garminDeps.Ingest = ingester
+	garminSync := garminsync.NewService(pool, jobClient)
+	scheduler.Service = garminSync
+	jobClient.PeriodicJobs().Add(garminsync.SchedulePeriodic())
 	// Detached from the signal context: canceling it would hard-stop running jobs; Stop below drains them.
 	if err := jobClient.Start(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("starting job client: %w", err)
@@ -86,7 +95,7 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	srv := &http.Server{
 		Addr: listenAddr,
 		Handler: api.NewRouter(logger, api.NewServer(db.New(pool), ingester, cursors, api.Garmin{
-			Auth: garminClient, Cipher: cipher, Backfill: garminsync.NewService(pool, jobClient),
+			Auth: garminClient, Cipher: cipher, Sync: garminSync,
 		}, cfg.RegistrationEnabled), spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

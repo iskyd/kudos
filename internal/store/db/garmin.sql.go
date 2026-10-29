@@ -135,7 +135,7 @@ func (q *Queries) GetGarminBackfill(ctx context.Context, userID int64) (GarminBa
 }
 
 const getGarminConnection = `-- name: GetGarminConnection :one
-SELECT user_id, key_ciphertext, key_expires_on, token_ciphertext, token_expires_at, status, sync_interval_h, synced_through, last_sync_at, created_at, updated_at FROM garmin_connections WHERE user_id = $1
+SELECT user_id, key_ciphertext, key_expires_on, token_ciphertext, token_expires_at, status, sync_interval_h, synced_through, last_sync_at, created_at, updated_at, last_attempt_at, last_error FROM garmin_connections WHERE user_id = $1
 `
 
 func (q *Queries) GetGarminConnection(ctx context.Context, userID int64) (GarminConnection, error) {
@@ -153,8 +153,43 @@ func (q *Queries) GetGarminConnection(ctx context.Context, userID int64) (Garmin
 		&i.LastSyncAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastAttemptAt,
+		&i.LastError,
 	)
 	return i, err
+}
+
+const listDueGarminSyncs = `-- name: ListDueGarminSyncs :many
+SELECT c.user_id FROM garmin_connections c
+LEFT JOIN garmin_backfills b ON b.user_id = c.user_id
+WHERE c.status = 'connected'
+    AND (b.user_id IS NULL OR b.status = 'done')
+    AND (c.last_attempt_at IS NULL OR c.last_attempt_at + make_interval(hours => c.sync_interval_h) <= now())
+ORDER BY c.user_id
+LIMIT $1
+`
+
+// The scheduler's scan across users, like login the one query not keyed by a
+// user: it returns only the IDs of connected users whose interval has passed and
+// whose backfill, if any, is done.
+func (q *Queries) ListDueGarminSyncs(ctx context.Context, limit int32) ([]int64, error) {
+	rows, err := q.db.Query(ctx, listDueGarminSyncs, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []int64
+	for rows.Next() {
+		var user_id int64
+		if err := rows.Scan(&user_id); err != nil {
+			return nil, err
+		}
+		items = append(items, user_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listGarminActivityImportFailures = `-- name: ListGarminActivityImportFailures :many
@@ -344,10 +379,24 @@ func (q *Queries) SetGarminKeyRejected(ctx context.Context, userID int64) error 
 	return err
 }
 
+const setGarminSyncError = `-- name: SetGarminSyncError :exec
+UPDATE garmin_connections SET last_error = $2, updated_at = now() WHERE user_id = $1
+`
+
+type SetGarminSyncErrorParams struct {
+	UserID    int64
+	LastError *string
+}
+
+func (q *Queries) SetGarminSyncError(ctx context.Context, arg SetGarminSyncErrorParams) error {
+	_, err := q.db.Exec(ctx, setGarminSyncError, arg.UserID, arg.LastError)
+	return err
+}
+
 const setGarminSyncInterval = `-- name: SetGarminSyncInterval :one
 UPDATE garmin_connections SET sync_interval_h = $2, updated_at = now()
 WHERE user_id = $1
-RETURNING user_id, key_ciphertext, key_expires_on, token_ciphertext, token_expires_at, status, sync_interval_h, synced_through, last_sync_at, created_at, updated_at
+RETURNING user_id, key_ciphertext, key_expires_on, token_ciphertext, token_expires_at, status, sync_interval_h, synced_through, last_sync_at, created_at, updated_at, last_attempt_at, last_error
 `
 
 type SetGarminSyncIntervalParams struct {
@@ -370,12 +419,15 @@ func (q *Queries) SetGarminSyncInterval(ctx context.Context, arg SetGarminSyncIn
 		&i.LastSyncAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastAttemptAt,
+		&i.LastError,
 	)
 	return i, err
 }
 
 const setGarminSynced = `-- name: SetGarminSynced :exec
-UPDATE garmin_connections SET synced_through = $2, last_sync_at = now(), updated_at = now() WHERE user_id = $1
+UPDATE garmin_connections SET synced_through = $2, last_sync_at = now(), last_error = NULL, updated_at = now()
+WHERE user_id = $1
 `
 
 type SetGarminSyncedParams struct {
@@ -385,6 +437,15 @@ type SetGarminSyncedParams struct {
 
 func (q *Queries) SetGarminSynced(ctx context.Context, arg SetGarminSyncedParams) error {
 	_, err := q.db.Exec(ctx, setGarminSynced, arg.UserID, arg.SyncedThrough)
+	return err
+}
+
+const startGarminSyncAttempt = `-- name: StartGarminSyncAttempt :exec
+UPDATE garmin_connections SET last_attempt_at = now(), updated_at = now() WHERE user_id = $1
+`
+
+func (q *Queries) StartGarminSyncAttempt(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, startGarminSyncAttempt, userID)
 	return err
 }
 
@@ -414,7 +475,7 @@ ON CONFLICT (user_id) DO UPDATE SET
     token_expires_at = EXCLUDED.token_expires_at,
     status = 'connected',
     updated_at = now()
-RETURNING user_id, key_ciphertext, key_expires_on, token_ciphertext, token_expires_at, status, sync_interval_h, synced_through, last_sync_at, created_at, updated_at
+RETURNING user_id, key_ciphertext, key_expires_on, token_ciphertext, token_expires_at, status, sync_interval_h, synced_through, last_sync_at, created_at, updated_at, last_attempt_at, last_error
 `
 
 type UpsertGarminKeyParams struct {
@@ -448,6 +509,8 @@ func (q *Queries) UpsertGarminKey(ctx context.Context, arg UpsertGarminKeyParams
 		&i.LastSyncAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.LastAttemptAt,
+		&i.LastError,
 	)
 	return i, err
 }
