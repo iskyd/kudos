@@ -51,11 +51,26 @@ func New(pool *pgxpool.Pool, jobClient *jobs.Client, dataDir string) *Service {
 type File struct {
 	Format string // fit, gpx or tcx
 	Data   []byte
+	Origin Origin
+}
+
+// Origin is where a file came from. The zero value is a user upload, whose
+// activities are keyed by start time, sport and device; a source keys them by
+// its own activity ID (invariant 6).
+type Origin struct {
+	Source     string // "garmin"
+	ActivityID string
 }
 
 // Upload decodes a file by its name's extension and ingests its activities.
 // loc is the user's timezone, used when the file records no local offset.
 func (s *Service) Upload(ctx context.Context, userID int64, loc *time.Location, name string, data []byte) ([]int64, error) {
+	return s.Import(ctx, userID, loc, name, data, Origin{})
+}
+
+// Import is Upload for a file from a source. loc is the fallback for a file
+// without a local offset.
+func (s *Service) Import(ctx context.Context, userID int64, loc *time.Location, name string, data []byte, o Origin) ([]int64, error) {
 	format := strings.TrimPrefix(strings.ToLower(filepath.Ext(name)), ".")
 	var decode func(io.Reader) ([]importer.Activity, error)
 	switch format {
@@ -72,7 +87,7 @@ func (s *Service) Upload(ctx context.Context, userID int64, loc *time.Location, 
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidFile, err)
 	}
-	return s.Ingest(ctx, userID, loc, File{Format: format, Data: data}, acts)
+	return s.Ingest(ctx, userID, loc, File{Format: format, Data: data, Origin: o}, acts)
 }
 
 // Ingest stores an uploaded file's activities, replacing earlier imports of the
@@ -122,14 +137,25 @@ func (s *Service) ingestTx(ctx context.Context, tx pgx.Tx, userID int64, loc *ti
 
 	var group *int64
 	if len(acts) > 1 {
-		id, err := q.UpsertMultisportGroup(ctx, db.UpsertMultisportGroupParams{UserID: userID, Source: "upload", SourceGroupID: digest})
+		source, groupID := "upload", digest
+		if f.Origin.Source != "" {
+			source, groupID = f.Origin.Source, f.Origin.ActivityID
+		}
+		id, err := q.UpsertMultisportGroup(ctx, db.UpsertMultisportGroupParams{UserID: userID, Source: source, SourceGroupID: groupID})
 		if err != nil {
 			return nil, created, fmt.Errorf("storing multisport group: %w", err)
 		}
 		group = &id
 	}
-	for _, a := range acts {
-		id, err := upsertActivity(ctx, q, userID, loc, a, &file.ID, group)
+	for i, a := range acts {
+		source, key := "upload", sourceKey(a.StartTime, a.Sport, a.Device)
+		if f.Origin.Source != "" {
+			source, key = f.Origin.Source, f.Origin.ActivityID
+			if len(acts) > 1 { // a multisport file holds its legs under one source ID
+				key = fmt.Sprintf("%s/%d", key, i)
+			}
+		}
+		id, err := upsertActivity(ctx, q, userID, loc, a, source, key, &file.ID, group)
 		if err != nil {
 			return nil, created, err
 		}
@@ -222,10 +248,10 @@ func sourceKey(start time.Time, sport importer.Sport, d importer.Device) string 
 }
 
 func upsertActivity(ctx context.Context, q *db.Queries, userID int64, loc *time.Location, a importer.Activity,
-	fileID, group *int64,
+	source, key string, fileID, group *int64,
 ) (int64, error) {
 	id, err := q.UpsertActivity(ctx, db.UpsertActivityParams{
-		UserID: userID, Source: "upload", SourceActivityID: sourceKey(a.StartTime, a.Sport, a.Device),
+		UserID: userID, Source: source, SourceActivityID: key,
 		Sport: string(a.Sport), Subtype: string(a.Subtype), StartTime: a.StartTime.UTC(), UtcOffsetS: offset(a, loc),
 		OriginalFileID: fileID, MultisportGroupID: group,
 		ElapsedTimeS: a.ElapsedTime, TimerTimeS: a.TimerTime, DistanceM: a.Distance,

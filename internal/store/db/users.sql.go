@@ -65,6 +65,17 @@ func (q *Queries) GetUserCredentials(ctx context.Context, username string) (GetU
 	return i, err
 }
 
+const getUserTimezone = `-- name: GetUserTimezone :one
+SELECT timezone FROM users WHERE id = $1
+`
+
+func (q *Queries) GetUserTimezone(ctx context.Context, id int64) (string, error) {
+	row := q.db.QueryRow(ctx, getUserTimezone, id)
+	var timezone string
+	err := row.Scan(&timezone)
+	return timezone, err
+}
+
 const updateUserTimezone = `-- name: UpdateUserTimezone :one
 UPDATE users SET timezone = $2 WHERE id = $1
 RETURNING id, username, timezone, created_at

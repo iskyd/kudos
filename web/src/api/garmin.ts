@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCurrentUser } from '@/api/auth'
 import { api } from '@/api/client'
 import type { components } from '@/api/generated/schema'
@@ -63,5 +63,75 @@ export function useDisconnectGarmin() {
       if (error) throw new ApiError(error)
     },
     onSuccess: () => queryClient.setQueryData<GarminConnection>(garminKey, { connected: false }),
+  })
+}
+
+export type GarminBackfill = components['schemas']['GarminBackfill']
+
+const backfillKey = ['garmin', 'backfill'] as const
+const failuresKey = ['garmin', 'backfill', 'failures'] as const
+// How often a running backfill's progress is refreshed.
+const backfillPollMs = 5000
+
+export function useGarminBackfill() {
+  return useQuery({
+    queryKey: backfillKey,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/garmin/backfill')
+      if (error) throw new ApiError(error)
+      return data
+    },
+    refetchInterval: (query) => (query.state.data?.status === 'running' ? backfillPollMs : false),
+  })
+}
+
+export function useStartGarminBackfill() {
+  const queryClient = useQueryClient()
+  const { csrfToken } = useCurrentUser()
+  return useMutation({
+    mutationFn: async (days: number) => {
+      const { data, error } = await api.POST('/api/garmin/backfill', {
+        body: { days },
+        headers: { 'X-CSRF-Token': csrfToken },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    onSuccess: (backfill) => queryClient.setQueryData(backfillKey, backfill),
+  })
+}
+
+export function useResumeGarminBackfill() {
+  const queryClient = useQueryClient()
+  const { csrfToken } = useCurrentUser()
+  return useMutation({
+    mutationFn: async (retryFailed: boolean) => {
+      const { data, error } = await api.POST('/api/garmin/backfill/resume', {
+        body: { retryFailed },
+        headers: { 'X-CSRF-Token': csrfToken },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    onSuccess: async (backfill) => {
+      queryClient.setQueryData(backfillKey, backfill)
+      await queryClient.invalidateQueries({ queryKey: failuresKey })
+    },
+  })
+}
+
+export function useGarminBackfillFailures(enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: failuresKey,
+    enabled,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await api.GET('/api/garmin/backfill/failures', {
+        params: { query: { cursor: pageParam } },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    getNextPageParam: (page) => page.nextCursor,
   })
 }

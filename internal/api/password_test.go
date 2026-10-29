@@ -69,7 +69,7 @@ func TestDefaultArgon(t *testing.T) {
 	if p := defaultArgon(); p.memory != 64*1024 || p.time != 3 || p.threads != 4 {
 		t.Fatalf("defaultArgon = %+v, want RFC 9106 (64 MiB, t=3, p=4)", p)
 	}
-	if s := NewServer(nil, nil, nil, nil, true); !strings.Contains(s.dummyHash, "$m=65536,t=3,p=4$") {
+	if s := NewServer(nil, nil, nil, Garmin{}, true); !strings.Contains(s.dummyHash, "$m=65536,t=3,p=4$") {
 		t.Fatalf("NewServer dummy hash = %q, want production parameters", s.dummyHash)
 	}
 }

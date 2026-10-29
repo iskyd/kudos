@@ -194,6 +194,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/garmin/backfill": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Onboarding backfill progress */
+        get: operations["getGarminBackfill"];
+        put?: never;
+        /**
+         * Start the onboarding backfill
+         * @description Imports the activities and daily health metrics of the last `days` local
+         *     days, ending today. A user has one backfill (backfill-exists); a paused one
+         *     is continued with resume.
+         */
+        post: operations["startGarminBackfill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/garmin/backfill/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resume the backfill
+         * @description Continues a paused backfill and, with retryFailed, imports the failed activities again.
+         */
+        post: operations["resumeGarminBackfill"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/garmin/backfill/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Activities the backfill could not import */
+        get: operations["listGarminBackfillFailures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -294,6 +354,47 @@ export interface components {
         };
         SetGarminSyncIntervalRequest: {
             hours: number;
+        };
+        StartGarminBackfillRequest: {
+            /**
+             * @description How many days of history to import, ending today.
+             * @default 120
+             */
+            days: number;
+        };
+        ResumeGarminBackfillRequest: {
+            /** @default false */
+            retryFailed: boolean;
+        };
+        GarminBackfill: {
+            started: boolean;
+            /** @enum {string} */
+            status?: "running" | "paused" | "done";
+            /**
+             * @description Set while paused. A rate-limited backfill continues by itself.
+             * @enum {string}
+             */
+            pauseReason?: "rate_limited" | "key_rejected" | "disconnected";
+            /** Format: date */
+            windowStart?: string;
+            /** Format: date */
+            windowEnd?: string;
+            /** @description Activities found in the window; 0 until they are listed. */
+            activitiesTotal?: number;
+            activitiesDone?: number;
+            activitiesFailed?: number;
+            daysTotal?: number;
+            /** @description Days whose health metrics are stored. */
+            daysDone?: number;
+        };
+        GarminImportFailure: {
+            sourceActivityId: string;
+            /** Format: date-time */
+            startTime: string;
+            reason: string;
+        };
+        GarminImportFailurePage: components["schemas"]["Page"] & {
+            items: components["schemas"]["GarminImportFailure"][];
         };
         /** @description RFC 9457 problem details. */
         Problem: {
@@ -617,6 +718,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["GarminConnection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getGarminBackfill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The backfill, or `started` false when there is none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GarminBackfill"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    startGarminBackfill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartGarminBackfillRequest"];
+            };
+        };
+        responses: {
+            /** @description The backfill was queued. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GarminBackfill"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    resumeGarminBackfill: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResumeGarminBackfillRequest"];
+            };
+        };
+        responses: {
+            /** @description The backfill after resuming. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GarminBackfill"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listGarminBackfillFailures: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Failed activities, oldest first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GarminImportFailurePage"];
                 };
             };
             default: components["responses"]["Problem"];

@@ -242,6 +242,81 @@ paths:
                 $ref: "#/components/schemas/GarminConnection"
         default:
           $ref: "#/components/responses/Problem"
+  /api/garmin/backfill:
+    get:
+      operationId: getGarminBackfill
+      summary: Onboarding backfill progress
+      tags: [garmin]
+      responses:
+        "200":
+          description: The backfill, or `started` false when there is none.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GarminBackfill"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: startGarminBackfill
+      summary: Start the onboarding backfill
+      description: |
+        Imports the activities and daily health metrics of the last `days` local
+        days, ending today. A user has one backfill (backfill-exists); a paused one
+        is continued with resume.
+      tags: [garmin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartGarminBackfillRequest"
+      responses:
+        "202":
+          description: The backfill was queued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GarminBackfill"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/garmin/backfill/resume:
+    post:
+      operationId: resumeGarminBackfill
+      summary: Resume the backfill
+      description: Continues a paused backfill and, with retryFailed, imports the failed activities again.
+      tags: [garmin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ResumeGarminBackfillRequest"
+      responses:
+        "200":
+          description: The backfill after resuming.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GarminBackfill"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/garmin/backfill/failures:
+    get:
+      operationId: listGarminBackfillFailures
+      summary: Activities the backfill could not import
+      tags: [garmin]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Failed activities, oldest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GarminImportFailurePage"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -426,6 +501,73 @@ components:
           type: integer
           minimum: 1
           maximum: 24
+    StartGarminBackfillRequest:
+      type: object
+      properties:
+        days:
+          type: integer
+          minimum: 1
+          maximum: 365
+          default: 120
+          description: How many days of history to import, ending today.
+    ResumeGarminBackfillRequest:
+      type: object
+      properties:
+        retryFailed:
+          type: boolean
+          default: false
+    GarminBackfill:
+      type: object
+      required: [started]
+      properties:
+        started:
+          type: boolean
+        status:
+          type: string
+          enum: [running, paused, done]
+        pauseReason:
+          type: string
+          enum: [rate_limited, key_rejected, disconnected]
+          description: Set while paused. A rate-limited backfill continues by itself.
+        windowStart:
+          type: string
+          format: date
+        windowEnd:
+          type: string
+          format: date
+        activitiesTotal:
+          type: integer
+          description: Activities found in the window; 0 until they are listed.
+        activitiesDone:
+          type: integer
+        activitiesFailed:
+          type: integer
+        daysTotal:
+          type: integer
+        daysDone:
+          type: integer
+          description: Days whose health metrics are stored.
+    GarminImportFailure:
+      type: object
+      required: [sourceActivityId, startTime, reason]
+      properties:
+        sourceActivityId:
+          type: string
+        startTime:
+          type: string
+          format: date-time
+        reason:
+          type: string
+    GarminImportFailurePage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/GarminImportFailure"
     Problem:
       type: object
       description: RFC 9457 problem details.

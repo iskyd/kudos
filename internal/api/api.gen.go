@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -17,18 +18,60 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for GarminBackfillPauseReason.
+const (
+	GarminBackfillPauseReasonDisconnected GarminBackfillPauseReason = "disconnected"
+	GarminBackfillPauseReasonKeyRejected  GarminBackfillPauseReason = "key_rejected"
+	GarminBackfillPauseReasonRateLimited  GarminBackfillPauseReason = "rate_limited"
+)
+
+// Valid indicates whether the value is a known member of the GarminBackfillPauseReason enum.
+func (e GarminBackfillPauseReason) Valid() bool {
+	switch e {
+	case GarminBackfillPauseReasonDisconnected:
+		return true
+	case GarminBackfillPauseReasonKeyRejected:
+		return true
+	case GarminBackfillPauseReasonRateLimited:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GarminBackfillStatus.
+const (
+	GarminBackfillStatusDone    GarminBackfillStatus = "done"
+	GarminBackfillStatusPaused  GarminBackfillStatus = "paused"
+	GarminBackfillStatusRunning GarminBackfillStatus = "running"
+)
+
+// Valid indicates whether the value is a known member of the GarminBackfillStatus enum.
+func (e GarminBackfillStatus) Valid() bool {
+	switch e {
+	case GarminBackfillStatusDone:
+		return true
+	case GarminBackfillStatusPaused:
+		return true
+	case GarminBackfillStatusRunning:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GarminConnectionStatus.
 const (
-	Connected   GarminConnectionStatus = "connected"
-	KeyRejected GarminConnectionStatus = "key_rejected"
+	GarminConnectionStatusConnected   GarminConnectionStatus = "connected"
+	GarminConnectionStatusKeyRejected GarminConnectionStatus = "key_rejected"
 )
 
 // Valid indicates whether the value is a known member of the GarminConnectionStatus enum.
 func (e GarminConnectionStatus) Valid() bool {
 	switch e {
-	case Connected:
+	case GarminConnectionStatusConnected:
 		return true
-	case KeyRejected:
+	case GarminConnectionStatusKeyRejected:
 		return true
 	default:
 		return false
@@ -37,34 +80,34 @@ func (e GarminConnectionStatus) Valid() bool {
 
 // Defines values for Sport.
 const (
-	Cycling           Sport = "cycling"
-	Hiking            Sport = "hiking"
-	OpenWaterSwimming Sport = "open_water_swimming"
-	Other             Sport = "other"
-	PoolSwimming      Sport = "pool_swimming"
-	Running           Sport = "running"
-	Strength          Sport = "strength"
-	TrailRunning      Sport = "trail_running"
+	SportCycling           Sport = "cycling"
+	SportHiking            Sport = "hiking"
+	SportOpenWaterSwimming Sport = "open_water_swimming"
+	SportOther             Sport = "other"
+	SportPoolSwimming      Sport = "pool_swimming"
+	SportRunning           Sport = "running"
+	SportStrength          Sport = "strength"
+	SportTrailRunning      Sport = "trail_running"
 )
 
 // Valid indicates whether the value is a known member of the Sport enum.
 func (e Sport) Valid() bool {
 	switch e {
-	case Cycling:
+	case SportCycling:
 		return true
-	case Hiking:
+	case SportHiking:
 		return true
-	case OpenWaterSwimming:
+	case SportOpenWaterSwimming:
 		return true
-	case Other:
+	case SportOther:
 		return true
-	case PoolSwimming:
+	case SportPoolSwimming:
 		return true
-	case Running:
+	case SportRunning:
 		return true
-	case Strength:
+	case SportStrength:
 		return true
-	case TrailRunning:
+	case SportTrailRunning:
 		return true
 	default:
 		return false
@@ -75,6 +118,32 @@ func (e Sport) Valid() bool {
 type CreatedActivity struct {
 	Id int64 `json:"id"`
 }
+
+// GarminBackfill defines model for GarminBackfill.
+type GarminBackfill struct {
+	ActivitiesDone   *int `json:"activitiesDone,omitempty"`
+	ActivitiesFailed *int `json:"activitiesFailed,omitempty"`
+
+	// ActivitiesTotal Activities found in the window; 0 until they are listed.
+	ActivitiesTotal *int `json:"activitiesTotal,omitempty"`
+
+	// DaysDone Days whose health metrics are stored.
+	DaysDone  *int `json:"daysDone,omitempty"`
+	DaysTotal *int `json:"daysTotal,omitempty"`
+
+	// PauseReason Set while paused. A rate-limited backfill continues by itself.
+	PauseReason *GarminBackfillPauseReason `json:"pauseReason,omitempty"`
+	Started     bool                       `json:"started"`
+	Status      *GarminBackfillStatus      `json:"status,omitempty"`
+	WindowEnd   *openapi_types.Date        `json:"windowEnd,omitempty"`
+	WindowStart *openapi_types.Date        `json:"windowStart,omitempty"`
+}
+
+// GarminBackfillPauseReason Set while paused. A rate-limited backfill continues by itself.
+type GarminBackfillPauseReason string
+
+// GarminBackfillStatus defines model for GarminBackfill.Status.
+type GarminBackfillStatus string
 
 // GarminConnection defines model for GarminConnection.
 type GarminConnection struct {
@@ -94,6 +163,21 @@ type GarminConnection struct {
 
 // GarminConnectionStatus key_rejected when Garmin refused the key; sync is paused until a new key is set.
 type GarminConnectionStatus string
+
+// GarminImportFailure defines model for GarminImportFailure.
+type GarminImportFailure struct {
+	Reason           string    `json:"reason"`
+	SourceActivityId string    `json:"sourceActivityId"`
+	StartTime        time.Time `json:"startTime"`
+}
+
+// GarminImportFailurePage defines model for GarminImportFailurePage.
+type GarminImportFailurePage struct {
+	Items []GarminImportFailure `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -173,6 +257,11 @@ type RegisterRequest struct {
 	Username Username `json:"username"`
 }
 
+// ResumeGarminBackfillRequest defines model for ResumeGarminBackfillRequest.
+type ResumeGarminBackfillRequest struct {
+	RetryFailed *bool `json:"retryFailed,omitempty"`
+}
+
 // SetGarminKeyRequest defines model for SetGarminKeyRequest.
 type SetGarminKeyRequest struct {
 	// ExpiresOn The expiry Garmin showed when the key was created, at most a year ahead.
@@ -187,6 +276,12 @@ type SetGarminSyncIntervalRequest struct {
 
 // Sport defines model for Sport.
 type Sport string
+
+// StartGarminBackfillRequest defines model for StartGarminBackfillRequest.
+type StartGarminBackfillRequest struct {
+	// Days How many days of history to import, ending today.
+	Days *int `json:"days,omitempty"`
+}
 
 // Timezone IANA time zone name.
 //
@@ -221,6 +316,15 @@ type UploadActivityMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
 
+// ListGarminBackfillFailuresParams defines parameters for ListGarminBackfillFailures.
+type ListGarminBackfillFailuresParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // CreateActivityJSONRequestBody defines body for CreateActivity for application/json ContentType.
 type CreateActivityJSONRequestBody = ManualActivityRequest
 
@@ -232,6 +336,12 @@ type LoginJSONRequestBody = LoginRequest
 
 // RegisterJSONRequestBody defines body for Register for application/json ContentType.
 type RegisterJSONRequestBody = RegisterRequest
+
+// StartGarminBackfillJSONRequestBody defines body for StartGarminBackfill for application/json ContentType.
+type StartGarminBackfillJSONRequestBody = StartGarminBackfillRequest
+
+// ResumeGarminBackfillJSONRequestBody defines body for ResumeGarminBackfill for application/json ContentType.
+type ResumeGarminBackfillJSONRequestBody = ResumeGarminBackfillRequest
 
 // SetGarminKeyJSONRequestBody defines body for SetGarminKey for application/json ContentType.
 type SetGarminKeyJSONRequestBody = SetGarminKeyRequest
@@ -265,6 +375,18 @@ type ServerInterface interface {
 	// GetGarminConnection Garmin connection status
 	// (GET /api/garmin)
 	GetGarminConnection(w http.ResponseWriter, r *http.Request)
+	// GetGarminBackfill Onboarding backfill progress
+	// (GET /api/garmin/backfill)
+	GetGarminBackfill(w http.ResponseWriter, r *http.Request)
+	// StartGarminBackfill Start the onboarding backfill
+	// (POST /api/garmin/backfill)
+	StartGarminBackfill(w http.ResponseWriter, r *http.Request)
+	// ListGarminBackfillFailures Activities the backfill could not import
+	// (GET /api/garmin/backfill/failures)
+	ListGarminBackfillFailures(w http.ResponseWriter, r *http.Request, params ListGarminBackfillFailuresParams)
+	// ResumeGarminBackfill Resume the backfill
+	// (POST /api/garmin/backfill/resume)
+	ResumeGarminBackfill(w http.ResponseWriter, r *http.Request)
 	// SetGarminKey Set the Personal API key
 	// (PUT /api/garmin/key)
 	SetGarminKey(w http.ResponseWriter, r *http.Request)
@@ -325,6 +447,30 @@ func (_ Unimplemented) DeleteGarminConnection(w http.ResponseWriter, r *http.Req
 // GetGarminConnection Garmin connection status
 // (GET /api/garmin)
 func (_ Unimplemented) GetGarminConnection(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetGarminBackfill Onboarding backfill progress
+// (GET /api/garmin/backfill)
+func (_ Unimplemented) GetGarminBackfill(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// StartGarminBackfill Start the onboarding backfill
+// (POST /api/garmin/backfill)
+func (_ Unimplemented) StartGarminBackfill(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListGarminBackfillFailures Activities the backfill could not import
+// (GET /api/garmin/backfill/failures)
+func (_ Unimplemented) ListGarminBackfillFailures(w http.ResponseWriter, r *http.Request, params ListGarminBackfillFailuresParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ResumeGarminBackfill Resume the backfill
+// (POST /api/garmin/backfill/resume)
+func (_ Unimplemented) ResumeGarminBackfill(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -456,6 +602,94 @@ func (siw *ServerInterfaceWrapper) GetGarminConnection(w http.ResponseWriter, r 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetGarminConnection(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetGarminBackfill operation middleware
+func (siw *ServerInterfaceWrapper) GetGarminBackfill(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGarminBackfill(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartGarminBackfill operation middleware
+func (siw *ServerInterfaceWrapper) StartGarminBackfill(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartGarminBackfill(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListGarminBackfillFailures operation middleware
+func (siw *ServerInterfaceWrapper) ListGarminBackfillFailures(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGarminBackfillFailuresParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGarminBackfillFailures(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ResumeGarminBackfill operation middleware
+func (siw *ServerInterfaceWrapper) ResumeGarminBackfill(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ResumeGarminBackfill(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -683,6 +917,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/garmin/sync-interval", wrapper.SetGarminSyncInterval)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/garmin/backfill", wrapper.GetGarminBackfill)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/garmin/backfill", wrapper.StartGarminBackfill)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/garmin/backfill/resume", wrapper.ResumeGarminBackfill)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/garmin/backfill/failures", wrapper.ListGarminBackfillFailures)
 	})
 
 	return r
@@ -976,6 +1222,161 @@ func (response GetGarminConnectiondefaultApplicationProblemPlusJSONResponse) Vis
 	return err
 }
 
+type GetGarminBackfillRequestObject struct {
+}
+
+type GetGarminBackfillResponseObject interface {
+	VisitGetGarminBackfillResponse(w http.ResponseWriter) error
+}
+
+type GetGarminBackfill200JSONResponse GarminBackfill
+
+func (response GetGarminBackfill200JSONResponse) VisitGetGarminBackfillResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGarminBackfilldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetGarminBackfilldefaultApplicationProblemPlusJSONResponse) VisitGetGarminBackfillResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartGarminBackfillRequestObject struct {
+	Body *StartGarminBackfillJSONRequestBody
+}
+
+type StartGarminBackfillResponseObject interface {
+	VisitStartGarminBackfillResponse(w http.ResponseWriter) error
+}
+
+type StartGarminBackfill202JSONResponse GarminBackfill
+
+func (response StartGarminBackfill202JSONResponse) VisitStartGarminBackfillResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type StartGarminBackfilldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response StartGarminBackfilldefaultApplicationProblemPlusJSONResponse) VisitStartGarminBackfillResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGarminBackfillFailuresRequestObject struct {
+	Params ListGarminBackfillFailuresParams
+}
+
+type ListGarminBackfillFailuresResponseObject interface {
+	VisitListGarminBackfillFailuresResponse(w http.ResponseWriter) error
+}
+
+type ListGarminBackfillFailures200JSONResponse GarminImportFailurePage
+
+func (response ListGarminBackfillFailures200JSONResponse) VisitListGarminBackfillFailuresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGarminBackfillFailuresdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListGarminBackfillFailuresdefaultApplicationProblemPlusJSONResponse) VisitListGarminBackfillFailuresResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeGarminBackfillRequestObject struct {
+	Body *ResumeGarminBackfillJSONRequestBody
+}
+
+type ResumeGarminBackfillResponseObject interface {
+	VisitResumeGarminBackfillResponse(w http.ResponseWriter) error
+}
+
+type ResumeGarminBackfill200JSONResponse GarminBackfill
+
+func (response ResumeGarminBackfill200JSONResponse) VisitResumeGarminBackfillResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ResumeGarminBackfilldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ResumeGarminBackfilldefaultApplicationProblemPlusJSONResponse) VisitResumeGarminBackfillResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SetGarminKeyRequestObject struct {
 	Body *SetGarminKeyJSONRequestBody
 }
@@ -1189,6 +1590,18 @@ type StrictServerInterface interface {
 	// GetGarminConnection Garmin connection status
 	// (GET /api/garmin)
 	GetGarminConnection(ctx context.Context, request GetGarminConnectionRequestObject) (GetGarminConnectionResponseObject, error)
+	// GetGarminBackfill Onboarding backfill progress
+	// (GET /api/garmin/backfill)
+	GetGarminBackfill(ctx context.Context, request GetGarminBackfillRequestObject) (GetGarminBackfillResponseObject, error)
+	// StartGarminBackfill Start the onboarding backfill
+	// (POST /api/garmin/backfill)
+	StartGarminBackfill(ctx context.Context, request StartGarminBackfillRequestObject) (StartGarminBackfillResponseObject, error)
+	// ListGarminBackfillFailures Activities the backfill could not import
+	// (GET /api/garmin/backfill/failures)
+	ListGarminBackfillFailures(ctx context.Context, request ListGarminBackfillFailuresRequestObject) (ListGarminBackfillFailuresResponseObject, error)
+	// ResumeGarminBackfill Resume the backfill
+	// (POST /api/garmin/backfill/resume)
+	ResumeGarminBackfill(ctx context.Context, request ResumeGarminBackfillRequestObject) (ResumeGarminBackfillResponseObject, error)
 	// SetGarminKey Set the Personal API key
 	// (PUT /api/garmin/key)
 	SetGarminKey(ctx context.Context, request SetGarminKeyRequestObject) (SetGarminKeyResponseObject, error)
@@ -1434,6 +1847,118 @@ func (sh *strictHandler) GetGarminConnection(w http.ResponseWriter, r *http.Requ
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetGarminConnectionResponseObject); ok {
 		if err := validResponse.VisitGetGarminConnectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetGarminBackfill operation middleware
+func (sh *strictHandler) GetGarminBackfill(w http.ResponseWriter, r *http.Request) {
+	var request GetGarminBackfillRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGarminBackfill(ctx, request.(GetGarminBackfillRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGarminBackfill")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetGarminBackfillResponseObject); ok {
+		if err := validResponse.VisitGetGarminBackfillResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// StartGarminBackfill operation middleware
+func (sh *strictHandler) StartGarminBackfill(w http.ResponseWriter, r *http.Request) {
+	var request StartGarminBackfillRequestObject
+
+	var body StartGarminBackfillJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.StartGarminBackfill(ctx, request.(StartGarminBackfillRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "StartGarminBackfill")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(StartGarminBackfillResponseObject); ok {
+		if err := validResponse.VisitStartGarminBackfillResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListGarminBackfillFailures operation middleware
+func (sh *strictHandler) ListGarminBackfillFailures(w http.ResponseWriter, r *http.Request, params ListGarminBackfillFailuresParams) {
+	var request ListGarminBackfillFailuresRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGarminBackfillFailures(ctx, request.(ListGarminBackfillFailuresRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGarminBackfillFailures")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGarminBackfillFailuresResponseObject); ok {
+		if err := validResponse.VisitListGarminBackfillFailuresResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ResumeGarminBackfill operation middleware
+func (sh *strictHandler) ResumeGarminBackfill(w http.ResponseWriter, r *http.Request) {
+	var request ResumeGarminBackfillRequestObject
+
+	var body ResumeGarminBackfillJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ResumeGarminBackfill(ctx, request.(ResumeGarminBackfillRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ResumeGarminBackfill")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ResumeGarminBackfillResponseObject); ok {
+		if err := validResponse.VisitResumeGarminBackfillResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

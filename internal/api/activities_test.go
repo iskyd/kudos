@@ -141,7 +141,7 @@ func TestCreateActivity(t *testing.T) {
 	t.Parallel()
 	c, q, me := loggedIn(t, "Europe/Rome")
 	body := ManualActivityRequest{
-		Sport: Running, LocalStartTime: "2026-01-10T18:30", DurationS: 1800,
+		Sport: SportRunning, LocalStartTime: "2026-01-10T18:30", DurationS: 1800,
 		DistanceM: new(5000.0), Rpe: new(6.5), Notes: new("Easy"),
 	}
 	created := decodeJSON[CreatedActivity](t, c.do(http.MethodPost, "/api/activities", body, nil), http.StatusCreated)
@@ -166,7 +166,7 @@ func TestCreateActivityRejects(t *testing.T) {
 	t.Parallel()
 	c, _, _ := loggedIn(t, "UTC")
 	valid := func() ManualActivityRequest {
-		return ManualActivityRequest{Sport: Cycling, LocalStartTime: "2026-01-10T18:30", DurationS: 3600}
+		return ManualActivityRequest{Sport: SportCycling, LocalStartTime: "2026-01-10T18:30", DurationS: 3600}
 	}
 	for name, change := range map[string]func(*ManualActivityRequest){
 		"unknown sport":     func(b *ManualActivityRequest) { b.Sport = "transition" },

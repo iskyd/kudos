@@ -1,11 +1,16 @@
 import { useState, type SubmitEvent } from 'react'
 import { useCurrentUser, useUpdateMe } from '@/api/auth'
 import {
+  type GarminBackfill,
   type GarminConnection,
   useDisconnectGarmin,
+  useGarminBackfill,
+  useGarminBackfillFailures,
   useGarminConnection,
+  useResumeGarminBackfill,
   useSetGarminKey,
   useSetGarminSyncInterval,
+  useStartGarminBackfill,
 } from '@/api/garmin'
 import { problemMessage } from '@/api/problem'
 import { Button } from '@/components/ui/button'
@@ -17,6 +22,14 @@ import { daysUntil, formatDateTime, formatDay, toISODay } from '@/lib/format/dat
 // Garmin warns about expiring keys a week ahead; so does KudOS.
 const expiryWarningDays = 7
 const syncIntervals = Array.from({ length: 24 }, (_, i) => i + 1)
+const defaultBackfillDays = 120
+const maxBackfillDays = 365
+
+const pauseMessages: Record<NonNullable<GarminBackfill['pauseReason']>, string> = {
+  rate_limited: 'Paused: Garmin is limiting requests. It continues by itself.',
+  key_rejected: 'Paused until you enter a new key.',
+  disconnected: 'Paused: Garmin is disconnected.',
+}
 
 export function SettingsPage() {
   return (
@@ -168,6 +181,7 @@ function GarminStatus({ connection }: { connection: GarminConnection }) {
           </p>
         )}
       </div>
+      <BackfillSection />
       <GarminKeyForm submitLabel="Replace key" />
       {disconnect.isError && (
         <p role="alert" className="text-sm text-destructive">
@@ -255,5 +269,198 @@ function GarminKeyForm({ submitLabel }: { submitLabel: string }) {
         {submitLabel}
       </Button>
     </form>
+  )
+}
+
+function BackfillSection() {
+  const backfill = useGarminBackfill()
+  return (
+    <div className="flex flex-col gap-3">
+      <h3 className="font-medium">History import</h3>
+      {backfill.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {backfill.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(backfill.error)}
+        </p>
+      )}
+      {backfill.data &&
+        (backfill.data.started ? (
+          <BackfillProgress backfill={backfill.data} />
+        ) : (
+          <StartBackfillForm />
+        ))}
+    </div>
+  )
+}
+
+function StartBackfillForm() {
+  const start = useStartGarminBackfill()
+  const [days, setDays] = useState(String(defaultBackfillDays))
+
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+    start.mutate(Number(days))
+  }
+
+  return (
+    <form onSubmit={onSubmit} className="flex flex-col gap-3">
+      <p className="text-sm text-muted-foreground">
+        Import your activities and daily health metrics from Garmin, up to a year back.
+      </p>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="backfill-days">Days of history</Label>
+        <Input
+          id="backfill-days"
+          type="number"
+          required
+          min={1}
+          max={maxBackfillDays}
+          value={days}
+          onChange={(event) => {
+            setDays(event.target.value)
+            start.reset()
+          }}
+          className="w-32"
+        />
+      </div>
+      {start.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(start.error)}
+        </p>
+      )}
+      <Button type="submit" className="self-start" disabled={start.isPending}>
+        Import history
+      </Button>
+    </form>
+  )
+}
+
+function BackfillProgress({ backfill }: { backfill: GarminBackfill }) {
+  const resume = useResumeGarminBackfill()
+  const total = backfill.activitiesTotal ?? 0
+  const handled = (backfill.activitiesDone ?? 0) + (backfill.activitiesFailed ?? 0)
+  const failed = backfill.activitiesFailed ?? 0
+  const window =
+    backfill.windowStart && backfill.windowEnd
+      ? `${formatDay(backfill.windowStart)} to ${formatDay(backfill.windowEnd)}`
+      : ''
+  const canResume = backfill.status === 'paused' && backfill.pauseReason !== 'rate_limited'
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p role="status" className="text-sm">
+        {backfill.status === 'done'
+          ? `Imported ${window}.`
+          : backfill.status === 'paused' && backfill.pauseReason
+            ? pauseMessages[backfill.pauseReason]
+            : `Importing ${window}…`}
+      </p>
+      <ProgressRow label="Activities" value={handled} max={total} />
+      <ProgressRow
+        label="Health days"
+        value={backfill.daysDone ?? 0}
+        max={backfill.daysTotal ?? 0}
+      />
+      {resume.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(resume.error)}
+        </p>
+      )}
+      {canResume && (
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={resume.isPending}
+          onClick={() => {
+            resume.mutate(false)
+          }}
+        >
+          Resume
+        </Button>
+      )}
+      {failed > 0 && (
+        <BackfillFailures
+          count={failed}
+          retrying={resume.isPending}
+          onRetry={() => {
+            resume.mutate(true)
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function ProgressRow({ label, value, max }: { label: string; value: number; max: number }) {
+  const id = `progress-${label.toLowerCase().replace(/\s+/g, '-')}`
+  return (
+    <div className="flex flex-col gap-1">
+      <div className="flex justify-between text-sm">
+        <label htmlFor={id}>{label}</label>
+        <span className="text-muted-foreground">
+          {value} of {max}
+        </span>
+      </div>
+      <progress
+        id={id}
+        value={value}
+        max={Math.max(max, 1)}
+        className="h-2 w-full accent-primary"
+      />
+    </div>
+  )
+}
+
+function BackfillFailures({
+  count,
+  retrying,
+  onRetry,
+}: {
+  count: number
+  retrying: boolean
+  onRetry: () => void
+}) {
+  const failures = useGarminBackfillFailures(true)
+  const items = failures.data?.pages.flatMap((page) => page.items) ?? []
+  return (
+    <div className="flex flex-col gap-2">
+      <h4 className="text-sm font-medium">
+        {count === 1
+          ? '1 activity could not be imported'
+          : `${String(count)} activities could not be imported`}
+      </h4>
+      {failures.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {failures.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(failures.error)}
+        </p>
+      )}
+      {items.length > 0 && (
+        <ul className="flex flex-col gap-1 text-sm">
+          {items.map((f) => (
+            <li key={f.sourceActivityId}>
+              <span>{formatDateTime(f.startTime)}</span>
+              <span className="text-muted-foreground"> — {f.reason}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="flex gap-2">
+        {failures.hasNextPage && (
+          <Button
+            variant="ghost"
+            disabled={failures.isFetchingNextPage}
+            onClick={() => {
+              void failures.fetchNextPage()
+            }}
+          >
+            Show more
+          </Button>
+        )}
+        <Button variant="outline" disabled={retrying} onClick={onRetry}>
+          Retry failed
+        </Button>
+      </div>
+    </div>
   )
 }

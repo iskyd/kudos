@@ -10,6 +10,81 @@ import (
 	"time"
 )
 
+const addGarminActivityImport = `-- name: AddGarminActivityImport :exec
+INSERT INTO garmin_activity_imports (user_id, source_activity_id, start_time, utc_offset_s)
+VALUES ($1, $2, $3, $4)
+ON CONFLICT (user_id, source_activity_id) DO NOTHING
+`
+
+type AddGarminActivityImportParams struct {
+	UserID           int64
+	SourceActivityID string
+	StartTime        time.Time
+	UtcOffsetS       *int32
+}
+
+// Listing again keeps the row and its outcome.
+func (q *Queries) AddGarminActivityImport(ctx context.Context, arg AddGarminActivityImportParams) error {
+	_, err := q.db.Exec(ctx, addGarminActivityImport,
+		arg.UserID,
+		arg.SourceActivityID,
+		arg.StartTime,
+		arg.UtcOffsetS,
+	)
+	return err
+}
+
+const countGarminActivityImports = `-- name: CountGarminActivityImports :one
+SELECT
+    count(*)::bigint AS total,
+    count(*) FILTER (WHERE status = 'done')::bigint AS done,
+    count(*) FILTER (WHERE status = 'failed')::bigint AS failed
+FROM garmin_activity_imports WHERE user_id = $1
+`
+
+type CountGarminActivityImportsRow struct {
+	Total  int64
+	Done   int64
+	Failed int64
+}
+
+func (q *Queries) CountGarminActivityImports(ctx context.Context, userID int64) (CountGarminActivityImportsRow, error) {
+	row := q.db.QueryRow(ctx, countGarminActivityImports, userID)
+	var i CountGarminActivityImportsRow
+	err := row.Scan(&i.Total, &i.Done, &i.Failed)
+	return i, err
+}
+
+const createGarminBackfill = `-- name: CreateGarminBackfill :one
+INSERT INTO garmin_backfills (user_id, window_start, window_end) VALUES ($1, $2, $3)
+ON CONFLICT (user_id) DO NOTHING
+RETURNING user_id, window_start, window_end, status, pause_reason, activities_listed, health_through, created_at, updated_at
+`
+
+type CreateGarminBackfillParams struct {
+	UserID      int64
+	WindowStart time.Time
+	WindowEnd   time.Time
+}
+
+// Returns no row when the user already has a backfill.
+func (q *Queries) CreateGarminBackfill(ctx context.Context, arg CreateGarminBackfillParams) (GarminBackfill, error) {
+	row := q.db.QueryRow(ctx, createGarminBackfill, arg.UserID, arg.WindowStart, arg.WindowEnd)
+	var i GarminBackfill
+	err := row.Scan(
+		&i.UserID,
+		&i.WindowStart,
+		&i.WindowEnd,
+		&i.Status,
+		&i.PauseReason,
+		&i.ActivitiesListed,
+		&i.HealthThrough,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const deleteGarminConnection = `-- name: DeleteGarminConnection :execrows
 DELETE FROM garmin_connections WHERE user_id = $1
 `
@@ -20,6 +95,43 @@ func (q *Queries) DeleteGarminConnection(ctx context.Context, userID int64) (int
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const finishGarminBackfill = `-- name: FinishGarminBackfill :execrows
+UPDATE garmin_backfills b SET status = 'done', updated_at = now()
+WHERE b.user_id = $1 AND b.status = 'running' AND NOT EXISTS (
+    SELECT 1 FROM garmin_activity_imports i WHERE i.user_id = $1 AND i.status = 'pending'
+)
+`
+
+// Finishes only when nothing is left to import, so a retry queued meanwhile is not lost.
+func (q *Queries) FinishGarminBackfill(ctx context.Context, userID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, finishGarminBackfill, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getGarminBackfill = `-- name: GetGarminBackfill :one
+SELECT user_id, window_start, window_end, status, pause_reason, activities_listed, health_through, created_at, updated_at FROM garmin_backfills WHERE user_id = $1
+`
+
+func (q *Queries) GetGarminBackfill(ctx context.Context, userID int64) (GarminBackfill, error) {
+	row := q.db.QueryRow(ctx, getGarminBackfill, userID)
+	var i GarminBackfill
+	err := row.Scan(
+		&i.UserID,
+		&i.WindowStart,
+		&i.WindowEnd,
+		&i.Status,
+		&i.PauseReason,
+		&i.ActivitiesListed,
+		&i.HealthThrough,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
 }
 
 const getGarminConnection = `-- name: GetGarminConnection :one
@@ -43,6 +155,193 @@ func (q *Queries) GetGarminConnection(ctx context.Context, userID int64) (Garmin
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const listGarminActivityImportFailures = `-- name: ListGarminActivityImportFailures :many
+SELECT source_activity_id, start_time, error FROM garmin_activity_imports
+WHERE user_id = $1 AND status = 'failed'
+    AND (start_time, source_activity_id) > ($2::timestamptz, $3::text)
+ORDER BY start_time, source_activity_id
+LIMIT $4
+`
+
+type ListGarminActivityImportFailuresParams struct {
+	UserID     int64
+	AfterStart time.Time
+	AfterID    string
+	MaxRows    int32
+}
+
+type ListGarminActivityImportFailuresRow struct {
+	SourceActivityID string
+	StartTime        time.Time
+	Error            *string
+}
+
+// Oldest first; the cursor is the last row's (start_time, source_activity_id).
+func (q *Queries) ListGarminActivityImportFailures(ctx context.Context, arg ListGarminActivityImportFailuresParams) ([]ListGarminActivityImportFailuresRow, error) {
+	rows, err := q.db.Query(ctx, listGarminActivityImportFailures,
+		arg.UserID,
+		arg.AfterStart,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListGarminActivityImportFailuresRow
+	for rows.Next() {
+		var i ListGarminActivityImportFailuresRow
+		if err := rows.Scan(&i.SourceActivityID, &i.StartTime, &i.Error); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const nextGarminActivityImport = `-- name: NextGarminActivityImport :one
+SELECT user_id, source_activity_id, start_time, utc_offset_s, status, error, attempts, updated_at FROM garmin_activity_imports
+WHERE user_id = $1 AND status = 'pending'
+ORDER BY start_time, source_activity_id
+LIMIT 1
+`
+
+func (q *Queries) NextGarminActivityImport(ctx context.Context, userID int64) (GarminActivityImport, error) {
+	row := q.db.QueryRow(ctx, nextGarminActivityImport, userID)
+	var i GarminActivityImport
+	err := row.Scan(
+		&i.UserID,
+		&i.SourceActivityID,
+		&i.StartTime,
+		&i.UtcOffsetS,
+		&i.Status,
+		&i.Error,
+		&i.Attempts,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const pauseGarminBackfill = `-- name: PauseGarminBackfill :exec
+UPDATE garmin_backfills SET status = 'paused', pause_reason = $2, updated_at = now()
+WHERE user_id = $1 AND status = 'running'
+`
+
+type PauseGarminBackfillParams struct {
+	UserID      int64
+	PauseReason *string
+}
+
+func (q *Queries) PauseGarminBackfill(ctx context.Context, arg PauseGarminBackfillParams) error {
+	_, err := q.db.Exec(ctx, pauseGarminBackfill, arg.UserID, arg.PauseReason)
+	return err
+}
+
+const retryGarminActivityImports = `-- name: RetryGarminActivityImports :execrows
+UPDATE garmin_activity_imports SET status = 'pending', error = NULL, updated_at = now()
+WHERE user_id = $1 AND status = 'failed'
+`
+
+func (q *Queries) RetryGarminActivityImports(ctx context.Context, userID int64) (int64, error) {
+	result, err := q.db.Exec(ctx, retryGarminActivityImports, userID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const runGarminBackfill = `-- name: RunGarminBackfill :one
+UPDATE garmin_backfills b SET status = 'running', pause_reason = NULL, updated_at = now()
+WHERE b.user_id = $1 AND (b.status <> 'done' OR EXISTS (
+    SELECT 1 FROM garmin_activity_imports i WHERE i.user_id = $1 AND i.status = 'pending'
+))
+RETURNING user_id, window_start, window_end, status, pause_reason, activities_listed, health_through, created_at, updated_at
+`
+
+// Marks an unfinished backfill running again; no row when there is none to run.
+func (q *Queries) RunGarminBackfill(ctx context.Context, userID int64) (GarminBackfill, error) {
+	row := q.db.QueryRow(ctx, runGarminBackfill, userID)
+	var i GarminBackfill
+	err := row.Scan(
+		&i.UserID,
+		&i.WindowStart,
+		&i.WindowEnd,
+		&i.Status,
+		&i.PauseReason,
+		&i.ActivitiesListed,
+		&i.HealthThrough,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const setGarminActivityImportDone = `-- name: SetGarminActivityImportDone :exec
+UPDATE garmin_activity_imports SET status = 'done', error = NULL, attempts = attempts + 1, updated_at = now()
+WHERE user_id = $1 AND source_activity_id = $2
+`
+
+type SetGarminActivityImportDoneParams struct {
+	UserID           int64
+	SourceActivityID string
+}
+
+func (q *Queries) SetGarminActivityImportDone(ctx context.Context, arg SetGarminActivityImportDoneParams) error {
+	_, err := q.db.Exec(ctx, setGarminActivityImportDone, arg.UserID, arg.SourceActivityID)
+	return err
+}
+
+const setGarminActivityImportFailed = `-- name: SetGarminActivityImportFailed :exec
+UPDATE garmin_activity_imports SET status = 'failed', error = $3, attempts = attempts + 1, updated_at = now()
+WHERE user_id = $1 AND source_activity_id = $2
+`
+
+type SetGarminActivityImportFailedParams struct {
+	UserID           int64
+	SourceActivityID string
+	Error            *string
+}
+
+func (q *Queries) SetGarminActivityImportFailed(ctx context.Context, arg SetGarminActivityImportFailedParams) error {
+	_, err := q.db.Exec(ctx, setGarminActivityImportFailed, arg.UserID, arg.SourceActivityID, arg.Error)
+	return err
+}
+
+const setGarminBackfillHealthThrough = `-- name: SetGarminBackfillHealthThrough :exec
+UPDATE garmin_backfills SET health_through = $2, updated_at = now() WHERE user_id = $1
+`
+
+type SetGarminBackfillHealthThroughParams struct {
+	UserID        int64
+	HealthThrough *time.Time
+}
+
+func (q *Queries) SetGarminBackfillHealthThrough(ctx context.Context, arg SetGarminBackfillHealthThroughParams) error {
+	_, err := q.db.Exec(ctx, setGarminBackfillHealthThrough, arg.UserID, arg.HealthThrough)
+	return err
+}
+
+const setGarminBackfillListed = `-- name: SetGarminBackfillListed :exec
+UPDATE garmin_backfills SET activities_listed = true, updated_at = now() WHERE user_id = $1
+`
+
+func (q *Queries) SetGarminBackfillListed(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, setGarminBackfillListed, userID)
+	return err
+}
+
+const setGarminKeyRejected = `-- name: SetGarminKeyRejected :exec
+UPDATE garmin_connections SET status = 'key_rejected', updated_at = now() WHERE user_id = $1
+`
+
+func (q *Queries) SetGarminKeyRejected(ctx context.Context, userID int64) error {
+	_, err := q.db.Exec(ctx, setGarminKeyRejected, userID)
+	return err
 }
 
 const setGarminSyncInterval = `-- name: SetGarminSyncInterval :one
@@ -73,6 +372,36 @@ func (q *Queries) SetGarminSyncInterval(ctx context.Context, arg SetGarminSyncIn
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const setGarminSynced = `-- name: SetGarminSynced :exec
+UPDATE garmin_connections SET synced_through = $2, last_sync_at = now(), updated_at = now() WHERE user_id = $1
+`
+
+type SetGarminSyncedParams struct {
+	UserID        int64
+	SyncedThrough *time.Time
+}
+
+func (q *Queries) SetGarminSynced(ctx context.Context, arg SetGarminSyncedParams) error {
+	_, err := q.db.Exec(ctx, setGarminSynced, arg.UserID, arg.SyncedThrough)
+	return err
+}
+
+const updateGarminToken = `-- name: UpdateGarminToken :exec
+UPDATE garmin_connections SET token_ciphertext = $2, token_expires_at = $3, updated_at = now()
+WHERE user_id = $1
+`
+
+type UpdateGarminTokenParams struct {
+	UserID          int64
+	TokenCiphertext []byte
+	TokenExpiresAt  *time.Time
+}
+
+func (q *Queries) UpdateGarminToken(ctx context.Context, arg UpdateGarminTokenParams) error {
+	_, err := q.db.Exec(ctx, updateGarminToken, arg.UserID, arg.TokenCiphertext, arg.TokenExpiresAt)
+	return err
 }
 
 const upsertGarminKey = `-- name: UpsertGarminKey :one

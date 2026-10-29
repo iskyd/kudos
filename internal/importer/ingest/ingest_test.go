@@ -5,6 +5,7 @@ import (
 	"compress/gzip"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"log/slog"
@@ -451,3 +452,50 @@ func TestConversions(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+func TestImportKeysBySourceID(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	data := corpus(t, "gpx/run.gpx")
+	garmin := Origin{Source: "garmin", ActivityID: "100001"}
+
+	first, err := e.svc.Import(ctx, e.alice, time.UTC, "100001_ACTIVITY.gpx", data, garmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	again, err := e.svc.Import(ctx, e.alice, time.UTC, "100001_ACTIVITY.gpx", data, garmin)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(first) != 1 || len(again) != 1 || first[0] != again[0] {
+		t.Fatalf("ids = %v then %v, want the same activity", first, again)
+	}
+	a, err := e.q.GetActivity(ctx, db.GetActivityParams{UserID: e.alice, ID: first[0]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a.Source != "garmin" || a.SourceActivityID != "100001" {
+		t.Errorf("activity source = %s/%s, want garmin/100001", a.Source, a.SourceActivityID)
+	}
+
+	// A multisport file keys its legs under the one Garmin ID.
+	start := time.Date(2026, 5, 1, 6, 0, 0, 0, time.UTC)
+	legs := []importer.Activity{
+		{Sport: importer.SportOpenWaterSwimming, Subtype: importer.SubtypeOutdoor, StartTime: start},
+		{Sport: importer.SportCycling, Subtype: importer.SubtypeOutdoor, StartTime: start.Add(time.Hour)},
+	}
+	ids, err := e.svc.Ingest(ctx, e.alice, time.UTC, File{Format: "fit", Data: []byte("tri"), Origin: Origin{Source: "garmin", ActivityID: "7"}}, legs)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i, id := range ids {
+		a, err := e.q.GetActivity(ctx, db.GetActivityParams{UserID: e.alice, ID: id})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if want := fmt.Sprintf("7/%d", i); a.Source != "garmin" || a.SourceActivityID != want || a.MultisportGroupID == nil {
+			t.Errorf("leg %d = %s/%s group %v, want garmin/%s in a group", i, a.Source, a.SourceActivityID, a.MultisportGroupID, want)
+		}
+	}
+}

@@ -10,3 +10,6 @@ SELECT id, username, password_hash, timezone FROM users WHERE username = $1;
 -- name: UpdateUserTimezone :one
 UPDATE users SET timezone = $2 WHERE id = $1
 RETURNING id, username, timezone, created_at;
+
+-- name: GetUserTimezone :one
+SELECT timezone FROM users WHERE id = $1;
