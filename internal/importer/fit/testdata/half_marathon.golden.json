@@ -25,6 +25,32 @@
       "MaxCadence": 178,
       "AvgTemperature": null,
       "Calories": 1467,
+      "PoolLength": null,
+      "RPE": 9,
+      "Feel": 0,
+      "Thresholds": {
+        "FTP": 378,
+        "ThresholdHR": 171,
+        "MaxHR": 187,
+        "RestingHR": 58,
+        "HRZones": [
+          97,
+          116,
+          135,
+          154,
+          174,
+          187
+        ],
+        "PowerZones": [
+          270,
+          333,
+          377,
+          418,
+          480,
+          4000
+        ]
+      },
+      "Workout": null,
       "Laps": [
         {
           "StartTime": "2026-10-25T08:35:15Z",
@@ -43,7 +69,8 @@
           "MaxCadence": 178,
           "AvgTemperature": null,
           "Calories": 65,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T08:39:55Z",
@@ -62,7 +89,8 @@
           "MaxCadence": 178,
           "AvgTemperature": null,
           "Calories": 68,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T08:44:28Z",
@@ -81,7 +109,8 @@
           "MaxCadence": 177,
           "AvgTemperature": null,
           "Calories": 68,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T08:49:08Z",
@@ -100,7 +129,8 @@
           "MaxCadence": 174,
           "AvgTemperature": null,
           "Calories": 68,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T08:53:48Z",
@@ -119,7 +149,8 @@
           "MaxCadence": 173,
           "AvgTemperature": null,
           "Calories": 68,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T08:58:27Z",
@@ -138,7 +169,8 @@
           "MaxCadence": 173,
           "AvgTemperature": null,
           "Calories": 70,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:03:17Z",
@@ -157,7 +189,8 @@
           "MaxCadence": 177,
           "AvgTemperature": null,
           "Calories": 69,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:08:01Z",
@@ -176,7 +209,8 @@
           "MaxCadence": 174,
           "AvgTemperature": null,
           "Calories": 69,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:12:42Z",
@@ -195,7 +229,8 @@
           "MaxCadence": 174,
           "AvgTemperature": null,
           "Calories": 70,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:17:24Z",
@@ -214,7 +249,8 @@
           "MaxCadence": 172,
           "AvgTemperature": null,
           "Calories": 69,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:22:01Z",
@@ -233,7 +269,8 @@
           "MaxCadence": 173,
           "AvgTemperature": null,
           "Calories": 69,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:26:39Z",
@@ -252,7 +289,8 @@
           "MaxCadence": 170,
           "AvgTemperature": null,
           "Calories": 70,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:31:27Z",
@@ -271,7 +309,8 @@
           "MaxCadence": 172,
           "AvgTemperature": null,
           "Calories": 70,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:36:23Z",
@@ -290,7 +329,8 @@
           "MaxCadence": 173,
           "AvgTemperature": null,
           "Calories": 70,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:41:13Z",
@@ -309,7 +349,8 @@
           "MaxCadence": 171,
           "AvgTemperature": null,
           "Calories": 72,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:46:31Z",
@@ -328,7 +369,8 @@
           "MaxCadence": 175,
           "AvgTemperature": null,
           "Calories": 74,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:52:00Z",
@@ -347,7 +389,8 @@
           "MaxCadence": 169,
           "AvgTemperature": null,
           "Calories": 71,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T09:57:24Z",
@@ -366,7 +409,8 @@
           "MaxCadence": 170,
           "AvgTemperature": null,
           "Calories": 71,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T10:02:41Z",
@@ -385,7 +429,8 @@
           "MaxCadence": 170,
           "AvgTemperature": null,
           "Calories": 69,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T10:07:43Z",
@@ -404,7 +449,8 @@
           "MaxCadence": 170,
           "AvgTemperature": null,
           "Calories": 71,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T10:12:52Z",
@@ -423,7 +469,8 @@
           "MaxCadence": 172,
           "AvgTemperature": null,
           "Calories": 71,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         },
         {
           "StartTime": "2026-10-25T10:17:56Z",
@@ -442,9 +489,12 @@
           "MaxCadence": 175,
           "AvgTemperature": null,
           "Calories": 7,
-          "Intensity": "interval"
+          "Intensity": "interval",
+          "WorkoutStepIndex": null
         }
       ],
+      "Lengths": null,
+      "Sets": null,
       "Samples": [
         {
           "Time": "2026-10-25T08:35:15Z",

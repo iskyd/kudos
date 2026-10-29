@@ -1,0 +1,917 @@
+[
+  {
+    "Activity": {
+      "Sport": "strength",
+      "Subtype": "indoor",
+      "StartTime": "2026-03-23T15:42:05Z",
+      "UTCOffset": 3600000000000,
+      "Device": {
+        "Manufacturer": "garmin",
+        "Product": 3992,
+        "Serial": 1
+      },
+      "ElapsedTime": 5825.731,
+      "TimerTime": 5825.731,
+      "Distance": 0,
+      "Ascent": null,
+      "Descent": null,
+      "AvgSpeed": 0,
+      "MaxSpeed": null,
+      "AvgHR": 74,
+      "MaxHR": 121,
+      "AvgPower": null,
+      "MaxPower": null,
+      "AvgCadence": null,
+      "MaxCadence": null,
+      "AvgTemperature": null,
+      "Calories": 247,
+      "PoolLength": null,
+      "RPE": null,
+      "Feel": null,
+      "Thresholds": {
+        "FTP": null,
+        "ThresholdHR": 175,
+        "MaxHR": 192,
+        "RestingHR": 58,
+        "HRZones": [
+          96,
+          115,
+          134,
+          154,
+          173,
+          192
+        ],
+        "PowerZones": null
+      },
+      "Workout": {
+        "Name": "Strength Workout",
+        "Steps": [
+          {
+            "Index": 0,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 11,
+            "ExerciseNumber": 1
+          },
+          {
+            "Index": 1,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 2,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 19,
+            "ExerciseNumber": 66
+          },
+          {
+            "Index": 3,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 4,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 31,
+            "ExerciseNumber": 14
+          },
+          {
+            "Index": 5,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 6,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 10,
+            "ExerciseNumber": 11
+          },
+          {
+            "Index": 7,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 8,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 19,
+            "ExerciseNumber": 43
+          },
+          {
+            "Index": 9,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 10,
+            "Intensity": "active",
+            "DurationType": "reps",
+            "Duration": 6,
+            "ExerciseCategory": 22,
+            "ExerciseNumber": 77
+          },
+          {
+            "Index": 11,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 12,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 1,
+            "ExerciseNumber": 12
+          },
+          {
+            "Index": 13,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 14,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 13,
+            "ExerciseNumber": 29
+          },
+          {
+            "Index": 15,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 20
+          },
+          {
+            "Index": 16,
+            "Intensity": "active",
+            "DurationType": "time",
+            "Duration": 40,
+            "ExerciseCategory": 17,
+            "ExerciseNumber": 48
+          },
+          {
+            "Index": 17,
+            "Intensity": "rest",
+            "DurationType": "time",
+            "Duration": 60
+          },
+          {
+            "Index": 18,
+            "DurationType": "repeat_until_steps_cmplt",
+            "RepeatFrom": 0,
+            "RepeatCount": 3
+          }
+        ]
+      },
+      "Laps": null,
+      "Lengths": null,
+      "Sets": [
+        {
+          "StartTime": "2026-03-23T15:42:05Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 10,
+          "Weight": 0,
+          "ExerciseCategory": 11,
+          "ExerciseNumber": 1,
+          "ExerciseName": "Dead Bug",
+          "WorkoutStepIndex": 0
+        },
+        {
+          "StartTime": "2026-03-23T15:42:45Z",
+          "Duration": 10.611,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 1
+        },
+        {
+          "StartTime": "2026-03-23T15:42:56Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": 19,
+          "ExerciseNumber": 66,
+          "ExerciseName": "Side Plank",
+          "WorkoutStepIndex": 2
+        },
+        {
+          "StartTime": "2026-03-23T15:43:36Z",
+          "Duration": 16.145,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 3
+        },
+        {
+          "StartTime": "2026-03-23T15:43:52Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 8,
+          "Weight": 0,
+          "ExerciseCategory": 31,
+          "ExerciseNumber": 14,
+          "ExerciseName": "Opposite Arm and Leg Balance",
+          "WorkoutStepIndex": 4
+        },
+        {
+          "StartTime": "2026-03-23T15:44:32Z",
+          "Duration": 10.139,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 5
+        },
+        {
+          "StartTime": "2026-03-23T15:44:42Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 12,
+          "Weight": 0,
+          "ExerciseCategory": 10,
+          "ExerciseNumber": 11,
+          "ExerciseName": "Hip Raise",
+          "WorkoutStepIndex": 6
+        },
+        {
+          "StartTime": "2026-03-23T15:45:22Z",
+          "Duration": 9.761,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 7
+        },
+        {
+          "StartTime": "2026-03-23T15:45:32Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": 19,
+          "ExerciseNumber": 43,
+          "ExerciseName": "Plank",
+          "WorkoutStepIndex": 8
+        },
+        {
+          "StartTime": "2026-03-23T15:46:12Z",
+          "Duration": 14.155,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 9
+        },
+        {
+          "StartTime": "2026-03-23T15:46:26Z",
+          "Duration": 19.738,
+          "Active": true,
+          "Reps": 6,
+          "Weight": 0,
+          "ExerciseCategory": 22,
+          "ExerciseNumber": 77,
+          "ExerciseName": "Push-up",
+          "WorkoutStepIndex": 10
+        },
+        {
+          "StartTime": "2026-03-23T15:46:46Z",
+          "Duration": 3.937,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 11
+        },
+        {
+          "StartTime": "2026-03-23T15:46:49Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 16,
+          "Weight": 0,
+          "ExerciseCategory": 1,
+          "ExerciseNumber": 12,
+          "ExerciseName": "Single-leg Donkey Calf Raise",
+          "WorkoutStepIndex": 12
+        },
+        {
+          "StartTime": "2026-03-23T15:47:29Z",
+          "Duration": 13.652,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 13
+        },
+        {
+          "StartTime": "2026-03-23T15:47:43Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 3,
+          "Weight": 0,
+          "ExerciseCategory": 13,
+          "ExerciseNumber": 29,
+          "ExerciseName": "Superman from Floor",
+          "WorkoutStepIndex": 14
+        },
+        {
+          "StartTime": "2026-03-23T15:48:23Z",
+          "Duration": 13.139,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 15
+        },
+        {
+          "StartTime": "2026-03-23T15:48:36Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 10,
+          "Weight": 0,
+          "ExerciseCategory": 17,
+          "ExerciseNumber": 48,
+          "ExerciseName": "Reverse Lunge with Reach Back",
+          "WorkoutStepIndex": 16
+        },
+        {
+          "StartTime": "2026-03-23T15:49:16Z",
+          "Duration": 60,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 17
+        },
+        {
+          "StartTime": "2026-03-23T15:50:16Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 10,
+          "Weight": 0,
+          "ExerciseCategory": 11,
+          "ExerciseNumber": 1,
+          "ExerciseName": "Dead Bug",
+          "WorkoutStepIndex": 0
+        },
+        {
+          "StartTime": "2026-03-23T15:50:56Z",
+          "Duration": 8.266,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 1
+        },
+        {
+          "StartTime": "2026-03-23T15:51:04Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": 19,
+          "ExerciseNumber": 66,
+          "ExerciseName": "Side Plank",
+          "WorkoutStepIndex": 2
+        },
+        {
+          "StartTime": "2026-03-23T15:51:44Z",
+          "Duration": 7.433,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 3
+        },
+        {
+          "StartTime": "2026-03-23T15:51:52Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 7,
+          "Weight": 0,
+          "ExerciseCategory": 31,
+          "ExerciseNumber": 14,
+          "ExerciseName": "Opposite Arm and Leg Balance",
+          "WorkoutStepIndex": 4
+        },
+        {
+          "StartTime": "2026-03-23T15:52:32Z",
+          "Duration": 8.638,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 5
+        },
+        {
+          "StartTime": "2026-03-23T15:52:41Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 10,
+          "Weight": 0,
+          "ExerciseCategory": 10,
+          "ExerciseNumber": 11,
+          "ExerciseName": "Hip Raise",
+          "WorkoutStepIndex": 6
+        },
+        {
+          "StartTime": "2026-03-23T15:53:21Z",
+          "Duration": 12.693,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 7
+        },
+        {
+          "StartTime": "2026-03-23T15:53:33Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": 19,
+          "ExerciseNumber": 43,
+          "ExerciseName": "Plank",
+          "WorkoutStepIndex": 8
+        },
+        {
+          "StartTime": "2026-03-23T15:54:13Z",
+          "Duration": 9.267,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 9
+        },
+        {
+          "StartTime": "2026-03-23T15:54:23Z",
+          "Duration": 16.477,
+          "Active": true,
+          "Reps": 6,
+          "Weight": 0,
+          "ExerciseCategory": 22,
+          "ExerciseNumber": 77,
+          "ExerciseName": "Push-up",
+          "WorkoutStepIndex": 10
+        },
+        {
+          "StartTime": "2026-03-23T15:54:39Z",
+          "Duration": 5.446,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 11
+        },
+        {
+          "StartTime": "2026-03-23T15:54:44Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 2,
+          "Weight": 0,
+          "ExerciseCategory": 1,
+          "ExerciseNumber": 12,
+          "ExerciseName": "Single-leg Donkey Calf Raise",
+          "WorkoutStepIndex": 12
+        },
+        {
+          "StartTime": "2026-03-23T15:55:24Z",
+          "Duration": 14.469,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 13
+        },
+        {
+          "StartTime": "2026-03-23T15:55:39Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 7,
+          "Weight": 0,
+          "ExerciseCategory": 13,
+          "ExerciseNumber": 29,
+          "ExerciseName": "Superman from Floor",
+          "WorkoutStepIndex": 14
+        },
+        {
+          "StartTime": "2026-03-23T15:56:19Z",
+          "Duration": 9.086,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 15
+        },
+        {
+          "StartTime": "2026-03-23T15:56:28Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 10,
+          "Weight": 0,
+          "ExerciseCategory": 17,
+          "ExerciseNumber": 48,
+          "ExerciseName": "Reverse Lunge with Reach Back",
+          "WorkoutStepIndex": 16
+        },
+        {
+          "StartTime": "2026-03-23T15:57:08Z",
+          "Duration": 60,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 17
+        },
+        {
+          "StartTime": "2026-03-23T15:58:08Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 12,
+          "Weight": 0,
+          "ExerciseCategory": 11,
+          "ExerciseNumber": 1,
+          "ExerciseName": "Dead Bug",
+          "WorkoutStepIndex": 0
+        },
+        {
+          "StartTime": "2026-03-23T15:58:48Z",
+          "Duration": 9.407,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 1
+        },
+        {
+          "StartTime": "2026-03-23T15:58:57Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": 19,
+          "ExerciseNumber": 66,
+          "ExerciseName": "Side Plank",
+          "WorkoutStepIndex": 2
+        },
+        {
+          "StartTime": "2026-03-23T15:59:37Z",
+          "Duration": 5.878,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 3
+        },
+        {
+          "StartTime": "2026-03-23T15:59:43Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 7,
+          "Weight": 0,
+          "ExerciseCategory": 31,
+          "ExerciseNumber": 14,
+          "ExerciseName": "Opposite Arm and Leg Balance",
+          "WorkoutStepIndex": 4
+        },
+        {
+          "StartTime": "2026-03-23T16:00:23Z",
+          "Duration": 10.361,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 5
+        },
+        {
+          "StartTime": "2026-03-23T16:00:34Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 11,
+          "Weight": 0,
+          "ExerciseCategory": 10,
+          "ExerciseNumber": 11,
+          "ExerciseName": "Hip Raise",
+          "WorkoutStepIndex": 6
+        },
+        {
+          "StartTime": "2026-03-23T16:01:14Z",
+          "Duration": 20,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 7
+        },
+        {
+          "StartTime": "2026-03-23T16:01:34Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": 19,
+          "ExerciseNumber": 43,
+          "ExerciseName": "Plank",
+          "WorkoutStepIndex": 8
+        },
+        {
+          "StartTime": "2026-03-23T16:02:14Z",
+          "Duration": 8.753,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 9
+        },
+        {
+          "StartTime": "2026-03-23T16:02:22Z",
+          "Duration": 0.168,
+          "Active": true,
+          "Reps": 0,
+          "Weight": 0,
+          "ExerciseCategory": 22,
+          "ExerciseNumber": 77,
+          "ExerciseName": "Push-up",
+          "WorkoutStepIndex": 10
+        },
+        {
+          "StartTime": "2026-03-23T16:02:23Z",
+          "Duration": 20,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 11
+        },
+        {
+          "StartTime": "2026-03-23T16:02:43Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 16,
+          "Weight": 0,
+          "ExerciseCategory": 1,
+          "ExerciseNumber": 12,
+          "ExerciseName": "Single-leg Donkey Calf Raise",
+          "WorkoutStepIndex": 12
+        },
+        {
+          "StartTime": "2026-03-23T16:03:23Z",
+          "Duration": 20,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 13
+        },
+        {
+          "StartTime": "2026-03-23T16:03:43Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 4,
+          "Weight": 0,
+          "ExerciseCategory": 13,
+          "ExerciseNumber": 29,
+          "ExerciseName": "Superman from Floor",
+          "WorkoutStepIndex": 14
+        },
+        {
+          "StartTime": "2026-03-23T16:04:23Z",
+          "Duration": 20,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": 15
+        },
+        {
+          "StartTime": "2026-03-23T16:04:43Z",
+          "Duration": 40,
+          "Active": true,
+          "Reps": 6,
+          "Weight": 0,
+          "ExerciseCategory": 17,
+          "ExerciseNumber": 48,
+          "ExerciseName": "Reverse Lunge with Reach Back",
+          "WorkoutStepIndex": 16
+        },
+        {
+          "StartTime": "2026-03-23T16:05:23Z",
+          "Duration": 4428.112,
+          "Active": false,
+          "Reps": null,
+          "Weight": null,
+          "ExerciseCategory": null,
+          "ExerciseNumber": null,
+          "ExerciseName": "",
+          "WorkoutStepIndex": null
+        }
+      ],
+      "Samples": [
+        {
+          "Time": "2026-03-23T15:42:05Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 77,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T15:50:38Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 84,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T15:59:31Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 107,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T16:10:00Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 86,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T16:19:08Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 72,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T16:30:07Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 68,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T16:39:04Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 71,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T16:50:08Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 64,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T17:01:11Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 66,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        },
+        {
+          "Time": "2026-03-23T17:11:02Z",
+          "Lat": null,
+          "Lon": null,
+          "Altitude": null,
+          "HR": 57,
+          "Power": null,
+          "Cadence": null,
+          "Speed": null,
+          "Distance": 0,
+          "Temperature": null,
+          "Extras": null
+        }
+      ]
+    },
+    "SampleCount": 2973,
+    "SamplesSHA256": "2b3a4b2a824800e5f736f7595aeff147f1a8079757fb882f8912c1503c226745"
+  }
+]

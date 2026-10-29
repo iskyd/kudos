@@ -20,7 +20,8 @@ import (
 // ErrNoSession means the file holds no session, so it is not an activity.
 var ErrNoSession = errors.New("fit: no session in file")
 
-// Decode parses a FIT activity file into one activity per session.
+// Decode parses a FIT activity file into one activity per session, in order: a
+// multisport file yields its legs and transitions, which the caller links in a group.
 // Unknown and proprietary messages are ignored.
 func Decode(r io.Reader) ([]importer.Activity, error) {
 	fit, err := decoder.New(r).Decode()
@@ -37,6 +38,8 @@ func Decode(r io.Reader) ([]importer.Activity, error) {
 		device.Product = file.FileId.Product
 	}
 	offset := localOffset(file.Activity)
+	names := exerciseNames(file)
+	dev := devFields(file)
 
 	acts := make([]importer.Activity, len(file.Sessions))
 	for i, s := range file.Sessions {
@@ -54,6 +57,10 @@ func Decode(r io.Reader) ([]importer.Activity, error) {
 				avgHR: s.AvgHeartRate, maxHR: s.MaxHeartRate, avgCadence: s.AvgCadence, avgFraction: s.AvgFractionalCadence,
 				maxCadence: s.MaxCadence, maxFraction: s.MaxFractionalCadence, temperature: s.AvgTemperature,
 			}, inStrides(s.Sport)),
+			PoolLength: scaled(s.PoolLengthScaled()),
+			RPE:        rpe(s.WorkoutRpe),
+			Feel:       num(s.WorkoutFeel, basetype.Uint8Invalid),
+			Thresholds: thresholds(file, i),
 		}
 	}
 
@@ -69,8 +76,17 @@ func Decode(r io.Reader) ([]importer.Activity, error) {
 				avgHR: l.AvgHeartRate, maxHR: l.MaxHeartRate, avgCadence: l.AvgCadence, avgFraction: l.AvgFractionalCadence,
 				maxCadence: l.MaxCadence, maxFraction: l.MaxFractionalCadence, temperature: l.AvgTemperature,
 			}, inStrides(file.Sessions[i].Sport)),
-			Intensity: intensity(l.Intensity),
+			Intensity:        intensity(l.Intensity),
+			WorkoutStepIndex: messageIndex(l.WktStepIndex),
 		})
+	}
+	for _, l := range file.Lengths {
+		i := sessionAt(file.Sessions, l.StartTime)
+		acts[i].Lengths = append(acts[i].Lengths, length(l))
+	}
+	for _, st := range strengthSets(file) {
+		i := sessionAt(file.Sessions, st.StartTime)
+		acts[i].Sets = append(acts[i].Sets, set(st, names))
 	}
 	for _, rec := range file.Records {
 		i := sessionAt(file.Sessions, rec.Timestamp)
@@ -78,9 +94,46 @@ func Decode(r io.Reader) ([]importer.Activity, error) {
 		if n := len(acts[i].Samples); n > 0 && !rec.Timestamp.After(acts[i].Samples[n-1].Time) {
 			continue
 		}
-		acts[i].Samples = append(acts[i].Samples, sample(rec, inStrides(file.Sessions[i].Sport)))
+		smp := sample(rec, inStrides(file.Sessions[i].Sport))
+		addDevFields(&smp, rec.DeveloperFields, dev)
+		acts[i].Samples = append(acts[i].Samples, smp)
+	}
+
+	// The workout goes to the sessions whose laps or sets ran its steps, or the first one.
+	if w := workout(file); w != nil {
+		attached := false
+		for i := range acts {
+			if usesSteps(acts[i]) {
+				acts[i].Workout, attached = w, true
+			}
+		}
+		if !attached {
+			acts[0].Workout = w
+		}
 	}
 	return acts, nil
+}
+
+func usesSteps(a importer.Activity) bool {
+	for _, l := range a.Laps {
+		if l.WorkoutStepIndex != nil {
+			return true
+		}
+	}
+	for _, s := range a.Sets {
+		if s.WorkoutStepIndex != nil {
+			return true
+		}
+	}
+	return false
+}
+
+// rpe converts the recorded 0–100 scale to 0–10.
+func rpe(v uint8) *float64 {
+	if v == basetype.Uint8Invalid {
+		return nil
+	}
+	return ptr(float64(v) / 10)
 }
 
 func sessionAt(sessions []*mesgdef.Session, t time.Time) int {

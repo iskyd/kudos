@@ -25,6 +25,25 @@
       "MaxCadence": 215,
       "AvgTemperature": null,
       "Calories": 1564,
+      "PoolLength": null,
+      "RPE": null,
+      "Feel": null,
+      "Thresholds": {
+        "FTP": null,
+        "ThresholdHR": 185,
+        "MaxHR": 205,
+        "RestingHR": 58,
+        "HRZones": [
+          97,
+          116,
+          135,
+          154,
+          174,
+          205
+        ],
+        "PowerZones": null
+      },
+      "Workout": null,
       "Laps": [
         {
           "StartTime": "2026-08-09T06:00:53Z",
@@ -43,9 +62,12 @@
           "MaxCadence": 215,
           "AvgTemperature": null,
           "Calories": 1564,
-          "Intensity": "active"
+          "Intensity": "active",
+          "WorkoutStepIndex": null
         }
       ],
+      "Lengths": null,
+      "Sets": null,
       "Samples": [
         {
           "Time": "2026-08-09T06:00:53Z",
