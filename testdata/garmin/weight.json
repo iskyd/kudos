@@ -1,0 +1,18 @@
+{
+  "dailyWeightSummaries": [],
+  "nextDateWeight": null,
+  "previousDateWeight": null,
+  "totalAverage": {
+    "bmi": null,
+    "bodyFat": null,
+    "bodyWater": null,
+    "boneMass": null,
+    "from": 1792972800000,
+    "metabolicAge": null,
+    "muscleMass": null,
+    "physiqueRating": null,
+    "until": 1793231999999,
+    "visceralFat": null,
+    "weight": null
+  }
+}
