@@ -1,0 +1,32 @@
+[
+  {
+    "calendarDate": "2026-10-26",
+    "values": {
+      "highStressDuration": 120,
+      "lowStressDuration": 17280,
+      "mediumStressDuration": 900,
+      "overallStressLevel": 23,
+      "restStressDuration": 48360
+    }
+  },
+  {
+    "calendarDate": "2026-10-27",
+    "values": {
+      "highStressDuration": 240,
+      "lowStressDuration": 15660,
+      "mediumStressDuration": 3240,
+      "overallStressLevel": 24,
+      "restStressDuration": 41340
+    }
+  },
+  {
+    "calendarDate": "2026-10-28",
+    "values": {
+      "highStressDuration": 1140,
+      "lowStressDuration": 12360,
+      "mediumStressDuration": 5760,
+      "overallStressLevel": 28,
+      "restStressDuration": 38040
+    }
+  }
+]

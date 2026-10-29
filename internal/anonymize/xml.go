@@ -1,4 +1,4 @@
-package main
+package anonymize
 
 import (
 	"fmt"
@@ -16,12 +16,12 @@ var (
 	unitID  = regexp.MustCompile(`<UnitId>[^<]*</UnitId>`)
 )
 
-// anonymizeXML anonymizes a Garmin Connect GPX or TCX export like anonymizeFIT does a
+// XML anonymizes a Garmin Connect GPX or TCX export like FIT does a
 // FIT file. The shift is computed in semicircles from the first position, so the
 // positions equal those in the anonymized FIT of the same activity.
-func anonymizeXML(in []byte) ([]byte, stats, error) {
+func XML(in []byte) ([]byte, Stats, error) {
 	var (
-		st    stats
+		st    Stats
 		shift int32
 		err   error
 	)
@@ -33,10 +33,10 @@ func anonymizeXML(in []byte) ([]byte, stats, error) {
 			return m
 		}
 		v := semicircles.ToSemicircles(deg)
-		if st.longitudes == 0 {
+		if st.Longitudes == 0 {
 			shift = semicircles.ToSemicircles(neutralLong) - v
 		}
-		st.longitudes++
+		st.Longitudes++
 		// int32 wraps around ±180°, as longitudes should.
 		return []byte(string(sub[1]) + strconv.FormatFloat(semicircles.ToDegrees(v+shift), 'g', -1, 64))
 	})
@@ -45,12 +45,12 @@ func anonymizeXML(in []byte) ([]byte, stats, error) {
 	}
 	out = gpxName.ReplaceAllFunc(out, func(m []byte) []byte {
 		if string(m) != "<name></name>" {
-			st.texts++
+			st.Texts++
 		}
 		return []byte("<name></name>")
 	})
 	out = unitID.ReplaceAllFunc(out, func([]byte) []byte {
-		st.serials++
+		st.Serials++
 		return []byte("<UnitId>1</UnitId>")
 	})
 	return out, st, nil

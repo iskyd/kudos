@@ -1,0 +1,183 @@
+[
+  {
+    "name": "token",
+    "method": "POST",
+    "path": "/personalapitoken-service/personal-api/personal-api-key/token",
+    "status": 200,
+    "contentType": "text/plain",
+    "bytes": 1141,
+    "tokenClaims": [
+      "client_ecosystem",
+      "client_id",
+      "client_type",
+      "exp",
+      "garmin_guid",
+      "iat",
+      "iss",
+      "jti",
+      "managed_status",
+      "revocation_eligibility",
+      "scope"
+    ],
+    "tokenLifetime": "24h0m0s"
+  },
+  {
+    "name": "activities_search",
+    "method": "GET",
+    "path": "/activitylist-service/activities/search/activities?endDate=2026-10-28\u0026limit=20\u0026start=0\u0026startDate=2026-10-26",
+    "status": 200,
+    "contentType": "application/json;charset=UTF-8",
+    "bytes": 4395,
+    "file": "activities_search.json"
+  },
+  {
+    "name": "activity_1",
+    "method": "GET",
+    "path": "/activity-service/activity/100001",
+    "status": 200,
+    "contentType": "application/json;charset=UTF-8",
+    "bytes": 5187,
+    "file": "activity_1.json"
+  },
+  {
+    "name": "activity_1_workouts",
+    "method": "GET",
+    "path": "/activity-service/activity/100001/workouts",
+    "status": 200,
+    "contentType": "application/json;charset=UTF-8",
+    "bytes": 161,
+    "file": "activity_1_workouts.json"
+  },
+  {
+    "name": "activity_1_download",
+    "method": "GET",
+    "path": "/download-service/files/activity/100001",
+    "status": 200,
+    "contentType": "application/x-zip-compressed",
+    "bytes": 99444,
+    "file": "activity_1.zip",
+    "zipEntries": [
+      {
+        "name": "100001_ACTIVITY.fit",
+        "bytes": 199017
+      }
+    ]
+  },
+  {
+    "name": "daily_summaries",
+    "method": "GET",
+    "path": "/usersummary-service/v2/dailysummaries?endDate=2026-10-28\u0026startDate=2026-10-26",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 7768,
+    "file": "daily_summaries.json"
+  },
+  {
+    "name": "sleep_summaries",
+    "method": "GET",
+    "path": "/sleep-service/sleep/dailySleepSummariesByDate?endDate=2026-10-28\u0026startDate=2026-10-26",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 8563,
+    "file": "sleep_summaries.json"
+  },
+  {
+    "name": "sleep_day",
+    "method": "GET",
+    "path": "/sleep-service/sleep/dailySleep?date=2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 2785,
+    "file": "sleep_day.json"
+  },
+  {
+    "name": "hrv_summaries",
+    "method": "GET",
+    "path": "/hrv-service/hrv/daily/2026-10-26/2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 857,
+    "file": "hrv_summaries.json"
+  },
+  {
+    "name": "hrv_day",
+    "method": "GET",
+    "path": "/hrv-service/hrv/2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 10505,
+    "file": "hrv_day.json"
+  },
+  {
+    "name": "stress",
+    "method": "GET",
+    "path": "/usersummary-service/stats/stress/daily/2026-10-26/2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 514,
+    "file": "stress.json"
+  },
+  {
+    "name": "body_battery",
+    "method": "GET",
+    "path": "/wellness-service/wellness/bodyBattery/reports/daily?endDate=2026-10-28\u0026startDate=2026-10-26",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 4409,
+    "file": "body_battery.json"
+  },
+  {
+    "name": "steps",
+    "method": "GET",
+    "path": "/usersummary-service/stats/steps/daily/2026-10-26/2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 265,
+    "file": "steps.json"
+  },
+  {
+    "name": "heart_rate_day",
+    "method": "GET",
+    "path": "/wellness-service/wellness/dailyHeartRate?date=2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 14173,
+    "file": "heart_rate_day.json"
+  },
+  {
+    "name": "weight",
+    "method": "GET",
+    "path": "/weight-service/weight/range/2026-10-26/2026-10-28?includeAll=true",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 287,
+    "file": "weight.json"
+  },
+  {
+    "name": "hydration",
+    "method": "GET",
+    "path": "/usersummary-service/stats/hydration/daily/2026-10-26/2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 2,
+    "file": "hydration.json"
+  },
+  {
+    "name": "spo2_day",
+    "method": "GET",
+    "path": "/wellness-service/wellness/daily/spo2acclimation/2026-10-28",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 7418,
+    "file": "spo2_day.json"
+  },
+  {
+    "name": "heart_rate_zones",
+    "method": "GET",
+    "path": "/biometric-service/heartRateZones/v2",
+    "status": 200,
+    "contentType": "application/json",
+    "bytes": 248,
+    "file": "heart_rate_zones.json"
+  }
+]
