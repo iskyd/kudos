@@ -109,7 +109,7 @@ Contributions are welcome. Before opening a pull request:
 
 1. Read [AGENTS.md](AGENTS.md). Its rules apply to humans and coding agents alike, including mandatory code generation and tests for every new or changed function.
 2. Keep the change focused.
-3. Install frontend dependencies once with `npm --prefix web ci`, then run `just check` (generation diff, lint, tests and coverage gates) and make sure it passes. `just e2e` runs the Playwright tests against a production build.
+3. Install frontend dependencies once with `npm --prefix web ci`, then run `just check` (generation diff, lint, tests and coverage gates) and make sure it passes. `just e2e` runs the Playwright tests against the real server (embedding a production build) and a throwaway TimescaleDB container on port 5433 (`KUDOS_E2E_DB_PORT`).
 4. Use [Conventional Commits](https://www.conventionalcommits.org) for commit messages.
 
 For local development, `just dev` starts TimescaleDB (`deploy/compose.dev.yml`), the Go server with live reload and the Vite dev server: open http://localhost:5173. Ctrl-C stops the app; `just dev-down` stops the database. Set `KUDOS_PORT` or `KUDOS_DB_PORT` if 8080 or 5432 is taken. A per-checkout encryption key is created in `.data/`.

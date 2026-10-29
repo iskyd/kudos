@@ -31,9 +31,17 @@ check: generate
 coverage:
     scripts/check-coverage.sh coverage.out
 
-# Run the Playwright end-to-end tests against a production build.
+E2E_DB_PORT := env("KUDOS_E2E_DB_PORT", "5433")
+
+# Run the Playwright end-to-end tests against the real server and a throwaway database.
 e2e:
-    npm --prefix web run test:e2e
+    #!/usr/bin/env bash
+    set -euo pipefail
+    export KUDOS_DB_PORT={{E2E_DB_PORT}}
+    compose="docker compose -p kudos-e2e -f deploy/compose.dev.yml"
+    trap "$compose down -v" EXIT
+    $compose up -d --wait
+    DATABASE_URL=postgres://kudos:kudos@127.0.0.1:{{E2E_DB_PORT}}/kudos?sslmode=disable npm --prefix web run test:e2e
 
 # Build the frontend, then the server binary (embedding it) into bin/.
 build:

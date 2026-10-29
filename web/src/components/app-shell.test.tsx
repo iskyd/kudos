@@ -1,37 +1,67 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { createMemoryRouter, RouterProvider } from 'react-router'
+import { http, HttpResponse } from 'msw'
 import { navItems } from '@/components/nav-items'
-import { routes } from '@/routes'
-
-function renderAt(path: string) {
-  render(<RouterProvider router={createMemoryRouter(routes, { initialEntries: [path] })} />)
-}
+import { ann, loggedInAs, problem, renderApp } from '@/test/render'
+import { server } from '@/test/server'
 
 describe('AppShell', () => {
-  it('links every section', () => {
-    renderAt('/')
-    const nav = screen.getByRole('navigation', { name: 'Main' })
+  beforeEach(() => {
+    loggedInAs(ann)
+  })
+
+  it('links every section', async () => {
+    renderApp('/')
+    const nav = await screen.findByRole('navigation', { name: 'Main' })
     for (const { label } of navItems) {
       expect(nav).toContainElement(screen.getByRole('link', { name: label }))
     }
   })
 
-  it.each(navItems)('renders $label at $path', ({ path, label }) => {
-    renderAt(path)
-    expect(screen.getByRole('heading', { name: label })).toBeInTheDocument()
+  it.each(navItems)('renders $label at $path', async ({ path, label }) => {
+    renderApp(path)
+    expect(await screen.findByRole('heading', { name: label })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
   })
 
   it('navigates on click', async () => {
-    renderAt('/')
-    await userEvent.click(screen.getByRole('link', { name: 'Plans' }))
+    renderApp('/')
+    await userEvent.click(await screen.findByRole('link', { name: 'Plans' }))
     expect(screen.getByRole('heading', { name: 'Plans' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current')
   })
 
-  it('renders not found for unknown paths', () => {
-    renderAt('/nope')
-    expect(screen.getByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+  it('renders not found for unknown paths', async () => {
+    renderApp('/nope')
+    expect(await screen.findByRole('heading', { name: 'Page not found' })).toBeInTheDocument()
+  })
+
+  it.each([
+    { name: 'logs out', status: 204 },
+    { name: 'treats an expired session as logged out', status: 401 },
+  ])('$name', async ({ status }) => {
+    let csrf: string | null = null
+    server.use(
+      http.post('/api/auth/logout', ({ request }) => {
+        csrf = request.headers.get('X-CSRF-Token')
+        return status === 204
+          ? new HttpResponse(null, { status })
+          : problem(status, 'unauthorized', 'Not logged in')
+      }),
+    )
+    const router = renderApp('/')
+    await userEvent.click(await screen.findByRole('button', { name: 'Log out' }))
+    expect(await screen.findByRole('heading', { name: 'Log in' })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/login')
+    expect(csrf).toBe('csrf-ann')
+  })
+
+  it('shows logout errors', async () => {
+    server.use(
+      http.post('/api/auth/logout', () => problem(403, 'csrf', 'Missing or invalid CSRF token')),
+    )
+    renderApp('/')
+    await userEvent.click(await screen.findByRole('button', { name: 'Log out' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Missing or invalid CSRF token')
   })
 })

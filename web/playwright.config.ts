@@ -1,13 +1,25 @@
 import { defineConfig, devices } from '@playwright/test'
 
+// The end-to-end tests run the real server (embedding a fresh build) against DATABASE_URL.
+// `just e2e` starts a throwaway database and sets it.
+const baseURL = 'http://127.0.0.1:4173'
+
 export default defineConfig({
   testDir: './e2e',
   forbidOnly: !!process.env.CI,
-  use: { baseURL: 'http://localhost:4173', trace: 'on-first-retry' },
+  use: { baseURL, trace: 'on-first-retry' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'npm run build && npm run preview -- --port 4173 --strictPort',
-    url: 'http://localhost:4173',
+    command: 'npm run build && go run ../cmd/server',
+    url: `${baseURL}/healthz`,
     reuseExistingServer: !process.env.CI,
+    timeout: 180_000,
+    env: {
+      LISTEN_ADDR: '127.0.0.1:4173',
+      DATA_DIR: 'test-results/data',
+      // A fixed test-only key: the e2e database holds no real secrets.
+      ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+      REGISTRATION_ENABLED: 'true',
+    },
   },
 })
