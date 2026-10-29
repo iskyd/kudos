@@ -107,7 +107,7 @@ For full history, v2 imports Garmin's account export (requested from the Garmin 
 FIT files are decoded with muktihari/fit and mapped to the internal model by a thin translation layer. These rules come from five real samples: a half marathon, an interval session, a pool swim and a strength workout recorded by a Forerunner 255, and a Zwift ride written by Zwift.
 
 - **Units:** positions are semicircles (convert to degrees); vertical oscillation and step length are millimetres; speed is m/s. Workout step values are raw and must be read by their type: distance in centimetres, time in milliseconds, speed in mm/s.
-- **Cadence:** running cadence is stored as strides per minute plus a fraction, so steps per minute = (cadence + fractional cadence) × 2. Cycling cadence is rpm as-is.
+- **Cadence:** running and hiking cadence are stored as strides per minute plus a fraction, so steps per minute = (cadence + fractional cadence) × 2 (confirmed for hiking by a later hike sample). Cycling cadence is rpm as-is.
 - **Invalid values:** unset values use filler numbers (255, 65535, 4294967295) and are dropped, including in developer fields. Zwift declares CORE body-temperature fields that are always empty.
 - **Local time:** offset = activity local timestamp − UTC timestamp. Watch files are correct (+2 h on 15 October, +1 h on 25 October, the day summer time ended). Zwift writes the FIT epoch (31 Dec 1989) instead, so the fallback order is: Garmin activity metadata from the API, then the user's timezone.
 - **Sample rate:** most activities record every second, but the strength sample used smart recording (gaps of 1–6 s, heart rate only). Analytics use time-weighted calculations, never sample counts.

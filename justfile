@@ -33,6 +33,10 @@ coverage:
 
 E2E_DB_PORT := env("KUDOS_E2E_DB_PORT", "5433")
 
+# Fuzz the FIT decoder briefly (CI runs this on every pull request).
+fuzz time="30s":
+    go test ./internal/importer/fit -run '^$' -fuzz FuzzDecodeActivity -fuzztime {{time}}
+
 # Run the Playwright end-to-end tests against the real server and a throwaway database.
 e2e:
     #!/usr/bin/env bash

@@ -8,6 +8,7 @@ Anonymized copies of real activities, used by the FIT parser tests. Never commit
 | `intervals.fit` | Outdoor interval run, Forerunner 255 |
 | `zwift.fit` | Virtual ride written by Zwift |
 | `bike.fit` | Outdoor ride, Forerunner 255 |
+| `hike.fit` | Hike, Forerunner 255 |
 | `pool_swim.fit` | Pool swim, Forerunner 255 |
 | `strength.fit` | Strength workout, Forerunner 255 |
 
