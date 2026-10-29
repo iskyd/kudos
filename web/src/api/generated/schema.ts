@@ -132,6 +132,68 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/garmin": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Garmin connection status
+         * @description The key and token are never returned, only the key's expiry and the sync state.
+         */
+        get: operations["getGarminConnection"];
+        put?: never;
+        post?: never;
+        /**
+         * Disconnect Garmin
+         * @description Deletes the stored key and token. Synced activities and metrics are kept.
+         */
+        delete: operations["deleteGarminConnection"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/garmin/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set the Personal API key
+         * @description Checks the key with Garmin by exchanging it for a token, then stores both
+         *     encrypted. A key Garmin refuses is not stored (garmin-key-rejected).
+         */
+        put: operations["setGarminKey"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/garmin/sync-interval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set how often Garmin is synced */
+        put: operations["setGarminSyncInterval"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -199,6 +261,39 @@ export interface components {
         UploadResult: {
             /** @description The stored activities; several for a multisport file. */
             activityIds: number[];
+        };
+        GarminConnection: {
+            connected: boolean;
+            /**
+             * @description key_rejected when Garmin refused the key; sync is paused until a new key is set.
+             * @enum {string}
+             */
+            status?: "connected" | "key_rejected";
+            /**
+             * Format: date
+             * @description The key's expiry date as entered by the user.
+             */
+            keyExpiresOn?: string;
+            syncIntervalHours?: number;
+            /** Format: date-time */
+            lastSyncAt?: string;
+            /**
+             * Format: date
+             * @description The last local day fully synced.
+             */
+            syncedThrough?: string;
+        };
+        SetGarminKeyRequest: {
+            /** Format: password */
+            key: string;
+            /**
+             * Format: date
+             * @description The expiry Garmin showed when the key was created, at most a year ahead.
+             */
+            expiresOn: string;
+        };
+        SetGarminSyncIntervalRequest: {
+            hours: number;
         };
         /** @description RFC 9457 problem details. */
         Problem: {
@@ -432,6 +527,96 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["UploadResult"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getGarminConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The connection, or `connected` false when there is none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GarminConnection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteGarminConnection: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disconnected, or there was no connection. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setGarminKey: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetGarminKeyRequest"];
+            };
+        };
+        responses: {
+            /** @description The key was accepted and stored. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GarminConnection"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setGarminSyncInterval: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetGarminSyncIntervalRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated connection. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GarminConnection"];
                 };
             };
             default: components["responses"]["Problem"];

@@ -15,6 +15,8 @@ import (
 
 	"github.com/iskyd/kudos/internal/api"
 	"github.com/iskyd/kudos/internal/config"
+	"github.com/iskyd/kudos/internal/connectors/garmin"
+	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store"
@@ -59,6 +61,12 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 		return fmt.Errorf("starting job client: %w", err)
 	}
 
+	cipher, err := crypto.New(cfg.EncryptionKey.Reveal())
+	if err != nil {
+		return fmt.Errorf("creating cipher: %w", err)
+	}
+	garminClient := garmin.New(garmin.DefaultBaseURL, &http.Client{Timeout: time.Minute})
+
 	spa, err := web.Handler()
 	if err != nil {
 		return fmt.Errorf("loading frontend: %w", err)
@@ -67,7 +75,7 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
 		Addr:              listenAddr,
-		Handler:           api.NewRouter(logger, api.NewServer(db.New(pool), ingest.New(pool, jobClient, cfg.DataDir), cfg.RegistrationEnabled), spa),
+		Handler:           api.NewRouter(logger, api.NewServer(db.New(pool), ingest.New(pool, jobClient, cfg.DataDir), garminClient, cipher, cfg.RegistrationEnabled), spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

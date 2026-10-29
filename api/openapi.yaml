@@ -174,6 +174,74 @@ paths:
                 $ref: "#/components/schemas/UploadResult"
         default:
           $ref: "#/components/responses/Problem"
+  /api/garmin:
+    get:
+      operationId: getGarminConnection
+      summary: Garmin connection status
+      description: The key and token are never returned, only the key's expiry and the sync state.
+      tags: [garmin]
+      responses:
+        "200":
+          description: The connection, or `connected` false when there is none.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GarminConnection"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteGarminConnection
+      summary: Disconnect Garmin
+      description: Deletes the stored key and token. Synced activities and metrics are kept.
+      tags: [garmin]
+      responses:
+        "204":
+          description: Disconnected, or there was no connection.
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/garmin/key:
+    put:
+      operationId: setGarminKey
+      summary: Set the Personal API key
+      description: |
+        Checks the key with Garmin by exchanging it for a token, then stores both
+        encrypted. A key Garmin refuses is not stored (garmin-key-rejected).
+      tags: [garmin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetGarminKeyRequest"
+      responses:
+        "200":
+          description: The key was accepted and stored.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GarminConnection"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/garmin/sync-interval:
+    put:
+      operationId: setGarminSyncInterval
+      summary: Set how often Garmin is synced
+      tags: [garmin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetGarminSyncIntervalRequest"
+      responses:
+        "200":
+          description: The updated connection.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GarminConnection"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -312,6 +380,52 @@ components:
           items:
             type: integer
             format: int64
+    GarminConnection:
+      type: object
+      required: [connected]
+      properties:
+        connected:
+          type: boolean
+        status:
+          type: string
+          enum: [connected, key_rejected]
+          description: key_rejected when Garmin refused the key; sync is paused until a new key is set.
+        keyExpiresOn:
+          type: string
+          format: date
+          description: The key's expiry date as entered by the user.
+        syncIntervalHours:
+          type: integer
+          minimum: 1
+          maximum: 24
+        lastSyncAt:
+          type: string
+          format: date-time
+        syncedThrough:
+          type: string
+          format: date
+          description: The last local day fully synced.
+    SetGarminKeyRequest:
+      type: object
+      required: [key, expiresOn]
+      properties:
+        key:
+          type: string
+          format: password
+          minLength: 1
+          maxLength: 1024
+        expiresOn:
+          type: string
+          format: date
+          description: The expiry Garmin showed when the key was created, at most a year ahead.
+    SetGarminSyncIntervalRequest:
+      type: object
+      required: [hours]
+      properties:
+        hours:
+          type: integer
+          minimum: 1
+          maximum: 24
     Problem:
       type: object
       description: RFC 9457 problem details.
