@@ -12,12 +12,23 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
 const testPassword = "correct horse battery staple"
+
+// testCipher uses a fixed key so tests can decrypt what handlers store.
+func testCipher(t *testing.T) *crypto.Cipher {
+	t.Helper()
+	c, err := crypto.New(bytes.Repeat([]byte{7}, crypto.KeySize))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return c
+}
 
 // apiClient drives the router like a browser: it keeps the session cookie and
 // sends the CSRF token on writes.
@@ -40,7 +51,7 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 	if logs != nil {
 		logger = slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
-	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), registration, cheapArgon()), spaStub)
+	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), fakeGarmin{}, testCipher(t), registration, cheapArgon()), spaStub)
 	return &apiClient{t: t, h: h}, q
 }
 

@@ -31,6 +31,8 @@ func TestWriteProblem(t *testing.T) {
 		{name: "unsupported file", err: &Error{Kind: KindUnsupportedFile}, wantStatus: 415, wantType: "urn:kudos:problem:unsupported-file", wantTitle: "Unsupported file type"},
 		{name: "invalid file", err: &Error{Kind: KindInvalidFile, Detail: "no session"}, wantStatus: 422, wantType: "urn:kudos:problem:invalid-file", wantTitle: "File could not be read", wantDetail: "no session"},
 		{name: "file too large", err: &Error{Kind: KindFileTooLarge}, wantStatus: 413, wantType: "urn:kudos:problem:file-too-large", wantTitle: "File too large"},
+		{name: "garmin key rejected", err: &Error{Kind: KindGarminKeyRejected}, wantStatus: 422, wantType: "urn:kudos:problem:garmin-key-rejected", wantTitle: "Garmin rejected the key"},
+		{name: "garmin unavailable", err: &Error{Kind: KindGarminUnavailable}, wantStatus: 502, wantType: "urn:kudos:problem:garmin-unavailable", wantTitle: "Garmin is unavailable"},
 		{name: "internal hides detail", err: &Error{Kind: KindInternal, Detail: "db password wrong"}, wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error"},
 		{name: "wrapped error keeps kind", err: fmt.Errorf("listing: %w", &Error{Kind: KindNotFound, Detail: "no such activity"}), wantStatus: 404, wantType: "urn:kudos:problem:not-found", wantTitle: "Not found", wantDetail: "no such activity"},
 		{name: "plain error is internal and logged", err: errors.New("db password wrong"), wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error", wantLogged: true},

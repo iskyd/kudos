@@ -10,11 +10,30 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/oapi-codegen/runtime"
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for GarminConnectionStatus.
+const (
+	Connected   GarminConnectionStatus = "connected"
+	KeyRejected GarminConnectionStatus = "key_rejected"
+)
+
+// Valid indicates whether the value is a known member of the GarminConnectionStatus enum.
+func (e GarminConnectionStatus) Valid() bool {
+	switch e {
+	case Connected:
+		return true
+	case KeyRejected:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for Sport.
 const (
@@ -56,6 +75,25 @@ func (e Sport) Valid() bool {
 type CreatedActivity struct {
 	Id int64 `json:"id"`
 }
+
+// GarminConnection defines model for GarminConnection.
+type GarminConnection struct {
+	Connected bool `json:"connected"`
+
+	// KeyExpiresOn The key's expiry date as entered by the user.
+	KeyExpiresOn *openapi_types.Date `json:"keyExpiresOn,omitempty"`
+	LastSyncAt   *time.Time          `json:"lastSyncAt,omitempty"`
+
+	// Status key_rejected when Garmin refused the key; sync is paused until a new key is set.
+	Status            *GarminConnectionStatus `json:"status,omitempty"`
+	SyncIntervalHours *int                    `json:"syncIntervalHours,omitempty"`
+
+	// SyncedThrough The last local day fully synced.
+	SyncedThrough *openapi_types.Date `json:"syncedThrough,omitempty"`
+}
+
+// GarminConnectionStatus key_rejected when Garmin refused the key; sync is paused until a new key is set.
+type GarminConnectionStatus string
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
@@ -135,6 +173,18 @@ type RegisterRequest struct {
 	Username Username `json:"username"`
 }
 
+// SetGarminKeyRequest defines model for SetGarminKeyRequest.
+type SetGarminKeyRequest struct {
+	// ExpiresOn The expiry Garmin showed when the key was created, at most a year ahead.
+	ExpiresOn openapi_types.Date `json:"expiresOn"`
+	Key       string             `json:"key"`
+}
+
+// SetGarminSyncIntervalRequest defines model for SetGarminSyncIntervalRequest.
+type SetGarminSyncIntervalRequest struct {
+	Hours int `json:"hours"`
+}
+
 // Sport defines model for Sport.
 type Sport string
 
@@ -183,6 +233,12 @@ type LoginJSONRequestBody = LoginRequest
 // RegisterJSONRequestBody defines body for Register for application/json ContentType.
 type RegisterJSONRequestBody = RegisterRequest
 
+// SetGarminKeyJSONRequestBody defines body for SetGarminKey for application/json ContentType.
+type SetGarminKeyJSONRequestBody = SetGarminKeyRequest
+
+// SetGarminSyncIntervalJSONRequestBody defines body for SetGarminSyncInterval for application/json ContentType.
+type SetGarminSyncIntervalJSONRequestBody = SetGarminSyncIntervalRequest
+
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
 
@@ -203,6 +259,18 @@ type ServerInterface interface {
 	// Register Create an account and log in
 	// (POST /api/auth/register)
 	Register(w http.ResponseWriter, r *http.Request)
+	// DeleteGarminConnection Disconnect Garmin
+	// (DELETE /api/garmin)
+	DeleteGarminConnection(w http.ResponseWriter, r *http.Request)
+	// GetGarminConnection Garmin connection status
+	// (GET /api/garmin)
+	GetGarminConnection(w http.ResponseWriter, r *http.Request)
+	// SetGarminKey Set the Personal API key
+	// (PUT /api/garmin/key)
+	SetGarminKey(w http.ResponseWriter, r *http.Request)
+	// SetGarminSyncInterval Set how often Garmin is synced
+	// (PUT /api/garmin/sync-interval)
+	SetGarminSyncInterval(w http.ResponseWriter, r *http.Request)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -245,6 +313,30 @@ func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
 // Register Create an account and log in
 // (POST /api/auth/register)
 func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteGarminConnection Disconnect Garmin
+// (DELETE /api/garmin)
+func (_ Unimplemented) DeleteGarminConnection(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetGarminConnection Garmin connection status
+// (GET /api/garmin)
+func (_ Unimplemented) GetGarminConnection(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetGarminKey Set the Personal API key
+// (PUT /api/garmin/key)
+func (_ Unimplemented) SetGarminKey(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetGarminSyncInterval Set how often Garmin is synced
+// (PUT /api/garmin/sync-interval)
+func (_ Unimplemented) SetGarminSyncInterval(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -336,6 +428,62 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Register(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteGarminConnection operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGarminConnection(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteGarminConnection(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetGarminConnection operation middleware
+func (siw *ServerInterfaceWrapper) GetGarminConnection(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetGarminConnection(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetGarminKey operation middleware
+func (siw *ServerInterfaceWrapper) SetGarminKey(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetGarminKey(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetGarminSyncInterval operation middleware
+func (siw *ServerInterfaceWrapper) SetGarminSyncInterval(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetGarminSyncInterval(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -523,6 +671,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/activities/uploads", wrapper.UploadActivity)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/garmin", wrapper.DeleteGarminConnection)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/garmin", wrapper.GetGarminConnection)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/garmin/key", wrapper.SetGarminKey)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/garmin/sync-interval", wrapper.SetGarminSyncInterval)
 	})
 
 	return r
@@ -746,6 +906,154 @@ func (response RegisterdefaultApplicationProblemPlusJSONResponse) VisitRegisterR
 	return err
 }
 
+type DeleteGarminConnectionRequestObject struct {
+}
+
+type DeleteGarminConnectionResponseObject interface {
+	VisitDeleteGarminConnectionResponse(w http.ResponseWriter) error
+}
+
+type DeleteGarminConnection204Response struct {
+}
+
+func (response DeleteGarminConnection204Response) VisitDeleteGarminConnectionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteGarminConnectiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteGarminConnectiondefaultApplicationProblemPlusJSONResponse) VisitDeleteGarminConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGarminConnectionRequestObject struct {
+}
+
+type GetGarminConnectionResponseObject interface {
+	VisitGetGarminConnectionResponse(w http.ResponseWriter) error
+}
+
+type GetGarminConnection200JSONResponse GarminConnection
+
+func (response GetGarminConnection200JSONResponse) VisitGetGarminConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetGarminConnectiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetGarminConnectiondefaultApplicationProblemPlusJSONResponse) VisitGetGarminConnectionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetGarminKeyRequestObject struct {
+	Body *SetGarminKeyJSONRequestBody
+}
+
+type SetGarminKeyResponseObject interface {
+	VisitSetGarminKeyResponse(w http.ResponseWriter) error
+}
+
+type SetGarminKey200JSONResponse GarminConnection
+
+func (response SetGarminKey200JSONResponse) VisitSetGarminKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetGarminKeydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response SetGarminKeydefaultApplicationProblemPlusJSONResponse) VisitSetGarminKeyResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetGarminSyncIntervalRequestObject struct {
+	Body *SetGarminSyncIntervalJSONRequestBody
+}
+
+type SetGarminSyncIntervalResponseObject interface {
+	VisitSetGarminSyncIntervalResponse(w http.ResponseWriter) error
+}
+
+type SetGarminSyncInterval200JSONResponse GarminConnection
+
+func (response SetGarminSyncInterval200JSONResponse) VisitSetGarminSyncIntervalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetGarminSyncIntervaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response SetGarminSyncIntervaldefaultApplicationProblemPlusJSONResponse) VisitSetGarminSyncIntervalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -875,6 +1183,18 @@ type StrictServerInterface interface {
 	// Register Create an account and log in
 	// (POST /api/auth/register)
 	Register(ctx context.Context, request RegisterRequestObject) (RegisterResponseObject, error)
+	// DeleteGarminConnection Disconnect Garmin
+	// (DELETE /api/garmin)
+	DeleteGarminConnection(ctx context.Context, request DeleteGarminConnectionRequestObject) (DeleteGarminConnectionResponseObject, error)
+	// GetGarminConnection Garmin connection status
+	// (GET /api/garmin)
+	GetGarminConnection(ctx context.Context, request GetGarminConnectionRequestObject) (GetGarminConnectionResponseObject, error)
+	// SetGarminKey Set the Personal API key
+	// (PUT /api/garmin/key)
+	SetGarminKey(ctx context.Context, request SetGarminKeyRequestObject) (SetGarminKeyResponseObject, error)
+	// SetGarminSyncInterval Set how often Garmin is synced
+	// (PUT /api/garmin/sync-interval)
+	SetGarminSyncInterval(ctx context.Context, request SetGarminSyncIntervalRequestObject) (SetGarminSyncIntervalResponseObject, error)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -1066,6 +1386,116 @@ func (sh *strictHandler) Register(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RegisterResponseObject); ok {
 		if err := validResponse.VisitRegisterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteGarminConnection operation middleware
+func (sh *strictHandler) DeleteGarminConnection(w http.ResponseWriter, r *http.Request) {
+	var request DeleteGarminConnectionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteGarminConnection(ctx, request.(DeleteGarminConnectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteGarminConnection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteGarminConnectionResponseObject); ok {
+		if err := validResponse.VisitDeleteGarminConnectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetGarminConnection operation middleware
+func (sh *strictHandler) GetGarminConnection(w http.ResponseWriter, r *http.Request) {
+	var request GetGarminConnectionRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGarminConnection(ctx, request.(GetGarminConnectionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGarminConnection")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetGarminConnectionResponseObject); ok {
+		if err := validResponse.VisitGetGarminConnectionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetGarminKey operation middleware
+func (sh *strictHandler) SetGarminKey(w http.ResponseWriter, r *http.Request) {
+	var request SetGarminKeyRequestObject
+
+	var body SetGarminKeyJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetGarminKey(ctx, request.(SetGarminKeyRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetGarminKey")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetGarminKeyResponseObject); ok {
+		if err := validResponse.VisitSetGarminKeyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetGarminSyncInterval operation middleware
+func (sh *strictHandler) SetGarminSyncInterval(w http.ResponseWriter, r *http.Request) {
+	var request SetGarminSyncIntervalRequestObject
+
+	var body SetGarminSyncIntervalJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetGarminSyncInterval(ctx, request.(SetGarminSyncIntervalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetGarminSyncInterval")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetGarminSyncIntervalResponseObject); ok {
+		if err := validResponse.VisitSetGarminSyncIntervalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

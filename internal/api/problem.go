@@ -30,6 +30,9 @@ const (
 	KindUnsupportedFile Kind = "unsupported-file"
 	KindInvalidFile     Kind = "invalid-file"
 	KindFileTooLarge    Kind = "file-too-large"
+
+	KindGarminKeyRejected Kind = "garmin-key-rejected"
+	KindGarminUnavailable Kind = "garmin-unavailable"
 )
 
 func (k Kind) status() int {
@@ -48,8 +51,10 @@ func (k Kind) status() int {
 		return http.StatusMethodNotAllowed
 	case KindUnsupportedFile:
 		return http.StatusUnsupportedMediaType
-	case KindInvalidFile:
+	case KindInvalidFile, KindGarminKeyRejected:
 		return http.StatusUnprocessableEntity
+	case KindGarminUnavailable:
+		return http.StatusBadGateway
 	case KindFileTooLarge:
 		return http.StatusRequestEntityTooLarge
 	default:
@@ -83,6 +88,10 @@ func (k Kind) title() string {
 		return "File could not be read"
 	case KindFileTooLarge:
 		return "File too large"
+	case KindGarminKeyRejected:
+		return "Garmin rejected the key"
+	case KindGarminUnavailable:
+		return "Garmin is unavailable"
 	default:
 		return "Internal error"
 	}

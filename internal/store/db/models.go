@@ -95,6 +95,20 @@ type DailyMetric struct {
 	UpdatedAt      time.Time
 }
 
+type GarminConnection struct {
+	UserID          int64
+	KeyCiphertext   []byte
+	KeyExpiresOn    time.Time
+	TokenCiphertext []byte
+	TokenExpiresAt  *time.Time
+	Status          string
+	SyncIntervalH   int16
+	SyncedThrough   *time.Time
+	LastSyncAt      *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+}
+
 type Lap struct {
 	UserID           int64
 	ActivityID       int64
