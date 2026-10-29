@@ -50,7 +50,7 @@ just dev        # docker compose up for TimescaleDB + app with live reload
 
 ### FIT parsing (muktihari/fit)
 11. Drop invalid sentinel values (`255`, `65535`, `4294967295`, and the library's `Invalid` constants), including in developer fields.
-12. Running cadence in FIT is strides/min: steps/min = `(cadence + fractional_cadence) × 2`. Cycling cadence is rpm as-is.
+12. Running and hiking cadence in FIT is strides/min: steps/min = `(cadence + fractional_cadence) × 2`. Cycling cadence is rpm as-is.
 13. Positions are semicircles; convert with the library's degree helpers. Vertical oscillation and step length are mm. Workout step values are raw and must be interpreted by their duration/target type (distance cm, time ms, speed mm/s).
 14. For `length` and `set` messages, use each message's `start_time`; their `timestamp` repeats the activity start.
 15. Pool swims: distance, pace and strokes come from `length` messages (active vs idle), not records. Compute SWOLF (length time in s + strokes); the watch leaves it empty.

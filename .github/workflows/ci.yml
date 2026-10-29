@@ -28,6 +28,8 @@ jobs:
         run: npm --prefix web ci
       - name: Check (generate, diff, lint, test, coverage)
         run: just check
+      - name: Fuzz the FIT decoder
+        run: just fuzz
       - name: Install Playwright browser
         run: npx --prefix web playwright install --with-deps chromium
       - name: End-to-end tests
