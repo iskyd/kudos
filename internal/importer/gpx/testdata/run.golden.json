@@ -1,0 +1,77 @@
+[
+  {
+    "Sport": "running",
+    "Subtype": "outdoor",
+    "StartTime": "2026-05-01T06:00:00Z",
+    "UTCOffset": null,
+    "Device": {
+      "Manufacturer": "",
+      "Product": 0,
+      "Serial": 0
+    },
+    "ElapsedTime": 9,
+    "TimerTime": null,
+    "Distance": 22.239016046654754,
+    "Ascent": null,
+    "Descent": null,
+    "AvgSpeed": null,
+    "MaxSpeed": null,
+    "AvgHR": null,
+    "MaxHR": null,
+    "AvgPower": null,
+    "MaxPower": null,
+    "AvgCadence": null,
+    "MaxCadence": null,
+    "AvgTemperature": null,
+    "Calories": null,
+    "PoolLength": null,
+    "RPE": null,
+    "Feel": null,
+    "Thresholds": null,
+    "Workout": null,
+    "Laps": null,
+    "Lengths": null,
+    "Sets": null,
+    "Samples": [
+      {
+        "Time": "2026-05-01T06:00:00Z",
+        "Lat": 45,
+        "Lon": -30,
+        "Altitude": 100,
+        "HR": 120,
+        "Power": null,
+        "Cadence": 160,
+        "Speed": null,
+        "Distance": 0,
+        "Temperature": 18,
+        "Extras": null
+      },
+      {
+        "Time": "2026-05-01T06:00:03Z",
+        "Lat": 45.0001,
+        "Lon": -30,
+        "Altitude": 100.5,
+        "HR": 125,
+        "Power": null,
+        "Cadence": 170,
+        "Speed": null,
+        "Distance": 11.119508023722423,
+        "Temperature": 18,
+        "Extras": null
+      },
+      {
+        "Time": "2026-05-01T06:00:09Z",
+        "Lat": 45.0002,
+        "Lon": -30,
+        "Altitude": 101,
+        "HR": 130,
+        "Power": null,
+        "Cadence": 172,
+        "Speed": null,
+        "Distance": 22.239016046654754,
+        "Temperature": null,
+        "Extras": null
+      }
+    ]
+  }
+]

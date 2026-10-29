@@ -1,6 +1,9 @@
 package importer
 
-import "time"
+import (
+	"math"
+	"time"
+)
 
 // Sport values match the activities.sport check constraint.
 type Sport string
@@ -183,4 +186,18 @@ type Sample struct {
 	Temperature *float64  // °C
 	// Extras holds sport-specific values keyed by name with a unit suffix, e.g. step_length_m.
 	Extras map[string]float64
+}
+
+// InStrides reports whether the sport's device cadence counts strides (one foot)
+// rather than steps, so steps/min is twice the recorded value.
+func (s Sport) InStrides() bool {
+	return s == SportRunning || s == SportTrailRunning || s == SportHiking
+}
+
+// Finite returns v, or nil when v is nil, NaN or infinite. Text formats can spell those.
+func Finite(v *float64) *float64 {
+	if v == nil || math.IsNaN(*v) || math.IsInf(*v, 0) {
+		return nil
+	}
+	return v
 }

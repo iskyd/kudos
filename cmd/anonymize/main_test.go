@@ -57,7 +57,7 @@ func record(i int32, lat, long int32) proto.Message {
 	}
 }
 
-// sample builds a FIT activity covering every kind of data fitanon must handle.
+// sample builds a FIT activity covering every kind of data anonymize must handle.
 func sample(t *testing.T) []byte {
 	t.Helper()
 	ts := datetime.ToUint32(start)

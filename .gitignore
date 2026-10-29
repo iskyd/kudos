@@ -21,7 +21,7 @@ encryption_key
 /data/
 /.data/
 # Raw, un-anonymized samples and Garmin exports; only files
-# processed by cmd/fitanon go into testdata/fit/
+# processed by cmd/anonymize go into testdata/fit/
 /private/
 testdata/**/raw/
 /*.zip

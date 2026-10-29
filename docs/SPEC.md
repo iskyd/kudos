@@ -341,7 +341,7 @@ The browser talks only to the app through the user's reverse proxy; outbound tra
 | Migrations | goose, embedded, run on startup | Upgrades are just pulling a new image |
 | Background jobs | River (Postgres-backed queue) | Retries, scheduling and transactional enqueue without extra infrastructure |
 | FIT parsing | muktihari/fit | Decoded all three samples, including Zwift developer fields (half marathon in about 21 ms); current FIT profile; keeps unknown messages. tormoder/fit last released in 2023 on an older profile |
-| GPX / TCX | gpxgo; small custom TCX parser |  |
+| GPX / TCX | Small custom parsers on `encoding/xml` |  |
 | Large uploads | tusd (Go library) | Resumable chunked upload for multi-GB exports (v2 bulk import only) |
 | Secret encryption | AES-256-GCM, key from Docker secret or env | Protects Garmin and LLM API keys at rest |
 | API contract | REST with an OpenAPI spec | Generated TypeScript client for the frontend |

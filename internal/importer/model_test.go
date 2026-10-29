@@ -1,6 +1,9 @@
 package importer
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestLengthSWOLF(t *testing.T) {
 	t.Parallel()
@@ -23,5 +26,30 @@ func TestLengthSWOLF(t *testing.T) {
 				t.Errorf("SWOLF() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestSportInStrides(t *testing.T) {
+	t.Parallel()
+	for sport, want := range map[Sport]bool{
+		SportRunning: true, SportTrailRunning: true, SportHiking: true,
+		SportCycling: false, SportPoolSwimming: false, SportOther: false,
+	} {
+		if got := sport.InStrides(); got != want {
+			t.Errorf("%s.InStrides() = %v, want %v", sport, got, want)
+		}
+	}
+}
+
+func TestFinite(t *testing.T) {
+	t.Parallel()
+	f := func(v float64) *float64 { return &v }
+	for _, v := range []*float64{nil, f(math.NaN()), f(math.Inf(1)), f(math.Inf(-1))} {
+		if Finite(v) != nil {
+			t.Errorf("Finite(%v) is not nil", v)
+		}
+	}
+	if got := Finite(f(1.5)); got == nil || *got != 1.5 {
+		t.Errorf("Finite(1.5) = %v", got)
 	}
 }

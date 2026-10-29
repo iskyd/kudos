@@ -1,0 +1,77 @@
+[
+  {
+    "Sport": "cycling",
+    "Subtype": "outdoor",
+    "StartTime": "2026-05-02T14:00:00Z",
+    "UTCOffset": null,
+    "Device": {
+      "Manufacturer": "",
+      "Product": 0,
+      "Serial": 0
+    },
+    "ElapsedTime": 20,
+    "TimerTime": null,
+    "Distance": 157.25359053434158,
+    "Ascent": null,
+    "Descent": null,
+    "AvgSpeed": null,
+    "MaxSpeed": null,
+    "AvgHR": null,
+    "MaxHR": null,
+    "AvgPower": null,
+    "MaxPower": null,
+    "AvgCadence": null,
+    "MaxCadence": null,
+    "AvgTemperature": null,
+    "Calories": null,
+    "PoolLength": null,
+    "RPE": null,
+    "Feel": null,
+    "Thresholds": null,
+    "Workout": null,
+    "Laps": null,
+    "Lengths": null,
+    "Sets": null,
+    "Samples": [
+      {
+        "Time": "2026-05-02T14:00:00Z",
+        "Lat": 45,
+        "Lon": -30,
+        "Altitude": null,
+        "HR": null,
+        "Power": null,
+        "Cadence": null,
+        "Speed": null,
+        "Distance": 0,
+        "Temperature": null,
+        "Extras": null
+      },
+      {
+        "Time": "2026-05-02T14:00:10Z",
+        "Lat": 45,
+        "Lon": -29.999,
+        "Altitude": null,
+        "HR": null,
+        "Power": 210,
+        "Cadence": null,
+        "Speed": null,
+        "Distance": 78.62679526731047,
+        "Temperature": null,
+        "Extras": null
+      },
+      {
+        "Time": "2026-05-02T14:00:20Z",
+        "Lat": 45,
+        "Lon": -29.998,
+        "Altitude": null,
+        "HR": null,
+        "Power": null,
+        "Cadence": null,
+        "Speed": null,
+        "Distance": 157.25359053434158,
+        "Temperature": null,
+        "Extras": null
+      }
+    ]
+  }
+]
