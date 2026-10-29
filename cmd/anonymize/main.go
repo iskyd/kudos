@@ -1,13 +1,15 @@
-// Command fitanon writes an anonymized copy of a FIT file for the test corpus.
+// Command anonymize writes an anonymized copy of a FIT file, or of a Garmin Connect
+// GPX or TCX export, for the test corpus.
 //
-//	fitanon in.fit out.fit
+//	anonymize in.fit|in.gpx|in.tcx out
 //
 // Every longitude is shifted so the first position lands on a neutral meridian
 // in the Atlantic. Latitudes are kept, so every distance between positions stays
 // exact. Device serial numbers become 1, 2, 3… in order of first appearance.
 // Text in fields the FIT profile does not describe is blanked: Garmin keeps the
 // owner's name, sensor serials and the activity's city there. Everything else is
-// copied as decoded, including unknown messages and developer fields.
+// copied as decoded, including unknown messages and developer fields. GPX and TCX
+// get the same longitude shift; their track names and device serial are replaced.
 package main
 
 import (
@@ -15,6 +17,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
@@ -42,12 +45,12 @@ type stats struct {
 
 func main() {
 	if len(os.Args) != 3 {
-		fmt.Fprintln(os.Stderr, "usage: fitanon in.fit out.fit")
+		fmt.Fprintln(os.Stderr, "usage: anonymize in.fit|in.gpx|in.tcx out")
 		os.Exit(2)
 	}
 	st, err := run(os.Args[1], os.Args[2])
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "fitanon:", err)
+		fmt.Fprintln(os.Stderr, "anonymize:", err)
 		os.Exit(1)
 	}
 	fmt.Printf("shifted %d longitudes (%d in unprofiled fields), replaced %d serial numbers, blanked %d texts\n",
@@ -59,12 +62,22 @@ func run(inPath, outPath string) (stats, error) {
 	if err != nil {
 		return stats{}, fmt.Errorf("reading input: %w", err)
 	}
-	var out bytes.Buffer
-	st, err := anonymize(bytes.NewReader(in), &out)
+	var (
+		out []byte
+		st  stats
+	)
+	switch strings.ToLower(filepath.Ext(inPath)) {
+	case ".gpx", ".tcx":
+		out, st, err = anonymizeXML(in)
+	default:
+		var buf bytes.Buffer
+		st, err = anonymize(bytes.NewReader(in), &buf)
+		out = buf.Bytes()
+	}
 	if err != nil {
 		return st, err
 	}
-	if err := os.WriteFile(outPath, out.Bytes(), 0o600); err != nil { //nolint:gosec // G703: the path is the operator's own command-line argument
+	if err := os.WriteFile(outPath, out, 0o600); err != nil { //nolint:gosec // G703: the path is the operator's own command-line argument
 		return st, fmt.Errorf("writing output: %w", err)
 	}
 	return st, nil

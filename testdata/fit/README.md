@@ -15,9 +15,9 @@ Anonymized copies of real activities, used by the FIT parser tests. Never commit
 Make each file with:
 
 ```bash
-go run ./cmd/fitanon original.fit testdata/fit/<name>.fit
+go run ./cmd/anonymize original.fit testdata/fit/<name>.fit
 ```
 
-`fitanon` shifts every longitude so the track starts on a neutral meridian in the Atlantic (latitudes are kept, so distances stay exact), renumbers device serial numbers and blanks text in fields the FIT profile does not describe (Garmin keeps the owner's name, sensor serials and the activity's city there). Everything else is kept: timestamps, heart rate, thresholds and the user profile's numbers (weight, height, gender, resting HR). Check you are happy publishing those before committing.
+`anonymize` shifts every longitude so the track starts on a neutral meridian in the Atlantic (latitudes are kept, so distances stay exact), renumbers device serial numbers and blanks text in fields the FIT profile does not describe (Garmin keeps the owner's name, sensor serials and the activity's city there). Everything else is kept: timestamps, heart rate, thresholds and the user profile's numbers (weight, height, gender, resting HR). Check you are happy publishing those before committing.
 
 The Zwift file's first position has a longitude of about 0, so its virtual track lands at an arbitrary longitude. Virtual activities never get a map, so this does not matter.

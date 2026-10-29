@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Synthetic" xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+  <metadata><time>2026-05-01T06:00:00Z</time></metadata>
+  <trk>
+    <name>Synthetic run</name>
+    <type>running</type>
+    <trkseg>
+      <trkpt lat="45.000000" lon="-30.000000"><ele>100.0</ele><time>2026-05-01T06:00:00Z</time>
+        <extensions><gpxtpx:TrackPointExtension><gpxtpx:atemp>18</gpxtpx:atemp><gpxtpx:hr>120</gpxtpx:hr><gpxtpx:cad>80</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>
+      <trkpt lat="45.000100" lon="-30.000000"><ele>100.5</ele><time>2026-05-01T06:00:03Z</time>
+        <extensions><gpxtpx:TrackPointExtension><gpxtpx:atemp>18</gpxtpx:atemp><gpxtpx:hr>125</gpxtpx:hr><gpxtpx:cad>85</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>
+      <!-- Repeated timestamp: dropped. -->
+      <trkpt lat="45.000150" lon="-30.000000"><ele>100.6</ele><time>2026-05-01T06:00:03Z</time></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="45.000200" lon="-30.000000"><ele>101.0</ele><time>2026-05-01T06:00:09+00:00</time>
+        <extensions><gpxtpx:TrackPointExtension><gpxtpx:hr>130</gpxtpx:hr><gpxtpx:cad>86</gpxtpx:cad></gpxtpx:TrackPointExtension></extensions></trkpt>
+    </trkseg>
+  </trk>
+</gpx>
