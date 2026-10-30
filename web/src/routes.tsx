@@ -10,6 +10,7 @@ import { ActivityDetailPage } from '@/pages/activity-detail'
 import { GearPage } from '@/pages/gear'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { SettingsPage } from '@/pages/settings'
+import { ZonesPage } from '@/pages/zones'
 
 const pages: Partial<Record<string, ReactElement>> = {
   '/activities': <ActivitiesPage />,
@@ -32,6 +33,7 @@ export const routes: RouteObject[] = [
           })),
           { path: '/activities/:id', element: <ActivityDetailPage /> },
           { path: '/activities/:id/compare/:other', element: <ActivityComparePage /> },
+          { path: '/settings/zones', element: <ZonesPage /> },
           { path: '*', element: <EmptyPage title="Page not found" /> },
         ],
       },

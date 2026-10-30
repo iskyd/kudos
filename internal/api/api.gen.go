@@ -543,6 +543,30 @@ func (e WorkoutExecutionKind) Valid() bool {
 	}
 }
 
+// Defines values for ZoneSport.
+const (
+	ZoneSportCycling  ZoneSport = "cycling"
+	ZoneSportGeneral  ZoneSport = "general"
+	ZoneSportRunning  ZoneSport = "running"
+	ZoneSportSwimming ZoneSport = "swimming"
+)
+
+// Valid indicates whether the value is a known member of the ZoneSport enum.
+func (e ZoneSport) Valid() bool {
+	switch e {
+	case ZoneSportCycling:
+		return true
+	case ZoneSportGeneral:
+		return true
+	case ZoneSportRunning:
+		return true
+	case ZoneSportSwimming:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListActivitiesParamsSort.
 const (
 	ListActivitiesParamsSortDate     ListActivitiesParamsSort = "date"
@@ -785,6 +809,26 @@ type ActivitySummarySource string
 
 // ActivitySummarySubtype defines model for ActivitySummary.Subtype.
 type ActivitySummarySubtype string
+
+// ActivityZones defines model for ActivityZones.
+type ActivityZones struct {
+	// Day The activity's local date.
+	Day openapi_types.Date `json:"day"`
+
+	// GeneralZoneSetId The general version used for heart rate reserve, if any.
+	GeneralZoneSetId *int64 `json:"generalZoneSetId,omitempty"`
+
+	// Sport Sports that share thresholds; general holds max and resting HR for any sport.
+	Sport ZoneSport `json:"sport"`
+
+	// ZoneSetId The sport's version used, if any.
+	ZoneSetId *int64 `json:"zoneSetId,omitempty"`
+
+	// Zones Zones per metric with the model each comes from: friel_run_hr,
+	// friel_bike_hr or heart_rate_reserve (bpm); friel_run_pace or css (m/s,
+	// slow to fast); coggan_power (W). A metric without a model is absent.
+	Zones Zones `json:"zones"`
+}
 
 // ComparedStreams One activity's values at each point of x.
 type ComparedStreams struct {
@@ -1215,6 +1259,84 @@ type WorkoutStep struct {
 	WeightKg         *float64 `json:"weightKg,omitempty"`
 }
 
+// Zone The range [low, high); low is absent for the first zone and high for the last.
+type Zone struct {
+	High *float64 `json:"high,omitempty"`
+	Low  *float64 `json:"low,omitempty"`
+	Name string   `json:"name"`
+}
+
+// ZoneSet defines model for ZoneSet.
+type ZoneSet struct {
+	// CssMS Critical swim speed.
+	CssMS         *float64           `json:"cssMS,omitempty"`
+	EffectiveFrom openapi_types.Date `json:"effectiveFrom"`
+
+	// FtpW Cycling functional threshold power.
+	FtpW *int  `json:"ftpW,omitempty"`
+	Id   int64 `json:"id"`
+
+	// LthrBpm Lactate threshold heart rate.
+	LthrBpm      *int `json:"lthrBpm,omitempty"`
+	MaxHrBpm     *int `json:"maxHrBpm,omitempty"`
+	RestingHrBpm *int `json:"restingHrBpm,omitempty"`
+
+	// Sport Sports that share thresholds; general holds max and resting HR for any sport.
+	Sport ZoneSport `json:"sport"`
+
+	// ThresholdSpeedMS Running threshold pace, as a speed.
+	ThresholdSpeedMS *float64 `json:"thresholdSpeedMS,omitempty"`
+
+	// Zones Zones per metric with the model each comes from: friel_run_hr,
+	// friel_bike_hr or heart_rate_reserve (bpm); friel_run_pace or css (m/s,
+	// slow to fast); coggan_power (W). A metric without a model is absent.
+	Zones Zones `json:"zones"`
+}
+
+// ZoneSetInput defines model for ZoneSetInput.
+type ZoneSetInput struct {
+	// CssMS Critical swim speed.
+	CssMS         *float64           `json:"cssMS,omitempty"`
+	EffectiveFrom openapi_types.Date `json:"effectiveFrom"`
+
+	// FtpW Cycling functional threshold power.
+	FtpW *int `json:"ftpW,omitempty"`
+
+	// LthrBpm Lactate threshold heart rate.
+	LthrBpm      *int `json:"lthrBpm,omitempty"`
+	MaxHrBpm     *int `json:"maxHrBpm,omitempty"`
+	RestingHrBpm *int `json:"restingHrBpm,omitempty"`
+
+	// Sport Sports that share thresholds; general holds max and resting HR for any sport.
+	Sport ZoneSport `json:"sport"`
+
+	// ThresholdSpeedMS Running threshold pace, as a speed.
+	ThresholdSpeedMS *float64 `json:"thresholdSpeedMS,omitempty"`
+}
+
+// ZoneSetPage defines model for ZoneSetPage.
+type ZoneSetPage struct {
+	Items []ZoneSet `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// ZoneSport Sports that share thresholds; general holds max and resting HR for any sport.
+type ZoneSport string
+
+// Zones Zones per metric with the model each comes from: friel_run_hr,
+// friel_bike_hr or heart_rate_reserve (bpm); friel_run_pace or css (m/s,
+// slow to fast); coggan_power (W). A metric without a model is absent.
+type Zones struct {
+	Hr         *[]Zone `json:"hr,omitempty"`
+	HrModel    *string `json:"hrModel,omitempty"`
+	Pace       *[]Zone `json:"pace,omitempty"`
+	PaceModel  *string `json:"paceModel,omitempty"`
+	Power      *[]Zone `json:"power,omitempty"`
+	PowerModel *string `json:"powerModel,omitempty"`
+}
+
 // ActivityID defines model for ActivityID.
 type ActivityID = int64
 
@@ -1320,6 +1442,17 @@ type ListGearParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListZoneSetsParams defines parameters for ListZoneSets.
+type ListZoneSetsParams struct {
+	Sport *ZoneSport `form:"sport,omitempty" json:"sport,omitempty"`
+
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // CreateActivityJSONRequestBody defines body for CreateActivity for application/json ContentType.
 type CreateActivityJSONRequestBody = ManualActivityRequest
 
@@ -1358,6 +1491,9 @@ type UpdateGearJSONRequestBody = GearInput
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
+
+// CreateZoneSetJSONRequestBody defines body for CreateZoneSet for application/json ContentType.
+type CreateZoneSetJSONRequestBody = ZoneSetInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -1400,6 +1536,9 @@ type ServerInterface interface {
 	// GetActivityStreams Sample streams of an activity
 	// (GET /api/activities/{id}/streams)
 	GetActivityStreams(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityStreamsParams)
+	// GetActivityZones The zones an activity uses
+	// (GET /api/activities/{id}/zones)
+	GetActivityZones(w http.ResponseWriter, r *http.Request, id ActivityID)
 	// Login Log in
 	// (POST /api/auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -1457,6 +1596,15 @@ type ServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// ListZoneSets List zone versions
+	// (GET /api/zones)
+	ListZoneSets(w http.ResponseWriter, r *http.Request, params ListZoneSetsParams)
+	// CreateZoneSet Add a zone version
+	// (POST /api/zones)
+	CreateZoneSet(w http.ResponseWriter, r *http.Request)
+	// DeleteZoneSet Delete a zone version
+	// (DELETE /api/zones/{zoneSetId})
+	DeleteZoneSet(w http.ResponseWriter, r *http.Request, zoneSetId int64)
 	// GetHealthz Liveness probe
 	// (GET /healthz)
 	GetHealthz(w http.ResponseWriter, r *http.Request)
@@ -1541,6 +1689,12 @@ func (_ Unimplemented) ListStrengthSets(w http.ResponseWriter, r *http.Request, 
 // GetActivityStreams Sample streams of an activity
 // (GET /api/activities/{id}/streams)
 func (_ Unimplemented) GetActivityStreams(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityStreamsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetActivityZones The zones an activity uses
+// (GET /api/activities/{id}/zones)
+func (_ Unimplemented) GetActivityZones(w http.ResponseWriter, r *http.Request, id ActivityID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1655,6 +1809,24 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 // UpdateMe Update profile settings
 // (PATCH /api/me)
 func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListZoneSets List zone versions
+// (GET /api/zones)
+func (_ Unimplemented) ListZoneSets(w http.ResponseWriter, r *http.Request, params ListZoneSetsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateZoneSet Add a zone version
+// (POST /api/zones)
+func (_ Unimplemented) CreateZoneSet(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteZoneSet Delete a zone version
+// (DELETE /api/zones/{zoneSetId})
+func (_ Unimplemented) DeleteZoneSet(w http.ResponseWriter, r *http.Request, zoneSetId int64) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2252,6 +2424,32 @@ func (siw *ServerInterfaceWrapper) GetActivityStreams(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetActivityZones operation middleware
+func (siw *ServerInterfaceWrapper) GetActivityZones(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActivityZones(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
 
@@ -2606,6 +2804,105 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// ListZoneSets operation middleware
+func (siw *ServerInterfaceWrapper) ListZoneSets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListZoneSetsParams
+
+	// ------------- Optional query parameter "sport" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sport", r.URL.Query(), &params.Sport, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sport"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sport", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListZoneSets(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateZoneSet operation middleware
+func (siw *ServerInterfaceWrapper) CreateZoneSet(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateZoneSet(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteZoneSet operation middleware
+func (siw *ServerInterfaceWrapper) DeleteZoneSet(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "zoneSetId" -------------
+	var zoneSetId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "zoneSetId", chi.URLParam(r, "zoneSetId"), &zoneSetId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "zoneSetId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteZoneSet(w, r, zoneSetId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetHealthz operation middleware
 func (siw *ServerInterfaceWrapper) GetHealthz(w http.ResponseWriter, r *http.Request) {
 
@@ -2831,6 +3128,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/execution", wrapper.GetActivityExecution)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/zones", wrapper.ListZoneSets)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/zones", wrapper.CreateZoneSet)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/zones/{zoneSetId}", wrapper.DeleteZoneSet)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}/zones", wrapper.GetActivityZones)
 	})
 
 	return r
@@ -3342,6 +3651,45 @@ type GetActivityStreamsdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetActivityStreamsdefaultApplicationProblemPlusJSONResponse) VisitGetActivityStreamsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityZonesRequestObject struct {
+	Id ActivityID `json:"id"`
+}
+
+type GetActivityZonesResponseObject interface {
+	VisitGetActivityZonesResponse(w http.ResponseWriter) error
+}
+
+type GetActivityZones200JSONResponse ActivityZones
+
+func (response GetActivityZones200JSONResponse) VisitGetActivityZonesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityZonesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetActivityZonesdefaultApplicationProblemPlusJSONResponse) VisitGetActivityZonesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -4098,6 +4446,117 @@ func (response UpdateMedefaultApplicationProblemPlusJSONResponse) VisitUpdateMeR
 	return err
 }
 
+type ListZoneSetsRequestObject struct {
+	Params ListZoneSetsParams
+}
+
+type ListZoneSetsResponseObject interface {
+	VisitListZoneSetsResponse(w http.ResponseWriter) error
+}
+
+type ListZoneSets200JSONResponse ZoneSetPage
+
+func (response ListZoneSets200JSONResponse) VisitListZoneSetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListZoneSetsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListZoneSetsdefaultApplicationProblemPlusJSONResponse) VisitListZoneSetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateZoneSetRequestObject struct {
+	Body *CreateZoneSetJSONRequestBody
+}
+
+type CreateZoneSetResponseObject interface {
+	VisitCreateZoneSetResponse(w http.ResponseWriter) error
+}
+
+type CreateZoneSet201JSONResponse ZoneSet
+
+func (response CreateZoneSet201JSONResponse) VisitCreateZoneSetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateZoneSetdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateZoneSetdefaultApplicationProblemPlusJSONResponse) VisitCreateZoneSetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteZoneSetRequestObject struct {
+	ZoneSetId int64 `json:"zoneSetId"`
+}
+
+type DeleteZoneSetResponseObject interface {
+	VisitDeleteZoneSetResponse(w http.ResponseWriter) error
+}
+
+type DeleteZoneSet204Response struct {
+}
+
+func (response DeleteZoneSet204Response) VisitDeleteZoneSetResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteZoneSetdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteZoneSetdefaultApplicationProblemPlusJSONResponse) VisitDeleteZoneSetResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetHealthzRequestObject struct {
 }
 
@@ -4174,6 +4633,9 @@ type StrictServerInterface interface {
 	// GetActivityStreams Sample streams of an activity
 	// (GET /api/activities/{id}/streams)
 	GetActivityStreams(ctx context.Context, request GetActivityStreamsRequestObject) (GetActivityStreamsResponseObject, error)
+	// GetActivityZones The zones an activity uses
+	// (GET /api/activities/{id}/zones)
+	GetActivityZones(ctx context.Context, request GetActivityZonesRequestObject) (GetActivityZonesResponseObject, error)
 	// Login Log in
 	// (POST /api/auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
@@ -4231,6 +4693,15 @@ type StrictServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// ListZoneSets List zone versions
+	// (GET /api/zones)
+	ListZoneSets(ctx context.Context, request ListZoneSetsRequestObject) (ListZoneSetsResponseObject, error)
+	// CreateZoneSet Add a zone version
+	// (POST /api/zones)
+	CreateZoneSet(ctx context.Context, request CreateZoneSetRequestObject) (CreateZoneSetResponseObject, error)
+	// DeleteZoneSet Delete a zone version
+	// (DELETE /api/zones/{zoneSetId})
+	DeleteZoneSet(ctx context.Context, request DeleteZoneSetRequestObject) (DeleteZoneSetResponseObject, error)
 	// GetHealthz Liveness probe
 	// (GET /healthz)
 	GetHealthz(ctx context.Context, request GetHealthzRequestObject) (GetHealthzResponseObject, error)
@@ -4636,6 +5107,32 @@ func (sh *strictHandler) GetActivityStreams(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetActivityStreamsResponseObject); ok {
 		if err := validResponse.VisitGetActivityStreamsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActivityZones operation middleware
+func (sh *strictHandler) GetActivityZones(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	var request GetActivityZonesRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActivityZones(ctx, request.(GetActivityZonesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActivityZones")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActivityZonesResponseObject); ok {
+		if err := validResponse.VisitGetActivityZonesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -5163,6 +5660,89 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListZoneSets operation middleware
+func (sh *strictHandler) ListZoneSets(w http.ResponseWriter, r *http.Request, params ListZoneSetsParams) {
+	var request ListZoneSetsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListZoneSets(ctx, request.(ListZoneSetsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListZoneSets")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListZoneSetsResponseObject); ok {
+		if err := validResponse.VisitListZoneSetsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateZoneSet operation middleware
+func (sh *strictHandler) CreateZoneSet(w http.ResponseWriter, r *http.Request) {
+	var request CreateZoneSetRequestObject
+
+	var body CreateZoneSetJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateZoneSet(ctx, request.(CreateZoneSetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateZoneSet")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateZoneSetResponseObject); ok {
+		if err := validResponse.VisitCreateZoneSetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteZoneSet operation middleware
+func (sh *strictHandler) DeleteZoneSet(w http.ResponseWriter, r *http.Request, zoneSetId int64) {
+	var request DeleteZoneSetRequestObject
+
+	request.ZoneSetId = zoneSetId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteZoneSet(ctx, request.(DeleteZoneSetRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteZoneSet")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteZoneSetResponseObject); ok {
+		if err := validResponse.VisitDeleteZoneSetResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

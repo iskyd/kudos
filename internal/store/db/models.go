@@ -223,3 +223,17 @@ type SwimLength struct {
 	Strokes      *int16
 	AvgSpeedMS   *float32
 }
+
+type ZoneSet struct {
+	ID               int64
+	UserID           int64
+	Sport            string
+	EffectiveFrom    time.Time
+	LthrBpm          *int16
+	ThresholdSpeedMS *float32
+	FtpW             *int16
+	CssMS            *float32
+	MaxHrBpm         *int16
+	RestingHrBpm     *int16
+	CreatedAt        time.Time
+}

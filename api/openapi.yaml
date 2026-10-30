@@ -724,6 +724,91 @@ paths:
                 $ref: "#/components/schemas/WorkoutExecution"
         default:
           $ref: "#/components/responses/Problem"
+  /api/zones:
+    get:
+      operationId: listZoneSets
+      summary: List zone versions
+      description: |
+        Latest effective date first, each with the zones its thresholds give
+        (heart rate reserve only from its own max and resting HR).
+      tags: [zones]
+      parameters:
+        - name: sport
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ZoneSport"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of versions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneSetPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createZoneSet
+      summary: Add a zone version
+      description: |
+        Thresholds valid for a sport from effectiveFrom on; at most one version per
+        sport and day. Running needs lthrBpm or thresholdSpeedMS, cycling ftpW or
+        lthrBpm, swimming cssMS, general maxHrBpm and restingHrBpm.
+      tags: [zones]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ZoneSetInput"
+      responses:
+        "201":
+          description: The new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneSet"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/zones/{zoneSetId}:
+    delete:
+      operationId: deleteZoneSet
+      summary: Delete a zone version
+      description: Activities on its dates fall back to the version before it.
+      tags: [zones]
+      parameters:
+        - name: zoneSetId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "204":
+          description: Deleted.
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/activities/{id}/zones:
+    get:
+      operationId: getActivityZones
+      summary: The zones an activity uses
+      description: |
+        The versions valid on the activity's local date: its sport's and the
+        general one (for heart rate reserve when the sport has no LTHR).
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+      responses:
+        "200":
+          description: The zones.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityZones"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -1592,6 +1677,126 @@ components:
         withinS:
           type: number
           format: double
+    ZoneSport:
+      type: string
+      description: Sports that share thresholds; general holds max and resting HR for any sport.
+      enum: [running, cycling, swimming, general]
+    ZoneSetInput:
+      type: object
+      required: [sport, effectiveFrom]
+      properties:
+        sport:
+          $ref: "#/components/schemas/ZoneSport"
+        effectiveFrom:
+          type: string
+          format: date
+        lthrBpm:
+          type: integer
+          minimum: 60
+          maximum: 240
+          description: Lactate threshold heart rate.
+        thresholdSpeedMS:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: Running threshold pace, as a speed.
+        ftpW:
+          type: integer
+          minimum: 1
+          maximum: 2000
+          description: Cycling functional threshold power.
+        cssMS:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: Critical swim speed.
+        maxHrBpm:
+          type: integer
+          minimum: 60
+          maximum: 250
+        restingHrBpm:
+          type: integer
+          minimum: 20
+          maximum: 150
+    ZoneSet:
+      allOf:
+        - $ref: "#/components/schemas/ZoneSetInput"
+        - type: object
+          required: [id, zones]
+          properties:
+            id:
+              type: integer
+              format: int64
+            zones:
+              $ref: "#/components/schemas/Zones"
+    ZoneSetPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ZoneSet"
+    Zones:
+      type: object
+      description: |
+        Zones per metric with the model each comes from: friel_run_hr,
+        friel_bike_hr or heart_rate_reserve (bpm); friel_run_pace or css (m/s,
+        slow to fast); coggan_power (W). A metric without a model is absent.
+      properties:
+        hrModel:
+          type: string
+        hr:
+          type: array
+          items:
+            $ref: "#/components/schemas/Zone"
+        paceModel:
+          type: string
+        pace:
+          type: array
+          items:
+            $ref: "#/components/schemas/Zone"
+        powerModel:
+          type: string
+        power:
+          type: array
+          items:
+            $ref: "#/components/schemas/Zone"
+    Zone:
+      type: object
+      required: [name]
+      description: The range [low, high); low is absent for the first zone and high for the last.
+      properties:
+        name:
+          type: string
+        low:
+          type: number
+          format: double
+        high:
+          type: number
+          format: double
+    ActivityZones:
+      type: object
+      required: [sport, day, zones]
+      properties:
+        sport:
+          $ref: "#/components/schemas/ZoneSport"
+        day:
+          type: string
+          format: date
+          description: The activity's local date.
+        zoneSetId:
+          type: integer
+          format: int64
+          description: The sport's version used, if any.
+        generalZoneSetId:
+          type: integer
+          format: int64
+          description: The general version used for heart rate reserve, if any.
+        zones:
+          $ref: "#/components/schemas/Zones"
     ActivityStreams:
       type: object
       required: [timeS]

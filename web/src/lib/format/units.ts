@@ -46,6 +46,11 @@ export function paceSeconds(metresPerSecond: number, per = 1000): number | null 
   return metresPerSecond > 0 ? per / metresPerSecond : null
 }
 
+// speedFromPace turns a pace (seconds per `per` metres) back into metres per second.
+export function speedFromPace(seconds: number, per = 1000): number | null {
+  return seconds > 0 ? per / seconds : null
+}
+
 // formatPace renders a speed as a pace: "4:35 /km", or "1:45 /100 m" with per = 100.
 export function formatPace(metresPerSecond: number, per = 1000): string {
   const s = paceSeconds(metresPerSecond, per)

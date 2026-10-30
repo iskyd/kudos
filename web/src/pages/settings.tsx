@@ -1,4 +1,5 @@
 import { useState, type SubmitEvent } from 'react'
+import { Link } from 'react-router'
 import { useCurrentUser, useUpdateMe } from '@/api/auth'
 import {
   type GarminBackfill,
@@ -35,6 +36,17 @@ export function SettingsPage() {
     <div className="flex max-w-xl flex-col gap-8">
       <h1 className="text-2xl font-semibold">Settings</h1>
       <ProfileSection />
+      <section aria-labelledby="zones-heading" className="flex flex-col gap-2">
+        <h2 id="zones-heading" className="text-lg font-semibold">
+          Training zones
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          Thresholds per sport, versioned by date.{' '}
+          <Link to="/settings/zones" className="underline">
+            Manage zones
+          </Link>
+        </p>
+      </section>
       <GarminSection />
     </div>
   )
