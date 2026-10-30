@@ -72,7 +72,7 @@ function ActivityList() {
   const [filters, setFilters] = useState<ActivityFilters>({ sort: 'date' })
   const activities = useActivities(filters)
   const items = activities.data?.pages.flatMap((page) => page.items) ?? []
-  const filtered = Boolean(filters.sport ?? filters.from ?? filters.to)
+  const filtered = Boolean(filters.sport ?? filters.tag ?? filters.from ?? filters.to)
 
   return (
     <section aria-label="Activity list" className="flex flex-col gap-4">
@@ -94,6 +94,16 @@ function ActivityList() {
               </NativeSelectOption>
             ))}
           </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="filter-tag">Pain tag</Label>
+          <Input
+            id="filter-tag"
+            value={filters.tag ?? ''}
+            onChange={(event) => {
+              setFilters({ ...filters, tag: event.target.value.trim() || undefined })
+            }}
+          />
         </div>
         <div className="flex flex-col gap-2">
           <Label htmlFor="filter-from">From</Label>

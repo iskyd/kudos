@@ -5,6 +5,7 @@ import (
 	"math"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -236,4 +237,69 @@ func TestDecimateWithoutChannels(t *testing.T) {
 	if out := columns(got, start); out.HrBpm != nil || len(out.TimeS) != 5 {
 		t.Errorf("columns = %+v", out)
 	}
+}
+
+func TestSetActivityAnnotation(t *testing.T) {
+	t.Parallel()
+	c, _, _ := loggedIn(t, "UTC")
+	id := uploadCorpus(t, c, "intervals.fit")
+	path := fmt.Sprintf("/api/activities/%d", id)
+
+	// Pre-filled from the watch.
+	a := decodeJSON[ActivityDetail](t, c.do(http.MethodGet, path, nil, nil), http.StatusOK)
+	if a.Rpe == nil || a.Feel == nil || a.PainTags == nil || len(a.PainTags) != 0 {
+		t.Fatalf("watch values: rpe %v, feel %v, tags %v", a.Rpe, a.Feel, a.PainTags)
+	}
+
+	cond := ActivityAnnotationWeatherConditionRain
+	tags := []string{"  Left Knee ", "left knee", "", "Achilles"}
+	a = decodeJSON[ActivityDetail](t, c.do(http.MethodPut, path+"/annotation", ActivityAnnotation{
+		Rpe: new(float32(7.5)), Feel: new(25), Notes: new("Heavy legs"), PainTags: &tags,
+		WeatherTemperatureC: new(float32(4)), WeatherCondition: &cond,
+	}, nil), http.StatusOK)
+	if *a.Rpe != 7.5 || *a.Feel != 25 || *a.Notes != "Heavy legs" || fmt.Sprint(a.PainTags) != "[left knee achilles]" ||
+		*a.WeatherTemperatureC != 4 || *a.WeatherCondition != ActivityDetailWeatherConditionRain {
+		t.Errorf("after editing: %+v", a)
+	}
+	if got := decodeJSON[ActivityDetail](t, c.do(http.MethodGet, path, nil, nil), http.StatusOK); fmt.Sprint(got.PainTags) != "[left knee achilles]" {
+		t.Errorf("stored tags = %v", got.PainTags)
+	}
+
+	// The list filters by tag, case-insensitively.
+	if page := decodeJSON[ActivityPage](t, c.do(http.MethodGet, "/api/activities?tag=LEFT%20KNEE", nil, nil), http.StatusOK); len(page.Items) != 1 {
+		t.Errorf("tag filter: %d activities", len(page.Items))
+	}
+	if page := decodeJSON[ActivityPage](t, c.do(http.MethodGet, "/api/activities?tag=back", nil, nil), http.StatusOK); len(page.Items) != 0 {
+		t.Errorf("unknown tag: %d activities", len(page.Items))
+	}
+
+	// Clearing: every field left out goes, blank notes included.
+	a = decodeJSON[ActivityDetail](t, c.do(http.MethodPut, path+"/annotation", ActivityAnnotation{Notes: new("   ")}, nil), http.StatusOK)
+	if a.Rpe != nil || a.Feel != nil || a.Notes != nil || len(a.PainTags) != 0 || a.WeatherTemperatureC != nil || a.WeatherCondition != nil {
+		t.Errorf("after clearing: %+v", a)
+	}
+
+	tooMany := make([]string, maxPainTags+1)
+	for i := range tooMany {
+		tooMany[i] = fmt.Sprint("tag", i)
+	}
+	bad := ActivityAnnotationWeatherCondition("fog")
+	for name, body := range map[string]ActivityAnnotation{
+		"rpe":       {Rpe: new(float32(10.5))},
+		"feel":      {Feel: new(101)},
+		"notes":     {Notes: new(strings.Repeat("x", maxNotesLen+1))},
+		"tags":      {PainTags: &tooMany},
+		"long tag":  {PainTags: &[]string{strings.Repeat("k", maxPainTagLen+1)}},
+		"cold":      {WeatherTemperatureC: new(float32(-61))},
+		"condition": {WeatherCondition: &bad},
+	} {
+		rec := c.do(http.MethodPut, path+"/annotation", body, nil)
+		if rec.Code != http.StatusBadRequest {
+			t.Errorf("%s: status %d", name, rec.Code)
+		}
+	}
+
+	bob := &apiClient{t: t, h: c.h}
+	bob.session(bob.do(http.MethodPost, "/api/auth/register", register("bob"), nil), http.StatusCreated)
+	wantProblem(t, bob.do(http.MethodPut, path+"/annotation", ActivityAnnotation{Notes: new("mine")}, nil), KindNotFound)
 }

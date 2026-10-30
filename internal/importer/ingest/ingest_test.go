@@ -503,3 +503,57 @@ func TestImportKeysBySourceID(t *testing.T) {
 		}
 	}
 }
+
+func TestAnnotate(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	ids, err := e.svc.Upload(ctx, e.alice, time.UTC, "intervals.fit", corpus(t, "fit/intervals.fit"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	id := ids[0]
+	// Pre-filled from the watch.
+	a, err := e.q.GetActivity(ctx, db.GetActivityParams{UserID: e.alice, ID: id})
+	if err != nil || a.Rpe == nil || a.Feel == nil {
+		t.Fatalf("watch values: rpe %v, feel %v, %v", a.Rpe, a.Feel, err)
+	}
+
+	rpe, feel, notes, temp, cond := float32(6.5), int16(100), "Windy", float32(-2.5), "wind"
+	if err := e.svc.Annotate(ctx, e.alice, id, Annotation{
+		RPE: &rpe, Feel: &feel, Notes: &notes, PainTags: []string{"left knee"}, WeatherTemperature: &temp, WeatherCondition: &cond,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	a, err = e.q.GetActivity(ctx, db.GetActivityParams{UserID: e.alice, ID: id})
+	if err != nil || *a.Rpe != 6.5 || *a.Feel != 100 || *a.Notes != "Windy" || a.PainTags[0] != "left knee" ||
+		*a.WeatherTemperatureC != -2.5 || *a.WeatherCondition != "wind" {
+		t.Fatalf("after editing: %+v, %v", a, err)
+	}
+
+	// Re-importing the file keeps the annotation.
+	if _, err := e.svc.Upload(ctx, e.alice, time.UTC, "intervals.fit", corpus(t, "fit/intervals.fit")); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ = e.q.GetActivity(ctx, db.GetActivityParams{UserID: e.alice, ID: id}); *a.Rpe != 6.5 || len(a.PainTags) != 1 {
+		t.Errorf("re-import changed the annotation: rpe %v, tags %v", *a.Rpe, a.PainTags)
+	}
+
+	// An empty annotation clears every field, the watch's values included.
+	if err := e.svc.Annotate(ctx, e.alice, id, Annotation{}); err != nil {
+		t.Fatal(err)
+	}
+	a, _ = e.q.GetActivity(ctx, db.GetActivityParams{UserID: e.alice, ID: id})
+	if a.Rpe != nil || a.Feel != nil || a.Notes != nil || len(a.PainTags) != 0 || a.WeatherTemperatureC != nil || a.WeatherCondition != nil {
+		t.Errorf("after clearing: %+v", a)
+	}
+
+	// Bob cannot annotate alice's activity; a bad value rolls back.
+	if err := e.svc.Annotate(ctx, e.bob, id, Annotation{Notes: &notes}); !errors.Is(err, ErrNotFound) {
+		t.Errorf("bob: %v", err)
+	}
+	bad := float32(11)
+	if err := e.svc.Annotate(ctx, e.alice, id, Annotation{RPE: &bad}); err == nil {
+		t.Error("an RPE of 11 was stored")
+	}
+}

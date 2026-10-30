@@ -469,3 +469,39 @@ func TestListMultisportLegsIsolation(t *testing.T) {
 		t.Errorf("bob lists %d of alice's legs, %v", len(legs), err)
 	}
 }
+
+func TestActivityAnnotationAndTagFilter(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	ids := map[string]int64{}
+	for i, name := range []string{"easy", "long", "tempo"} {
+		id, err := q.UpsertActivity(ctx, db.UpsertActivityParams{
+			UserID: alice.ID, Source: "manual", SourceActivityID: name, Sport: "running", Subtype: "outdoor",
+			StartTime: start.Add(time.Duration(i) * time.Hour),
+		})
+		check(t, err)
+		ids[name] = id
+	}
+	for name, tags := range map[string][]string{"long": {"left knee", "achilles"}, "tempo": {"left knee"}} {
+		n, err := q.UpdateActivityAnnotation(ctx, db.UpdateActivityAnnotationParams{UserID: alice.ID, ID: ids[name], PainTags: tags})
+		if err != nil || n != 1 {
+			t.Fatalf("annotating %s: %d, %v", name, n, err)
+		}
+	}
+	// Bob cannot annotate alice's activity.
+	if n, err := q.UpdateActivityAnnotation(ctx, db.UpdateActivityAnnotationParams{UserID: bob.ID, ID: ids["easy"], PainTags: []string{"x"}}); err != nil || n != 0 {
+		t.Errorf("bob annotated %d rows, %v", n, err)
+	}
+
+	for tag, want := range map[string][]string{"left knee": {"tempo", "long"}, "achilles": {"long"}, "back": nil} {
+		if got := listIDs(t, q, db.ListActivitiesParams{UserID: alice.ID, Sort: "date", Tag: &tag}); !reflect.DeepEqual(got, want) {
+			t.Errorf("tag %q: %v, want %v", tag, got, want)
+		}
+	}
+	if got := listIDs(t, q, db.ListActivitiesParams{UserID: bob.ID, Sort: "date", Tag: ptr("left knee")}); got != nil {
+		t.Errorf("bob lists %v", got)
+	}
+}

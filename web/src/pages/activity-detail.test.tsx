@@ -26,6 +26,9 @@ const run: ActivityDetail = {
   avgHrBpm: 151.6,
   ascentM: 42,
   caloriesKcal: 690,
+  rpe: 7,
+  feel: 75,
+  painTags: [],
   workout: {
     name: 'Intervals',
     steps: [
@@ -313,5 +316,111 @@ describe('ActivityDetailPage', () => {
     renderApp('/activities')
     await userEvent.click(await screen.findByRole('link', { name: '10 Oct 2026, 07:30' }))
     expect(await screen.findByRole('heading', { name: 'Running' })).toBeInTheDocument()
+  })
+
+  describe('notes and feel', () => {
+    it('pre-fills from the watch and saves edits with the CSRF token', async () => {
+      serve(run, runStreams)
+      let body: unknown
+      let csrf: string | null = null
+      server.use(
+        http.put('/api/activities/:id/annotation', async ({ request }) => {
+          body = await request.json()
+          csrf = request.headers.get('X-CSRF-Token')
+          return HttpResponse.json({ ...run, rpe: 8.5, painTags: ['left knee'] })
+        }),
+      )
+      renderApp('/activities/1')
+      const rpe = await screen.findByLabelText('RPE (0–10)')
+      expect(rpe).toHaveValue('7')
+      expect(screen.getByLabelText('Mood')).toHaveValue('75')
+      expect(screen.getByLabelText('Weather')).toHaveValue('')
+
+      await userEvent.clear(rpe)
+      await userEvent.type(rpe, '8,5')
+      await userEvent.selectOptions(screen.getByLabelText('Mood'), 'Very strong')
+      await userEvent.type(
+        screen.getByLabelText('Pain tags (comma-separated)'),
+        'Left Knee, left knee',
+      )
+      await userEvent.type(screen.getByLabelText('Temperature (°C)'), '-3')
+      await userEvent.selectOptions(screen.getByLabelText('Weather'), 'Snow')
+      await userEvent.type(screen.getByLabelText('Notes'), 'Icy')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+      expect(await screen.findByText('Saved.')).toBeInTheDocument()
+      expect(body).toEqual({
+        rpe: 8.5,
+        feel: 100,
+        notes: 'Icy',
+        painTags: ['left knee'],
+        weatherTemperatureC: -3,
+        weatherCondition: 'snow',
+      })
+      expect(csrf).toBe('csrf-ann')
+    })
+
+    it('clears every field', async () => {
+      serve(
+        {
+          ...run,
+          notes: 'Old',
+          painTags: ['achilles'],
+          weatherTemperatureC: 20,
+          weatherCondition: 'sun',
+        },
+        runStreams,
+      )
+      let body: unknown
+      server.use(
+        http.put('/api/activities/:id/annotation', async ({ request }) => {
+          body = await request.json()
+          return HttpResponse.json({ ...run, rpe: undefined, feel: undefined })
+        }),
+      )
+      renderApp('/activities/1')
+      expect(await screen.findByLabelText('Pain tags (comma-separated)')).toHaveValue('achilles')
+      await userEvent.clear(screen.getByLabelText('RPE (0–10)'))
+      await userEvent.selectOptions(screen.getByLabelText('Mood'), 'Not set')
+      await userEvent.clear(screen.getByLabelText('Notes'))
+      await userEvent.clear(screen.getByLabelText('Pain tags (comma-separated)'))
+      await userEvent.clear(screen.getByLabelText('Temperature (°C)'))
+      await userEvent.selectOptions(screen.getByLabelText('Weather'), 'Not set')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      expect(await screen.findByText('Saved.')).toBeInTheDocument()
+      expect(body).toEqual({ painTags: [] })
+    })
+
+    it('keeps an unusual watch mood as an option', async () => {
+      serve({ ...run, feel: 60 }, runStreams)
+      renderApp('/activities/1')
+      expect(await screen.findByLabelText('Mood')).toHaveValue('60')
+    })
+
+    it.each([
+      ['RPE (0–10)', '11', 'RPE must be a number from 0 to 10.'],
+      ['RPE (0–10)', 'hard', 'RPE must be a number from 0 to 10.'],
+      ['Temperature (°C)', 'warm', 'Temperature must be a number.'],
+    ])('rejects %s %j before saving', async (label, text, message) => {
+      serve(run, runStreams)
+      renderApp('/activities/1')
+      const input = await screen.findByLabelText(label)
+      await userEvent.clear(input)
+      await userEvent.type(input, text)
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent(message)
+    })
+
+    it('shows save errors', async () => {
+      serve(run, runStreams)
+      server.use(
+        http.put('/api/activities/:id/annotation', () =>
+          problem(400, 'invalid-request', 'Invalid request', 'at most 10 pain tags'),
+        ),
+      )
+      renderApp('/activities/1')
+      await userEvent.click(await screen.findByRole('button', { name: 'Save' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('at most 10 pain tags')
+    })
   })
 })

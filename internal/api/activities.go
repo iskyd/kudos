@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"mime/multipart"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -152,6 +153,10 @@ func (s *Server) ListActivities(ctx context.Context, req ListActivitiesRequestOb
 			return invalid("unknown sport")
 		}
 		params.Sport = (*string)(p.Sport)
+	}
+	if p.Tag != nil {
+		tag := strings.ToLower(strings.TrimSpace(*p.Tag))
+		params.Tag = &tag
 	}
 	if p.From != nil {
 		params.FromDay = &p.From.Time
