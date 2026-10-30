@@ -328,13 +328,55 @@ export interface paths {
         get?: never;
         /**
          * Set what the user adds to an activity
-         * @description Replaces RPE, feel (mood), notes, pain tags and weather; a field left out or
+         * @description Replaces RPE, feel (mood), notes, pain tags, weather and gear; a field left out or
          *     null is cleared. RPE and feel arrive pre-filled from the watch when it
          *     recorded them. Tags are trimmed, lowercased and deduplicated.
          */
         put: operations["setActivityAnnotation"];
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gear": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List shoes and bikes
+         * @description Oldest first, each with the distance and time summed over its activities.
+         */
+        get: operations["listGear"];
+        put?: never;
+        /** Add shoes or a bike */
+        post: operations["createGear"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gear/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit, retire or reactivate gear */
+        put: operations["updateGear"];
+        post?: never;
+        /**
+         * Delete gear
+         * @description Its activities are kept and lose their gear.
+         */
+        delete: operations["deleteGear"];
         options?: never;
         head?: never;
         patch?: never;
@@ -627,6 +669,8 @@ export interface components {
             weatherCondition?: "sun" | "cloud" | "rain" | "wind" | "snow";
             workout?: components["schemas"]["RecordedWorkout"];
             painTags: string[];
+            /** Format: int64 */
+            gearId?: number;
             /** @description Every leg of the multisport activity this one belongs to, in order; empty otherwise. */
             legs: components["schemas"]["ActivitySummary"][];
         };
@@ -644,6 +688,44 @@ export interface components {
             weatherTemperatureC?: number;
             /** @enum {string} */
             weatherCondition?: "sun" | "cloud" | "rain" | "wind" | "snow";
+            /**
+             * Format: int64
+             * @description The user's own shoes or bike.
+             */
+            gearId?: number;
+        };
+        GearInput: {
+            /** @enum {string} */
+            kind: "shoes" | "bike";
+            name: string;
+            /**
+             * Format: double
+             * @description Distance at which to replace it; absent for no warning.
+             */
+            replacementDistanceM?: number;
+            /** @default false */
+            retired: boolean;
+        };
+        Gear: components["schemas"]["GearInput"] & {
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: double
+             * @description Summed over the assigned activities.
+             */
+            distanceM: number;
+            /**
+             * Format: double
+             * @description Timer time (else elapsed time) summed over the assigned activities.
+             */
+            timeS: number;
+            /** Format: int64 */
+            activities: number;
+            /** @description The distance has reached the replacement threshold. */
+            replacementDue: boolean;
+        };
+        GearPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["Gear"][];
         };
         RecordedWorkout: {
             name?: string;
@@ -804,6 +886,7 @@ export interface components {
     };
     parameters: {
         ActivityID: number;
+        GearID: number;
         /** @description Opaque cursor from a previous page's `nextCursor`. */
         Cursor: string;
         /** @description Maximum number of items to return. */
@@ -986,6 +1069,8 @@ export interface operations {
                 from?: string;
                 /** @description Last local day, inclusive. */
                 to?: string;
+                /** @description Only activities with this gear. */
+                gear?: number;
                 /** @description Only activities with this pain tag. */
                 tag?: string;
                 sort?: "date" | "distance" | "duration";
@@ -1319,6 +1404,105 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ActivityDetail"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listGear: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of gear. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GearPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createGear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GearInput"];
+            };
+        };
+        responses: {
+            /** @description The new gear. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Gear"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateGear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GearID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GearInput"];
+            };
+        };
+        responses: {
+            /** @description The gear with its totals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Gear"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteGear: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

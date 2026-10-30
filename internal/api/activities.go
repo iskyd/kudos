@@ -154,6 +154,7 @@ func (s *Server) ListActivities(ctx context.Context, req ListActivitiesRequestOb
 		}
 		params.Sport = (*string)(p.Sport)
 	}
+	params.GearID = p.Gear
 	if p.Tag != nil {
 		tag := strings.ToLower(strings.TrimSpace(*p.Tag))
 		params.Tag = &tag

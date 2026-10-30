@@ -9,6 +9,7 @@ import {
   useUploadActivity,
   type Sport,
 } from '@/api/activities'
+import { useGear } from '@/api/gear'
 import { problemMessage } from '@/api/problem'
 import { Button } from '@/components/ui/button'
 import {
@@ -71,8 +72,11 @@ export function ActivitiesPage() {
 function ActivityList() {
   const [filters, setFilters] = useState<ActivityFilters>({ sort: 'date' })
   const activities = useActivities(filters)
+  const gear = useGear().data?.pages[0]?.items ?? []
   const items = activities.data?.pages.flatMap((page) => page.items) ?? []
-  const filtered = Boolean(filters.sport ?? filters.tag ?? filters.from ?? filters.to)
+  const filtered = Boolean(
+    filters.sport ?? filters.gear ?? filters.tag ?? filters.from ?? filters.to,
+  )
 
   return (
     <section aria-label="Activity list" className="flex flex-col gap-4">
@@ -95,6 +99,26 @@ function ActivityList() {
             ))}
           </NativeSelect>
         </div>
+        {gear.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="filter-gear">Gear</Label>
+            <NativeSelect
+              id="filter-gear"
+              value={filters.gear ?? ''}
+              onChange={(event) => {
+                const id = event.target.value
+                setFilters({ ...filters, gear: id === '' ? undefined : Number(id) })
+              }}
+            >
+              <NativeSelectOption value="">All gear</NativeSelectOption>
+              {gear.map((g) => (
+                <NativeSelectOption key={g.id} value={g.id}>
+                  {g.name}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </div>
+        )}
         <div className="flex flex-col gap-2">
           <Label htmlFor="filter-tag">Pain tag</Label>
           <Input

@@ -166,6 +166,13 @@ paths:
           schema:
             type: string
             format: date
+        - name: gear
+          in: query
+          required: false
+          description: Only activities with this gear.
+          schema:
+            type: integer
+            format: int64
         - name: tag
           in: query
           required: false
@@ -423,7 +430,7 @@ paths:
       operationId: setActivityAnnotation
       summary: Set what the user adds to an activity
       description: |
-        Replaces RPE, feel (mood), notes, pain tags and weather; a field left out or
+        Replaces RPE, feel (mood), notes, pain tags, weather and gear; a field left out or
         null is cleared. RPE and feel arrive pre-filled from the watch when it
         recorded them. Tags are trimmed, lowercased and deduplicated.
       tags: [activities]
@@ -442,6 +449,77 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ActivityDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/gear:
+    get:
+      operationId: listGear
+      summary: List shoes and bikes
+      description: Oldest first, each with the distance and time summed over its activities.
+      tags: [gear]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of gear.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GearPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createGear
+      summary: Add shoes or a bike
+      tags: [gear]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GearInput"
+      responses:
+        "201":
+          description: The new gear.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gear"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/gear/{id}:
+    put:
+      operationId: updateGear
+      summary: Edit, retire or reactivate gear
+      tags: [gear]
+      parameters:
+        - $ref: "#/components/parameters/GearID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GearInput"
+      responses:
+        "200":
+          description: The gear with its totals.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Gear"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteGear
+      summary: Delete gear
+      description: Its activities are kept and lose their gear.
+      tags: [gear]
+      parameters:
+        - $ref: "#/components/parameters/GearID"
+      responses:
+        "204":
+          description: Deleted.
         default:
           $ref: "#/components/responses/Problem"
   /api/activities/{id}/laps:
@@ -542,6 +620,13 @@ components:
         type: string
   parameters:
     ActivityID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    GearID:
       name: id
       in: path
       required: true
@@ -902,6 +987,9 @@ components:
               type: array
               items:
                 type: string
+            gearId:
+              type: integer
+              format: int64
             legs:
               type: array
               description: Every leg of the multisport activity this one belongs to, in order; empty otherwise.
@@ -939,6 +1027,62 @@ components:
         weatherCondition:
           type: string
           enum: [sun, cloud, rain, wind, snow]
+        gearId:
+          type: integer
+          format: int64
+          description: The user's own shoes or bike.
+    GearInput:
+      type: object
+      required: [kind, name]
+      properties:
+        kind:
+          type: string
+          enum: [shoes, bike]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 80
+        replacementDistanceM:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: Distance at which to replace it; absent for no warning.
+        retired:
+          type: boolean
+          default: false
+    Gear:
+      allOf:
+        - $ref: "#/components/schemas/GearInput"
+        - type: object
+          required: [id, retired, distanceM, timeS, activities, replacementDue]
+          properties:
+            id:
+              type: integer
+              format: int64
+            distanceM:
+              type: number
+              format: double
+              description: Summed over the assigned activities.
+            timeS:
+              type: number
+              format: double
+              description: Timer time (else elapsed time) summed over the assigned activities.
+            activities:
+              type: integer
+              format: int64
+            replacementDue:
+              type: boolean
+              description: The distance has reached the replacement threshold.
+    GearPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Gear"
     RecordedWorkout:
       type: object
       required: [steps]

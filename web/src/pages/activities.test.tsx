@@ -2,6 +2,7 @@ import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import type { ActivitySummary, ManualActivity } from '@/api/activities'
+import type { Gear } from '@/api/gear'
 import { ann, loggedInAs, problem, renderApp } from '@/test/render'
 import { server } from '@/test/server'
 
@@ -19,6 +20,17 @@ const run: ActivitySummary = {
   timerTimeS: 3723,
   elapsedTimeS: 3800,
   distanceM: 10015,
+}
+
+const trainers: Gear = {
+  id: 5,
+  kind: 'shoes',
+  name: 'Trainers',
+  retired: false,
+  distanceM: 0,
+  timeS: 0,
+  activities: 0,
+  replacementDue: false,
 }
 
 async function openDialog(button: string, title: string) {
@@ -253,6 +265,30 @@ describe('activity list', () => {
     await userEvent.clear(screen.getByLabelText('From'))
     await userEvent.clear(screen.getByLabelText('Pain tag'))
     expect(queries.at(-1)).toBe('?sort=distance&to=2026-10-31')
+  })
+
+  it('filters by gear once there is gear', async () => {
+    const queries: string[] = []
+    server.use(
+      http.get('/api/activities', ({ request }) => {
+        queries.push(new URL(request.url).search)
+        return HttpResponse.json({ items: [run] })
+      }),
+      http.get('/api/gear', () =>
+        HttpResponse.json({
+          items: [
+            { ...trainers, id: 5 },
+            { ...trainers, id: 6, name: 'Road bike', kind: 'bike' },
+          ],
+        }),
+      ),
+    )
+    renderApp('/activities')
+    await userEvent.selectOptions(await screen.findByLabelText('Gear'), 'Road bike')
+    await screen.findByRole('cell', { name: 'Running' })
+    expect(queries.at(-1)).toBe('?sort=date&gear=6')
+    await userEvent.selectOptions(screen.getByLabelText('Gear'), 'All gear')
+    expect(queries.at(-1)).toBe('?sort=date')
   })
 
   it('loads more pages with the cursor', async () => {

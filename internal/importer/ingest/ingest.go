@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/iskyd/kudos/internal/importer"
@@ -34,6 +35,7 @@ var (
 	ErrUnsupportedFormat = errors.New("unsupported file format; upload a .fit, .gpx or .tcx file")
 	ErrInvalidFile       = errors.New("the file could not be read")
 	ErrNotFound          = errors.New("no such activity")
+	ErrGearNotFound      = errors.New("no such gear")
 )
 
 // Service ingests activities.
@@ -432,6 +434,7 @@ type Annotation struct {
 	PainTags           []string
 	WeatherTemperature *float32 // °C
 	WeatherCondition   *string
+	GearID             *int64
 }
 
 // Annotate replaces the activity's annotation and queues its derived values for
@@ -444,8 +447,12 @@ func (s *Service) Annotate(ctx context.Context, userID, activityID int64, a Anno
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		n, err := db.New(tx).UpdateActivityAnnotation(ctx, db.UpdateActivityAnnotationParams{
 			UserID: userID, ID: activityID, Rpe: a.RPE, Feel: a.Feel, Notes: a.Notes, PainTags: tags,
-			WeatherTemperatureC: a.WeatherTemperature, WeatherCondition: a.WeatherCondition,
+			WeatherTemperatureC: a.WeatherTemperature, WeatherCondition: a.WeatherCondition, GearID: a.GearID,
 		})
+		// The composite foreign key rejects gear that is not the user's.
+		if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.ConstraintName == "activities_gear_fk" {
+			return ErrGearNotFound
+		}
 		if err != nil {
 			return fmt.Errorf("storing: %w", err)
 		}

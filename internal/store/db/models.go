@@ -42,6 +42,7 @@ type Activity struct {
 	WeatherCondition    *string
 	Overrides           []byte
 	PainTags            []string
+	GearID              *int64
 }
 
 type ActivityStream struct {
@@ -133,6 +134,16 @@ type GarminConnection struct {
 	UpdatedAt       time.Time
 	LastAttemptAt   *time.Time
 	LastError       *string
+}
+
+type Gear struct {
+	ID                   int64
+	UserID               int64
+	Kind                 string
+	Name                 string
+	ReplacementDistanceM *float64
+	Retired              bool
+	CreatedAt            time.Time
 }
 
 type Lap struct {
