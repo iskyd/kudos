@@ -863,6 +863,43 @@ paths:
           description: Dismissed.
         default:
           $ref: "#/components/responses/Problem"
+  /api/fitness:
+    get:
+      operationId: getFitness
+      summary: Fitness, fatigue and form by day
+      description: |
+        Daily training load summed over activities by local date, with fitness
+        (CTL, 42-day), fatigue (ATL, 7-day) and form (TSB, the previous day's
+        fitness minus fatigue), computed on demand. The recurrences start from
+        zero a year before from, so earlier history weighs under 0.02%. At most
+        3660 days per request.
+      tags: [analytics]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: First local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last local day, inclusive.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: One entry per day from from to to.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FitnessDay"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -1895,6 +1932,29 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/ZoneSuggestion"
+    FitnessDay:
+      type: object
+      required: [day, load, ctl, atl, tsb]
+      properties:
+        day:
+          type: string
+          format: date
+        load:
+          type: number
+          format: double
+          description: The day's summed training load.
+        ctl:
+          type: number
+          format: double
+          description: Fitness.
+        atl:
+          type: number
+          format: double
+          description: Fatigue.
+        tsb:
+          type: number
+          format: double
+          description: Form.
     ActivityStreams:
       type: object
       required: [timeS]

@@ -66,6 +66,8 @@ type ActivityDerived struct {
 	PaceZoneS        []float64
 	PowerZoneModel   *string
 	PowerZoneS       []float64
+	Load             *float64
+	LoadMethod       *string
 }
 
 type ActivityEdit struct {

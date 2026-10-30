@@ -11,7 +11,7 @@ import (
 )
 
 const getActivityDerived = `-- name: GetActivityDerived :one
-SELECT user_id, activity_id, version, stale, computed_at, zone_set_id, general_zone_set_id, avg_hr_bpm, avg_power_w, avg_speed_m_s, avg_cadence, hr_zone_model, hr_zone_s, pace_zone_model, pace_zone_s, power_zone_model, power_zone_s FROM activity_derived WHERE user_id = $1 AND activity_id = $2
+SELECT user_id, activity_id, version, stale, computed_at, zone_set_id, general_zone_set_id, avg_hr_bpm, avg_power_w, avg_speed_m_s, avg_cadence, hr_zone_model, hr_zone_s, pace_zone_model, pace_zone_s, power_zone_model, power_zone_s, load, load_method FROM activity_derived WHERE user_id = $1 AND activity_id = $2
 `
 
 type GetActivityDerivedParams struct {
@@ -40,6 +40,8 @@ func (q *Queries) GetActivityDerived(ctx context.Context, arg GetActivityDerived
 		&i.PaceZoneS,
 		&i.PowerZoneModel,
 		&i.PowerZoneS,
+		&i.Load,
+		&i.LoadMethod,
 	)
 	return i, err
 }
@@ -110,6 +112,59 @@ func (q *Queries) ListActivitiesNeedingDerived(ctx context.Context, arg ListActi
 	return items, nil
 }
 
+const listDailyLoads = `-- name: ListDailyLoads :many
+SELECT day, sum(load)::double precision AS load FROM (
+    SELECT ((coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)
+            + make_interval(secs => a.utc_offset_s)) AT TIME ZONE 'UTC')::date AS day, d.load
+    FROM activity_derived d
+    JOIN activities a ON a.id = d.activity_id AND a.user_id = d.user_id
+    WHERE d.user_id = $1 AND d.load IS NOT NULL AND a.merged_into IS NULL
+) l
+WHERE day BETWEEN $2::date AND $3::date
+GROUP BY day
+ORDER BY day
+LIMIT $4
+`
+
+type ListDailyLoadsParams struct {
+	UserID  int64
+	FromDay time.Time
+	ToDay   time.Time
+	MaxRows int32
+}
+
+type ListDailyLoadsRow struct {
+	Day  time.Time
+	Load float64
+}
+
+// The user's summed load per local date in [from_day, to_day], days with load
+// only, in date order; merged-away activities count within the one they joined.
+func (q *Queries) ListDailyLoads(ctx context.Context, arg ListDailyLoadsParams) ([]ListDailyLoadsRow, error) {
+	rows, err := q.db.Query(ctx, listDailyLoads,
+		arg.UserID,
+		arg.FromDay,
+		arg.ToDay,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDailyLoadsRow
+	for rows.Next() {
+		var i ListDailyLoadsRow
+		if err := rows.Scan(&i.Day, &i.Load); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUserIDs = `-- name: ListUserIDs :many
 SELECT id FROM users WHERE id > $1 ORDER BY id LIMIT $2
 `
@@ -144,11 +199,13 @@ const upsertActivityDerived = `-- name: UpsertActivityDerived :exec
 INSERT INTO activity_derived (
     user_id, activity_id, version, zone_set_id, general_zone_set_id,
     avg_hr_bpm, avg_power_w, avg_speed_m_s, avg_cadence,
-    hr_zone_model, hr_zone_s, pace_zone_model, pace_zone_s, power_zone_model, power_zone_s
+    hr_zone_model, hr_zone_s, pace_zone_model, pace_zone_s, power_zone_model, power_zone_s,
+    load, load_method
 ) VALUES (
     $1, $2, $3, $4, $5,
     $6, $7, $8, $9,
-    $10, $11, $12, $13, $14, $15
+    $10, $11, $12, $13, $14, $15,
+    $16, $17
 )
 ON CONFLICT (activity_id) DO UPDATE SET
     version = EXCLUDED.version, stale = false, computed_at = now(),
@@ -157,7 +214,8 @@ ON CONFLICT (activity_id) DO UPDATE SET
     avg_speed_m_s = EXCLUDED.avg_speed_m_s, avg_cadence = EXCLUDED.avg_cadence,
     hr_zone_model = EXCLUDED.hr_zone_model, hr_zone_s = EXCLUDED.hr_zone_s,
     pace_zone_model = EXCLUDED.pace_zone_model, pace_zone_s = EXCLUDED.pace_zone_s,
-    power_zone_model = EXCLUDED.power_zone_model, power_zone_s = EXCLUDED.power_zone_s
+    power_zone_model = EXCLUDED.power_zone_model, power_zone_s = EXCLUDED.power_zone_s,
+    load = EXCLUDED.load, load_method = EXCLUDED.load_method
 WHERE activity_derived.user_id = EXCLUDED.user_id
 `
 
@@ -177,6 +235,8 @@ type UpsertActivityDerivedParams struct {
 	PaceZoneS        []float64
 	PowerZoneModel   *string
 	PowerZoneS       []float64
+	Load             *float64
+	LoadMethod       *string
 }
 
 // The WHERE makes a conflicting row of another user a no-op instead of an overwrite.
@@ -197,6 +257,8 @@ func (q *Queries) UpsertActivityDerived(ctx context.Context, arg UpsertActivityD
 		arg.PaceZoneS,
 		arg.PowerZoneModel,
 		arg.PowerZoneS,
+		arg.Load,
+		arg.LoadMethod,
 	)
 	return err
 }

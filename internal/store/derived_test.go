@@ -95,6 +95,29 @@ func TestActivityDerivedIsolationAndInvalidation(t *testing.T) {
 		t.Errorf("for version 2: %v, %v", got, err)
 	}
 
+	// Daily loads sum by local date, within the range, for the user only.
+	method := "hr_tss"
+	for i, l := range []float64{30, 50} {
+		check(t, q.UpsertActivityDerived(ctx, db.UpsertActivityDerivedParams{UserID: alice.ID, ActivityID: ids[i], Version: 1, Load: &l, LoadMethod: &method}))
+	}
+	check(t, q.UpsertActivityDerived(ctx, db.UpsertActivityDerivedParams{UserID: bob.ID, ActivityID: bobs, Version: 1, Load: new(70.0), LoadMethod: &method}))
+	loads := func(userID int64, from, to int) []db.ListDailyLoadsRow {
+		got, err := q.ListDailyLoads(ctx, db.ListDailyLoadsParams{
+			UserID: userID, FromDay: time.Date(2026, 10, from, 0, 0, 0, 0, time.UTC), ToDay: time.Date(2026, 10, to, 0, 0, 0, 0, time.UTC), MaxRows: 10,
+		})
+		check(t, err)
+		return got
+	}
+	if got := loads(alice.ID, 15, 20); len(got) != 2 || got[0].Day.Day() != 15 || got[0].Load != 30 || got[1].Day.Day() != 20 || got[1].Load != 50 {
+		t.Errorf("alice's loads: %+v", got)
+	}
+	if got := loads(alice.ID, 16, 19); len(got) != 0 {
+		t.Errorf("outside the range: %+v", got)
+	}
+	if got := loads(bob.ID, 1, 31); len(got) != 1 || got[0].Load != 70 {
+		t.Errorf("bob's loads: %+v", got)
+	}
+
 	users, err := q.ListUserIDs(ctx, db.ListUserIDsParams{MaxRows: 1})
 	check(t, err)
 	more, err := q.ListUserIDs(ctx, db.ListUserIDsParams{After: users[0], MaxRows: 10})

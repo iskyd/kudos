@@ -11,6 +11,8 @@ import (
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
 	"github.com/riverqueue/river/rivertest"
 
+	"github.com/iskyd/kudos/internal/analytics"
+	"github.com/iskyd/kudos/internal/importer"
 	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store/db"
 )
@@ -222,7 +224,75 @@ func sameDerived(a, b db.ActivityDerived) bool {
 	eq := func(x, y *float64) bool { return (x == nil) == (y == nil) && (x == nil || *x == *y) }
 	return a.Version == b.Version && a.Stale == b.Stale && eq(a.AvgHrBpm, b.AvgHrBpm) && eq(a.AvgSpeedMS, b.AvgSpeedMS) &&
 		eq(a.AvgPowerW, b.AvgPowerW) && eq(a.AvgCadence, b.AvgCadence) && slices.Equal(a.HrZoneS, b.HrZoneS) &&
-		slices.Equal(a.PaceZoneS, b.PaceZoneS) && slices.Equal(a.PowerZoneS, b.PowerZoneS)
+		slices.Equal(a.PaceZoneS, b.PaceZoneS) && slices.Equal(a.PowerZoneS, b.PowerZoneS) &&
+		eq(a.Load, b.Load) && (a.LoadMethod == nil) == (b.LoadMethod == nil) && (a.LoadMethod == nil || *a.LoadMethod == *b.LoadMethod)
+}
+
+func TestLoadUsesTheFirstApplicableMethod(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	for _, p := range []db.CreateZoneSetParams{
+		{Sport: "cycling", FtpW: new(int16(250))},
+		{Sport: "running", ThresholdSpeedMS: new(float32(4))},
+		{Sport: "swimming", CssMS: new(float32(1))},
+		{Sport: "general", LthrBpm: new(int16(160)), RestingHrBpm: new(int16(50))},
+	} {
+		p.UserID, p.EffectiveFrom = e.alice, time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+		if _, err := e.q.CreateZoneSet(ctx, p); err != nil {
+			t.Fatal(err)
+		}
+	}
+	hours := func(a db.Activity) float64 { return *a.TimerTimeS / 3600 }
+	speed := func(a db.Activity) float64 { return *a.DistanceM / *a.TimerTimeS }
+
+	ride := e.upload(t, "zwift.fit")
+	segs, err := e.svc.Segments(ctx, e.alice, View{Segments: []Segment{{ActivityID: ride.ID, From: minTime, To: maxTime}}}, maxSummarySamples)
+	if err != nil {
+		t.Fatal(err)
+	}
+	np, _ := analytics.NormalizedPower(segs)
+	run := e.upload(t, "intervals.fit")
+	swim := e.upload(t, "pool_swim.fit")
+	strength := e.upload(t, "strength.fit")
+	manual, err := e.svc.CreateManual(ctx, e.alice, Manual{
+		Sport: importer.SportStrength, Start: time.Date(2026, 10, 1, 18, 0, 0, 0, time.UTC), Duration: 5400, RPE: new(6.0),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	strengthHR := *e.compute(t, strength.ID).AvgHrBpm
+
+	for _, tc := range []struct {
+		name   string
+		id     int64
+		method string
+		want   float64
+	}{
+		{"zwift: power against the cycling FTP", ride.ID, "power_tss", hours(e.effective(t, ride.ID)) * np * np / (250 * 250) * 100},
+		// The run carries running power but no running FTP is set.
+		{"intervals: pace", run.ID, "pace_rtss", hours(e.effective(t, run.ID)) * math.Pow(speed(e.effective(t, run.ID))/4, 2) * 100},
+		// Speed from the lengths' distance over timer time.
+		{"pool: CSS", swim.ID, "swim_tss", hours(e.effective(t, swim.ID)) * math.Pow(speed(e.effective(t, swim.ID)), 3) * 100},
+		{"strength: heart rate", strength.ID, "hr_tss", hours(e.effective(t, strength.ID)) * (strengthHR - 50) * (strengthHR - 50) / (110 * 110) * 100},
+		// 6 × 1.5 h × 10.
+		{"manual: session RPE", manual, "session_rpe", 90},
+	} {
+		d := e.compute(t, tc.id)
+		if d.LoadMethod == nil || *d.LoadMethod != tc.method || d.Load == nil || math.Abs(*d.Load-tc.want) > 1e-6 {
+			t.Errorf("%s: %v %v, want %s %v", tc.name, deref(d.LoadMethod), deref(d.Load), tc.method, tc.want)
+		}
+	}
+	if np <= 0 || speed(e.effective(t, swim.ID)) <= 0 {
+		t.Errorf("degenerate inputs: NP %v", np)
+	}
+}
+
+func deref[T any](p *T) any {
+	if p == nil {
+		return nil
+	}
+	return *p
 }
 
 func TestDerivedWorkers(t *testing.T) {
