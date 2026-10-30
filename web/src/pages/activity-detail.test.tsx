@@ -38,6 +38,7 @@ const run: ActivityDetail = {
     ],
   },
   legs: [],
+  edits: [],
 }
 
 const runStreams: ActivityStreams = {

@@ -15,6 +15,7 @@ import {
 } from '@/api/activities'
 import { useGear } from '@/api/gear'
 import { ApiError, problemMessage } from '@/api/problem'
+import { ActivityEdits } from '@/components/activity-edits'
 import { RouteMap } from '@/components/route-map'
 import { StreamChart } from '@/components/stream-chart'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,7 @@ export function ActivityDetailPage() {
       </header>
       <Summary a={a} />
       <Annotation key={a.id} a={a} />
+      <ActivityEdits a={a} />
       {a.legs.length > 0 && <Legs a={a} />}
       <Streams a={a} />
       <Laps a={a} />

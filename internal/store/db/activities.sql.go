@@ -10,6 +10,32 @@ import (
 	"time"
 )
 
+const deleteActivityEdit = `-- name: DeleteActivityEdit :one
+DELETE FROM activity_edits
+WHERE user_id = $1 AND activity_id = $2 AND id = $3
+RETURNING id, user_id, activity_id, kind, params, created_at
+`
+
+type DeleteActivityEditParams struct {
+	UserID     int64
+	ActivityID int64
+	ID         int64
+}
+
+func (q *Queries) DeleteActivityEdit(ctx context.Context, arg DeleteActivityEditParams) (ActivityEdit, error) {
+	row := q.db.QueryRow(ctx, deleteActivityEdit, arg.UserID, arg.ActivityID, arg.ID)
+	var i ActivityEdit
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ActivityID,
+		&i.Kind,
+		&i.Params,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const deleteActivityStreams = `-- name: DeleteActivityStreams :exec
 DELETE FROM activity_streams WHERE user_id = $1 AND activity_id = $2
 `
@@ -36,6 +62,23 @@ type DeleteLapsParams struct {
 func (q *Queries) DeleteLaps(ctx context.Context, arg DeleteLapsParams) error {
 	_, err := q.db.Exec(ctx, deleteLaps, arg.UserID, arg.ActivityID)
 	return err
+}
+
+const deleteSplitActivity = `-- name: DeleteSplitActivity :execrows
+DELETE FROM activities WHERE user_id = $1 AND split_of = $2 AND source = 'split'
+`
+
+type DeleteSplitActivityParams struct {
+	UserID  int64
+	SplitOf *int64
+}
+
+func (q *Queries) DeleteSplitActivity(ctx context.Context, arg DeleteSplitActivityParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteSplitActivity, arg.UserID, arg.SplitOf)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const deleteStrengthSets = `-- name: DeleteStrengthSets :exec
@@ -67,7 +110,7 @@ func (q *Queries) DeleteSwimLengths(ctx context.Context, arg DeleteSwimLengthsPa
 }
 
 const getActivity = `-- name: GetActivity :one
-SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides, pain_tags, gear_id FROM activities WHERE user_id = $1 AND id = $2
+SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides, pain_tags, gear_id, merged_into, split_of FROM activities WHERE user_id = $1 AND id = $2
 `
 
 type GetActivityParams struct {
@@ -113,6 +156,8 @@ func (q *Queries) GetActivity(ctx context.Context, arg GetActivityParams) (Activ
 		&i.Overrides,
 		&i.PainTags,
 		&i.GearID,
+		&i.MergedInto,
+		&i.SplitOf,
 	)
 	return i, err
 }
@@ -187,6 +232,38 @@ func (q *Queries) GetRecordedWorkout(ctx context.Context, arg GetRecordedWorkout
 	return i, err
 }
 
+const insertActivityEdit = `-- name: InsertActivityEdit :one
+INSERT INTO activity_edits (user_id, activity_id, kind, params)
+VALUES ($1, $2, $3, $4)
+RETURNING id, user_id, activity_id, kind, params, created_at
+`
+
+type InsertActivityEditParams struct {
+	UserID     int64
+	ActivityID int64
+	Kind       string
+	Params     []byte
+}
+
+func (q *Queries) InsertActivityEdit(ctx context.Context, arg InsertActivityEditParams) (ActivityEdit, error) {
+	row := q.db.QueryRow(ctx, insertActivityEdit,
+		arg.UserID,
+		arg.ActivityID,
+		arg.Kind,
+		arg.Params,
+	)
+	var i ActivityEdit
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.ActivityID,
+		&i.Kind,
+		&i.Params,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 type InsertActivityStreamsParams struct {
 	UserID       int64
 	ActivityID   int64
@@ -224,6 +301,36 @@ type InsertLapsParams struct {
 	WorkoutStepIndex *int32
 }
 
+const insertSplitActivity = `-- name: InsertSplitActivity :one
+INSERT INTO activities (user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, split_of)
+VALUES ($1, 'split', 'split:' || $2::bigint, $3, $4, $5, $6, $2)
+RETURNING id
+`
+
+type InsertSplitActivityParams struct {
+	UserID     int64
+	SplitOf    *int64
+	Sport      string
+	Subtype    string
+	StartTime  time.Time
+	UtcOffsetS int32
+}
+
+// The second part of a split: no samples of its own, it reads its parent's from @start_time.
+func (q *Queries) InsertSplitActivity(ctx context.Context, arg InsertSplitActivityParams) (int64, error) {
+	row := q.db.QueryRow(ctx, insertSplitActivity,
+		arg.UserID,
+		arg.SplitOf,
+		arg.Sport,
+		arg.Subtype,
+		arg.StartTime,
+		arg.UtcOffsetS,
+	)
+	var id int64
+	err := row.Scan(&id)
+	return id, err
+}
+
 type InsertStrengthSetsParams struct {
 	UserID           int64
 	ActivityID       int64
@@ -253,21 +360,24 @@ type InsertSwimLengthsParams struct {
 }
 
 const listActivities = `-- name: ListActivities :many
-SELECT a.id, a.user_id, a.source, a.source_activity_id, a.sport, a.subtype, a.start_time, a.utc_offset_s, a.original_file_id, a.multisport_group_id, a.elapsed_time_s, a.timer_time_s, a.distance_m, a.ascent_m, a.descent_m, a.avg_speed_m_s, a.max_speed_m_s, a.avg_hr_bpm, a.max_hr_bpm, a.avg_power_w, a.max_power_w, a.avg_cadence, a.max_cadence, a.avg_temperature_c, a.pool_length_m, a.calories_kcal, a.rpe, a.feel, a.notes, a.weather_temperature_c, a.weather_condition, a.overrides, a.pain_tags, a.gear_id, k.sort_key
+SELECT a.id, a.user_id, a.source, a.source_activity_id, a.sport, a.subtype, a.start_time, a.utc_offset_s, a.original_file_id, a.multisport_group_id, a.elapsed_time_s, a.timer_time_s, a.distance_m, a.ascent_m, a.descent_m, a.avg_speed_m_s, a.max_speed_m_s, a.avg_hr_bpm, a.max_hr_bpm, a.avg_power_w, a.max_power_w, a.avg_cadence, a.max_cadence, a.avg_temperature_c, a.pool_length_m, a.calories_kcal, a.rpe, a.feel, a.notes, a.weather_temperature_c, a.weather_condition, a.overrides, a.pain_tags, a.gear_id, a.merged_into, a.split_of, k.sort_key
 FROM activities a,
     LATERAL (SELECT (CASE $1::text
-        WHEN 'distance' THEN coalesce(a.distance_m, -1)
-        WHEN 'duration' THEN coalesce(a.timer_time_s, a.elapsed_time_s, -1)
-        ELSE extract(epoch FROM a.start_time)
+        WHEN 'distance' THEN coalesce(CASE WHEN a.overrides->'summary' IS NULL THEN a.distance_m
+            ELSE (a.overrides->'summary'->>'distance_m')::float8 END, -1)
+        WHEN 'duration' THEN coalesce(CASE WHEN a.overrides->'summary' IS NULL THEN coalesce(a.timer_time_s, a.elapsed_time_s)
+            ELSE (a.overrides->'summary'->>'timer_time_s')::float8 END, -1)
+        ELSE extract(epoch FROM coalesce((a.overrides->>'start_time')::timestamptz, a.start_time))
     END)::float8 AS sort_key) k
 WHERE a.user_id = $2
-    AND ($3::text IS NULL OR a.sport = $3)
+    AND a.merged_into IS NULL
+    AND ($3::text IS NULL OR coalesce(a.overrides->>'sport', a.sport) = $3::text)
     AND ($4::bigint IS NULL OR a.gear_id = $4)
     AND ($5::text IS NULL OR $5::text = ANY(a.pain_tags))
-    AND ($6::date IS NULL
-        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= $6)
-    AND ($7::date IS NULL
-        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= $7)
+    AND ($6::date IS NULL OR (coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)
+        AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= $6)
+    AND ($7::date IS NULL OR (coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)
+        AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= $7)
     AND (k.sort_key, a.id) < ($8::float8, $9::bigint)
 ORDER BY k.sort_key DESC, a.id DESC
 LIMIT $10
@@ -293,7 +403,9 @@ type ListActivitiesRow struct {
 
 // One page sorted by @sort (date, distance or duration), largest or newest first;
 // activities without the value sort last. Pass the last row's sort_key and id to
-// get the next page. Filters are optional; days are local calendar days.
+// get the next page. Filters are optional; days are local calendar days. Sport,
+// start and summary values are effective ones (edits applied, see overrides);
+// merged-away activities are left out.
 func (q *Queries) ListActivities(ctx context.Context, arg ListActivitiesParams) ([]ListActivitiesRow, error) {
 	rows, err := q.db.Query(ctx, listActivities,
 		arg.Sort,
@@ -349,7 +461,49 @@ func (q *Queries) ListActivities(ctx context.Context, arg ListActivitiesParams) 
 			&i.Activity.Overrides,
 			&i.Activity.PainTags,
 			&i.Activity.GearID,
+			&i.Activity.MergedInto,
+			&i.Activity.SplitOf,
 			&i.SortKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listActivityEdits = `-- name: ListActivityEdits :many
+SELECT id, user_id, activity_id, kind, params, created_at FROM activity_edits
+WHERE user_id = $1 AND activity_id = $2
+ORDER BY id
+LIMIT 100
+`
+
+type ListActivityEditsParams struct {
+	UserID     int64
+	ActivityID int64
+}
+
+// Oldest first. Edits per activity are capped in code; the limit is a guard.
+func (q *Queries) ListActivityEdits(ctx context.Context, arg ListActivityEditsParams) ([]ActivityEdit, error) {
+	rows, err := q.db.Query(ctx, listActivityEdits, arg.UserID, arg.ActivityID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActivityEdit
+	for rows.Next() {
+		var i ActivityEdit
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ActivityID,
+			&i.Kind,
+			&i.Params,
+			&i.CreatedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -380,6 +534,65 @@ func (q *Queries) ListActivityStreams(ctx context.Context, arg ListActivityStrea
 		arg.UserID,
 		arg.ActivityID,
 		arg.After,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ActivityStream
+	for rows.Next() {
+		var i ActivityStream
+		if err := rows.Scan(
+			&i.UserID,
+			&i.ActivityID,
+			&i.Time,
+			&i.LatDeg,
+			&i.LonDeg,
+			&i.AltitudeM,
+			&i.HrBpm,
+			&i.PowerW,
+			&i.Cadence,
+			&i.SpeedMS,
+			&i.DistanceM,
+			&i.TemperatureC,
+			&i.Extras,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listActivityStreamsWindow = `-- name: ListActivityStreamsWindow :many
+SELECT user_id, activity_id, time, lat_deg, lon_deg, altitude_m, hr_bpm, power_w, cadence, speed_m_s, distance_m, temperature_c, extras FROM activity_streams
+WHERE user_id = $1 AND activity_id = $2
+    AND time > $3::timestamptz AND time >= $4::timestamptz AND time < $5::timestamptz
+ORDER BY time
+LIMIT $6
+`
+
+type ListActivityStreamsWindowParams struct {
+	UserID     int64
+	ActivityID int64
+	After      time.Time
+	FromTime   time.Time
+	ToTime     time.Time
+	MaxRows    int32
+}
+
+// One page of samples in [@from_time, @to_time) after @after.
+func (q *Queries) ListActivityStreamsWindow(ctx context.Context, arg ListActivityStreamsWindowParams) ([]ActivityStream, error) {
+	rows, err := q.db.Query(ctx, listActivityStreamsWindow,
+		arg.UserID,
+		arg.ActivityID,
+		arg.After,
+		arg.FromTime,
+		arg.ToTime,
 		arg.MaxRows,
 	)
 	if err != nil {
@@ -473,7 +686,7 @@ func (q *Queries) ListLaps(ctx context.Context, arg ListLapsParams) ([]Lap, erro
 }
 
 const listMultisportLegs = `-- name: ListMultisportLegs :many
-SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides, pain_tags, gear_id FROM activities
+SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides, pain_tags, gear_id, merged_into, split_of FROM activities
 WHERE user_id = $1 AND multisport_group_id = $2
 ORDER BY start_time, id
 LIMIT 50
@@ -529,6 +742,8 @@ func (q *Queries) ListMultisportLegs(ctx context.Context, arg ListMultisportLegs
 			&i.Overrides,
 			&i.PainTags,
 			&i.GearID,
+			&i.MergedInto,
+			&i.SplitOf,
 		); err != nil {
 			return nil, err
 		}
@@ -640,6 +855,36 @@ func (q *Queries) ListSwimLengths(ctx context.Context, arg ListSwimLengthsParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const setActivityMergedInto = `-- name: SetActivityMergedInto :exec
+UPDATE activities SET merged_into = $1 WHERE user_id = $2 AND id = $3
+`
+
+type SetActivityMergedIntoParams struct {
+	MergedInto *int64
+	UserID     int64
+	ID         int64
+}
+
+func (q *Queries) SetActivityMergedInto(ctx context.Context, arg SetActivityMergedIntoParams) error {
+	_, err := q.db.Exec(ctx, setActivityMergedInto, arg.MergedInto, arg.UserID, arg.ID)
+	return err
+}
+
+const setActivityOverrides = `-- name: SetActivityOverrides :exec
+UPDATE activities SET overrides = $1 WHERE user_id = $2 AND id = $3
+`
+
+type SetActivityOverridesParams struct {
+	Overrides []byte
+	UserID    int64
+	ID        int64
+}
+
+func (q *Queries) SetActivityOverrides(ctx context.Context, arg SetActivityOverridesParams) error {
+	_, err := q.db.Exec(ctx, setActivityOverrides, arg.Overrides, arg.UserID, arg.ID)
+	return err
 }
 
 const updateActivityAnnotation = `-- name: UpdateActivityAnnotation :execrows

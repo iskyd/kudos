@@ -191,7 +191,11 @@ func (s *Server) ListActivities(ctx context.Context, req ListActivitiesRequestOb
 		page.NextCursor = &next
 	}
 	for _, r := range rows {
-		page.Items = append(page.Items, activitySummary(r.Activity))
+		a, err := ingest.Effective(r.Activity)
+		if err != nil {
+			return nil, err
+		}
+		page.Items = append(page.Items, activitySummary(a))
 	}
 	return ListActivities200JSONResponse(page), nil
 }

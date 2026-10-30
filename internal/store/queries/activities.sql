@@ -69,22 +69,27 @@ SELECT * FROM activities WHERE user_id = $1 AND id = $2;
 -- name: ListActivities :many
 -- One page sorted by @sort (date, distance or duration), largest or newest first;
 -- activities without the value sort last. Pass the last row's sort_key and id to
--- get the next page. Filters are optional; days are local calendar days.
+-- get the next page. Filters are optional; days are local calendar days. Sport,
+-- start and summary values are effective ones (edits applied, see overrides);
+-- merged-away activities are left out.
 SELECT sqlc.embed(a), k.sort_key
 FROM activities a,
     LATERAL (SELECT (CASE @sort::text
-        WHEN 'distance' THEN coalesce(a.distance_m, -1)
-        WHEN 'duration' THEN coalesce(a.timer_time_s, a.elapsed_time_s, -1)
-        ELSE extract(epoch FROM a.start_time)
+        WHEN 'distance' THEN coalesce(CASE WHEN a.overrides->'summary' IS NULL THEN a.distance_m
+            ELSE (a.overrides->'summary'->>'distance_m')::float8 END, -1)
+        WHEN 'duration' THEN coalesce(CASE WHEN a.overrides->'summary' IS NULL THEN coalesce(a.timer_time_s, a.elapsed_time_s)
+            ELSE (a.overrides->'summary'->>'timer_time_s')::float8 END, -1)
+        ELSE extract(epoch FROM coalesce((a.overrides->>'start_time')::timestamptz, a.start_time))
     END)::float8 AS sort_key) k
 WHERE a.user_id = @user_id
-    AND (sqlc.narg(sport)::text IS NULL OR a.sport = sqlc.narg(sport))
+    AND a.merged_into IS NULL
+    AND (sqlc.narg(sport)::text IS NULL OR coalesce(a.overrides->>'sport', a.sport) = sqlc.narg(sport)::text)
     AND (sqlc.narg(gear_id)::bigint IS NULL OR a.gear_id = sqlc.narg(gear_id))
     AND (sqlc.narg(tag)::text IS NULL OR sqlc.narg(tag)::text = ANY(a.pain_tags))
-    AND (sqlc.narg(from_day)::date IS NULL
-        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= sqlc.narg(from_day))
-    AND (sqlc.narg(to_day)::date IS NULL
-        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= sqlc.narg(to_day))
+    AND (sqlc.narg(from_day)::date IS NULL OR (coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)
+        AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= sqlc.narg(from_day))
+    AND (sqlc.narg(to_day)::date IS NULL OR (coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)
+        AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= sqlc.narg(to_day))
     AND (k.sort_key, a.id) < (@before_key::float8, @before_id::bigint)
 ORDER BY k.sort_key DESC, a.id DESC
 LIMIT @max_rows;
@@ -101,6 +106,14 @@ DELETE FROM activity_streams WHERE user_id = $1 AND activity_id = $2;
 -- name: ListActivityStreams :many
 SELECT * FROM activity_streams
 WHERE user_id = @user_id AND activity_id = @activity_id AND time > @after::timestamptz
+ORDER BY time
+LIMIT @max_rows;
+
+-- name: ListActivityStreamsWindow :many
+-- One page of samples in [@from_time, @to_time) after @after.
+SELECT * FROM activity_streams
+WHERE user_id = @user_id AND activity_id = @activity_id
+    AND time > @after::timestamptz AND time >= @from_time::timestamptz AND time < @to_time::timestamptz
 ORDER BY time
 LIMIT @max_rows;
 
@@ -183,3 +196,35 @@ SELECT * FROM activities
 WHERE user_id = $1 AND multisport_group_id = $2
 ORDER BY start_time, id
 LIMIT 50;
+
+-- name: InsertActivityEdit :one
+INSERT INTO activity_edits (user_id, activity_id, kind, params)
+VALUES (@user_id, @activity_id, @kind, @params)
+RETURNING *;
+
+-- name: ListActivityEdits :many
+-- Oldest first. Edits per activity are capped in code; the limit is a guard.
+SELECT * FROM activity_edits
+WHERE user_id = @user_id AND activity_id = @activity_id
+ORDER BY id
+LIMIT 100;
+
+-- name: DeleteActivityEdit :one
+DELETE FROM activity_edits
+WHERE user_id = @user_id AND activity_id = @activity_id AND id = @id
+RETURNING *;
+
+-- name: SetActivityOverrides :exec
+UPDATE activities SET overrides = @overrides WHERE user_id = @user_id AND id = @id;
+
+-- name: SetActivityMergedInto :exec
+UPDATE activities SET merged_into = @merged_into WHERE user_id = @user_id AND id = @id;
+
+-- name: InsertSplitActivity :one
+-- The second part of a split: no samples of its own, it reads its parent's from @start_time.
+INSERT INTO activities (user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, split_of)
+VALUES (@user_id, 'split', 'split:' || @split_of::bigint, @sport, @subtype, @start_time, @utc_offset_s, @split_of)
+RETURNING id;
+
+-- name: DeleteSplitActivity :execrows
+DELETE FROM activities WHERE user_id = @user_id AND split_of = @split_of AND source = 'split';

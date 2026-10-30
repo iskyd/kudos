@@ -49,6 +49,7 @@ func (e ActivityAnnotationWeatherCondition) Valid() bool {
 const (
 	ActivityDetailSourceGarmin ActivityDetailSource = "garmin"
 	ActivityDetailSourceManual ActivityDetailSource = "manual"
+	ActivityDetailSourceSplit  ActivityDetailSource = "split"
 	ActivityDetailSourceUpload ActivityDetailSource = "upload"
 )
 
@@ -58,6 +59,8 @@ func (e ActivityDetailSource) Valid() bool {
 	case ActivityDetailSourceGarmin:
 		return true
 	case ActivityDetailSourceManual:
+		return true
+	case ActivityDetailSourceSplit:
 		return true
 	case ActivityDetailSourceUpload:
 		return true
@@ -117,6 +120,81 @@ func (e ActivityDetailWeatherCondition) Valid() bool {
 	}
 }
 
+// Defines values for ActivityEditSubtype.
+const (
+	ActivityEditSubtypeIndoor    ActivityEditSubtype = "indoor"
+	ActivityEditSubtypeOutdoor   ActivityEditSubtype = "outdoor"
+	ActivityEditSubtypeTreadmill ActivityEditSubtype = "treadmill"
+	ActivityEditSubtypeVirtual   ActivityEditSubtype = "virtual"
+)
+
+// Valid indicates whether the value is a known member of the ActivityEditSubtype enum.
+func (e ActivityEditSubtype) Valid() bool {
+	switch e {
+	case ActivityEditSubtypeIndoor:
+		return true
+	case ActivityEditSubtypeOutdoor:
+		return true
+	case ActivityEditSubtypeTreadmill:
+		return true
+	case ActivityEditSubtypeVirtual:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ActivityEditKind.
+const (
+	ActivityEditKindExcludeHr ActivityEditKind = "exclude_hr"
+	ActivityEditKindMerge     ActivityEditKind = "merge"
+	ActivityEditKindSplit     ActivityEditKind = "split"
+	ActivityEditKindSport     ActivityEditKind = "sport"
+	ActivityEditKindTrim      ActivityEditKind = "trim"
+)
+
+// Valid indicates whether the value is a known member of the ActivityEditKind enum.
+func (e ActivityEditKind) Valid() bool {
+	switch e {
+	case ActivityEditKindExcludeHr:
+		return true
+	case ActivityEditKindMerge:
+		return true
+	case ActivityEditKindSplit:
+		return true
+	case ActivityEditKindSport:
+		return true
+	case ActivityEditKindTrim:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ActivityEditRequestSubtype.
+const (
+	ActivityEditRequestSubtypeIndoor    ActivityEditRequestSubtype = "indoor"
+	ActivityEditRequestSubtypeOutdoor   ActivityEditRequestSubtype = "outdoor"
+	ActivityEditRequestSubtypeTreadmill ActivityEditRequestSubtype = "treadmill"
+	ActivityEditRequestSubtypeVirtual   ActivityEditRequestSubtype = "virtual"
+)
+
+// Valid indicates whether the value is a known member of the ActivityEditRequestSubtype enum.
+func (e ActivityEditRequestSubtype) Valid() bool {
+	switch e {
+	case ActivityEditRequestSubtypeIndoor:
+		return true
+	case ActivityEditRequestSubtypeOutdoor:
+		return true
+	case ActivityEditRequestSubtypeTreadmill:
+		return true
+	case ActivityEditRequestSubtypeVirtual:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ActivitySport.
 const (
 	ActivitySportCycling           ActivitySport = "cycling"
@@ -160,6 +238,7 @@ func (e ActivitySport) Valid() bool {
 const (
 	ActivitySummarySourceGarmin ActivitySummarySource = "garmin"
 	ActivitySummarySourceManual ActivitySummarySource = "manual"
+	ActivitySummarySourceSplit  ActivitySummarySource = "split"
 	ActivitySummarySourceUpload ActivitySummarySource = "upload"
 )
 
@@ -169,6 +248,8 @@ func (e ActivitySummarySource) Valid() bool {
 	case ActivitySummarySourceGarmin:
 		return true
 	case ActivitySummarySourceManual:
+		return true
+	case ActivitySummarySourceSplit:
 		return true
 	case ActivitySummarySourceUpload:
 		return true
@@ -450,7 +531,10 @@ type ActivityDetail struct {
 	CaloriesKcal    *int     `json:"caloriesKcal,omitempty"`
 	DescentM        *float32 `json:"descentM,omitempty"`
 	DistanceM       *float64 `json:"distanceM,omitempty"`
-	ElapsedTimeS    *float64 `json:"elapsedTimeS,omitempty"`
+
+	// Edits The user's edits, oldest first; values above already apply them.
+	Edits        []ActivityEdit `json:"edits"`
+	ElapsedTimeS *float64       `json:"elapsedTimeS,omitempty"`
 
 	// Feel Workout feel, 0 to 100.
 	Feel   *int   `json:"feel,omitempty"`
@@ -458,16 +542,24 @@ type ActivityDetail struct {
 	Id     int64  `json:"id"`
 
 	// Legs Every leg of the multisport activity this one belongs to, in order; empty otherwise.
-	Legs        []ActivitySummary    `json:"legs"`
-	MaxCadence  *float32             `json:"maxCadence,omitempty"`
-	MaxHrBpm    *int                 `json:"maxHrBpm,omitempty"`
-	MaxPowerW   *int                 `json:"maxPowerW,omitempty"`
-	MaxSpeedMS  *float32             `json:"maxSpeedMS,omitempty"`
-	Notes       *string              `json:"notes,omitempty"`
-	PainTags    []string             `json:"painTags"`
-	PoolLengthM *float32             `json:"poolLengthM,omitempty"`
-	Rpe         *float32             `json:"rpe,omitempty"`
-	Source      ActivityDetailSource `json:"source"`
+	Legs       []ActivitySummary `json:"legs"`
+	MaxCadence *float32          `json:"maxCadence,omitempty"`
+	MaxHrBpm   *int              `json:"maxHrBpm,omitempty"`
+	MaxPowerW  *int              `json:"maxPowerW,omitempty"`
+	MaxSpeedMS *float32          `json:"maxSpeedMS,omitempty"`
+
+	// MergedInto The activity this one was merged into; it is left out of the list.
+	MergedInto  *int64   `json:"mergedInto,omitempty"`
+	Notes       *string  `json:"notes,omitempty"`
+	PainTags    []string `json:"painTags"`
+	PoolLengthM *float32 `json:"poolLengthM,omitempty"`
+	Rpe         *float32 `json:"rpe,omitempty"`
+
+	// Source `split` is the second part of a split activity.
+	Source ActivityDetailSource `json:"source"`
+
+	// SplitOf For the second part of a split, the activity it was split from.
+	SplitOf *int64 `json:"splitOf,omitempty"`
 
 	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
 	Sport ActivitySport `json:"sport"`
@@ -484,7 +576,7 @@ type ActivityDetail struct {
 	Workout             *RecordedWorkout                `json:"workout,omitempty"`
 }
 
-// ActivityDetailSource defines model for ActivityDetail.Source.
+// ActivityDetailSource `split` is the second part of a split activity.
 type ActivityDetailSource string
 
 // ActivityDetailSubtype defines model for ActivityDetail.Subtype.
@@ -492,6 +584,52 @@ type ActivityDetailSubtype string
 
 // ActivityDetailWeatherCondition defines model for ActivityDetail.WeatherCondition.
 type ActivityDetailWeatherCondition string
+
+// ActivityEdit defines model for ActivityEdit.
+type ActivityEdit struct {
+	// ActivityId The activity merged in, or the second part of a split.
+	ActivityId *int64 `json:"activityId,omitempty"`
+
+	// At Where a split's second part starts.
+	At        *time.Time `json:"at,omitempty"`
+	CreatedAt time.Time  `json:"createdAt"`
+
+	// From Trim or excluded heart rate range start, inclusive.
+	From *time.Time       `json:"from,omitempty"`
+	Id   int64            `json:"id"`
+	Kind ActivityEditKind `json:"kind"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport   *ActivitySport       `json:"sport,omitempty"`
+	Subtype *ActivityEditSubtype `json:"subtype,omitempty"`
+
+	// To Range end, inclusive.
+	To *time.Time `json:"to,omitempty"`
+}
+
+// ActivityEditSubtype defines model for ActivityEdit.Subtype.
+type ActivityEditSubtype string
+
+// ActivityEditKind defines model for ActivityEditKind.
+type ActivityEditKind string
+
+// ActivityEditRequest Offsets are seconds from the activity's current start. sport: sport and
+// subtype; trim and exclude_hr: fromS and toS (inclusive); split: atS, where
+// the second part starts; merge: activityId, the activity to merge in.
+type ActivityEditRequest struct {
+	ActivityId *int64           `json:"activityId,omitempty"`
+	AtS        *float64         `json:"atS,omitempty"`
+	FromS      *float64         `json:"fromS,omitempty"`
+	Kind       ActivityEditKind `json:"kind"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport   *ActivitySport              `json:"sport,omitempty"`
+	Subtype *ActivityEditRequestSubtype `json:"subtype,omitempty"`
+	ToS     *float64                    `json:"toS,omitempty"`
+}
+
+// ActivityEditRequestSubtype defines model for ActivityEditRequest.Subtype.
+type ActivityEditRequestSubtype string
 
 // ActivityPage defines model for ActivityPage.
 type ActivityPage struct {
@@ -542,15 +680,17 @@ type ActivityStreams struct {
 
 // ActivitySummary defines model for ActivitySummary.
 type ActivitySummary struct {
-	AscentM      *float32              `json:"ascentM,omitempty"`
-	AvgHrBpm     *int                  `json:"avgHrBpm,omitempty"`
-	AvgPowerW    *int                  `json:"avgPowerW,omitempty"`
-	AvgSpeedMS   *float32              `json:"avgSpeedMS,omitempty"`
-	DistanceM    *float64              `json:"distanceM,omitempty"`
-	ElapsedTimeS *float64              `json:"elapsedTimeS,omitempty"`
-	Id           int64                 `json:"id"`
-	Rpe          *float32              `json:"rpe,omitempty"`
-	Source       ActivitySummarySource `json:"source"`
+	AscentM      *float32 `json:"ascentM,omitempty"`
+	AvgHrBpm     *int     `json:"avgHrBpm,omitempty"`
+	AvgPowerW    *int     `json:"avgPowerW,omitempty"`
+	AvgSpeedMS   *float32 `json:"avgSpeedMS,omitempty"`
+	DistanceM    *float64 `json:"distanceM,omitempty"`
+	ElapsedTimeS *float64 `json:"elapsedTimeS,omitempty"`
+	Id           int64    `json:"id"`
+	Rpe          *float32 `json:"rpe,omitempty"`
+
+	// Source `split` is the second part of a split activity.
+	Source ActivitySummarySource `json:"source"`
 
 	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
 	Sport ActivitySport `json:"sport"`
@@ -564,7 +704,7 @@ type ActivitySummary struct {
 	UtcOffsetS int `json:"utcOffsetS"`
 }
 
-// ActivitySummarySource defines model for ActivitySummary.Source.
+// ActivitySummarySource `split` is the second part of a split activity.
 type ActivitySummarySource string
 
 // ActivitySummarySubtype defines model for ActivitySummary.Subtype.
@@ -1032,6 +1172,9 @@ type UploadActivityMultipartRequestBody UploadActivityMultipartBody
 // SetActivityAnnotationJSONRequestBody defines body for SetActivityAnnotation for application/json ContentType.
 type SetActivityAnnotationJSONRequestBody = ActivityAnnotation
 
+// AddActivityEditJSONRequestBody defines body for AddActivityEdit for application/json ContentType.
+type AddActivityEditJSONRequestBody = ActivityEditRequest
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -1076,6 +1219,12 @@ type ServerInterface interface {
 	// SetActivityAnnotation Set what the user adds to an activity
 	// (PUT /api/activities/{id}/annotation)
 	SetActivityAnnotation(w http.ResponseWriter, r *http.Request, id ActivityID)
+	// AddActivityEdit Edit an activity
+	// (POST /api/activities/{id}/edits)
+	AddActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID)
+	// UndoActivityEdit Undo one edit
+	// (DELETE /api/activities/{id}/edits/{editId})
+	UndoActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID, editId int64)
 	// ListLaps Laps of an activity
 	// (GET /api/activities/{id}/laps)
 	ListLaps(w http.ResponseWriter, r *http.Request, id ActivityID, params ListLapsParams)
@@ -1181,6 +1330,18 @@ func (_ Unimplemented) GetActivity(w http.ResponseWriter, r *http.Request, id Ac
 // SetActivityAnnotation Set what the user adds to an activity
 // (PUT /api/activities/{id}/annotation)
 func (_ Unimplemented) SetActivityAnnotation(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// AddActivityEdit Edit an activity
+// (POST /api/activities/{id}/edits)
+func (_ Unimplemented) AddActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UndoActivityEdit Undo one edit
+// (DELETE /api/activities/{id}/edits/{editId})
+func (_ Unimplemented) UndoActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID, editId int64) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1532,6 +1693,67 @@ func (siw *ServerInterfaceWrapper) SetActivityAnnotation(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetActivityAnnotation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// AddActivityEdit operation middleware
+func (siw *ServerInterfaceWrapper) AddActivityEdit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.AddActivityEdit(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UndoActivityEdit operation middleware
+func (siw *ServerInterfaceWrapper) UndoActivityEdit(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "editId" -------------
+	var editId int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "editId", chi.URLParam(r, "editId"), &editId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "editId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UndoActivityEdit(w, r, id, editId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2306,6 +2528,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/api/activities/{id}/annotation", wrapper.SetActivityAnnotation)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/activities/{id}/edits", wrapper.AddActivityEdit)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/activities/{id}/edits/{editId}", wrapper.UndoActivityEdit)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/gear", wrapper.ListGear)
 	})
 	r.Group(func(r chi.Router) {
@@ -2520,6 +2748,86 @@ type SetActivityAnnotationdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response SetActivityAnnotationdefaultApplicationProblemPlusJSONResponse) VisitSetActivityAnnotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddActivityEditRequestObject struct {
+	Id   ActivityID `json:"id"`
+	Body *AddActivityEditJSONRequestBody
+}
+
+type AddActivityEditResponseObject interface {
+	VisitAddActivityEditResponse(w http.ResponseWriter) error
+}
+
+type AddActivityEdit200JSONResponse ActivityDetail
+
+func (response AddActivityEdit200JSONResponse) VisitAddActivityEditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type AddActivityEditdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response AddActivityEditdefaultApplicationProblemPlusJSONResponse) VisitAddActivityEditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoActivityEditRequestObject struct {
+	Id     ActivityID `json:"id"`
+	EditId int64      `json:"editId"`
+}
+
+type UndoActivityEditResponseObject interface {
+	VisitUndoActivityEditResponse(w http.ResponseWriter) error
+}
+
+type UndoActivityEdit200JSONResponse ActivityDetail
+
+func (response UndoActivityEdit200JSONResponse) VisitUndoActivityEditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UndoActivityEditdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response UndoActivityEditdefaultApplicationProblemPlusJSONResponse) VisitUndoActivityEditResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3488,6 +3796,12 @@ type StrictServerInterface interface {
 	// SetActivityAnnotation Set what the user adds to an activity
 	// (PUT /api/activities/{id}/annotation)
 	SetActivityAnnotation(ctx context.Context, request SetActivityAnnotationRequestObject) (SetActivityAnnotationResponseObject, error)
+	// AddActivityEdit Edit an activity
+	// (POST /api/activities/{id}/edits)
+	AddActivityEdit(ctx context.Context, request AddActivityEditRequestObject) (AddActivityEditResponseObject, error)
+	// UndoActivityEdit Undo one edit
+	// (DELETE /api/activities/{id}/edits/{editId})
+	UndoActivityEdit(ctx context.Context, request UndoActivityEditRequestObject) (UndoActivityEditResponseObject, error)
 	// ListLaps Laps of an activity
 	// (GET /api/activities/{id}/laps)
 	ListLaps(ctx context.Context, request ListLapsRequestObject) (ListLapsResponseObject, error)
@@ -3741,6 +4055,66 @@ func (sh *strictHandler) SetActivityAnnotation(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetActivityAnnotationResponseObject); ok {
 		if err := validResponse.VisitSetActivityAnnotationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// AddActivityEdit operation middleware
+func (sh *strictHandler) AddActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	var request AddActivityEditRequestObject
+
+	request.Id = id
+
+	var body AddActivityEditJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.AddActivityEdit(ctx, request.(AddActivityEditRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "AddActivityEdit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(AddActivityEditResponseObject); ok {
+		if err := validResponse.VisitAddActivityEditResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UndoActivityEdit operation middleware
+func (sh *strictHandler) UndoActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID, editId int64) {
+	var request UndoActivityEditRequestObject
+
+	request.Id = id
+	request.EditId = editId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UndoActivityEdit(ctx, request.(UndoActivityEditRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UndoActivityEdit")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UndoActivityEditResponseObject); ok {
+		if err := validResponse.VisitUndoActivityEditResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
