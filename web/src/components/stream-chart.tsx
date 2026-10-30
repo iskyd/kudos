@@ -10,18 +10,31 @@ const height = 160
 
 export interface StreamChartProps {
   label: string
-  // Seconds from the activity start.
+  // Seconds from the activity start, or the comparison's common axis.
   time: number[]
   values: (number | null)[]
+  // A second activity's values on the same axis, drawn dashed.
+  compare?: (number | null)[]
+  // Formats the x axis; durations by default.
+  formatX?: (value: number) => string
   // Formats an axis value; values are SI, formatting goes through lib/format.
   format: (value: number) => string
   // Draws lower values higher, as for pace.
   invert?: boolean
-  onHover: (index: number | null) => void
+  onHover?: (index: number | null) => void
 }
 
 // StreamChart draws one stream with uPlot (canvas); hovering reports the sample index.
-export function StreamChart({ label, time, values, format, invert, onHover }: StreamChartProps) {
+export function StreamChart({
+  label,
+  time,
+  values,
+  compare,
+  formatX = formatDuration,
+  format,
+  invert,
+  onHover,
+}: StreamChartProps) {
   const ref = useRef<HTMLDivElement>(null)
   const hover = useRef(onHover)
   useEffect(() => {
@@ -40,19 +53,32 @@ export function StreamChart({ label, time, values, format, invert, onHover }: St
         legend: { show: false },
         scales: { x: { time: false }, y: { dir: invert ? -1 : 1 } },
         axes: [
-          { stroke: axisColor, values: (_, ticks) => ticks.map((t) => formatDuration(t)) },
+          { stroke: axisColor, values: (_, ticks) => ticks.map((t) => formatX(t)) },
           { stroke: axisColor, size: 80, values: (_, ticks) => ticks.map((t) => format(t)) },
         ],
-        series: [{}, { label, stroke: cssColor('--chart-2'), width: 1.5 }],
+        series: [
+          {},
+          { label, stroke: cssColor('--chart-2'), width: 1.5 },
+          ...(compare
+            ? [
+                {
+                  label: `${label} (compared)`,
+                  stroke: cssColor('--chart-1'),
+                  width: 1.5,
+                  dash: [6, 4],
+                },
+              ]
+            : []),
+        ],
         hooks: {
           setCursor: [
             (u) => {
-              hover.current(u.cursor.idx ?? null)
+              hover.current?.(u.cursor.idx ?? null)
             },
           ],
         },
       },
-      [time, values],
+      compare ? [time, values, compare] : [time, values],
       el,
     )
     const resize = new ResizeObserver(() => {
@@ -63,7 +89,7 @@ export function StreamChart({ label, time, values, format, invert, onHover }: St
       resize.disconnect()
       chart.destroy()
     }
-  }, [label, time, values, format, invert])
+  }, [label, time, values, compare, formatX, format, invert])
 
   return (
     <figure className="flex flex-col gap-1">

@@ -130,7 +130,7 @@ func (s *Server) ListActivities(ctx context.Context, req ListActivitiesRequestOb
 	invalid := func(detail string) (ListActivitiesResponseObject, error) {
 		return nil, &Error{Kind: KindInvalidRequest, Detail: detail}
 	}
-	sort := Date
+	sort := ListActivitiesParamsSortDate
 	if p.Sort != nil {
 		sort = *p.Sort
 	}

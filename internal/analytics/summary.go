@@ -12,8 +12,8 @@ const MaxGap = 10 * time.Second
 
 // Sample is one recorded sample in SI units; a nil channel was not recorded.
 type Sample struct {
-	Time                                             time.Time
-	HR, Power, Cadence, Speed, Distance, Temperature *float64
+	Time                                                       time.Time
+	HR, Power, Cadence, Speed, Distance, Temperature, Altitude *float64
 }
 
 // Summary holds an activity's summary values computed from its samples.

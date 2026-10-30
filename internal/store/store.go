@@ -3,6 +3,8 @@ package store
 import (
 	"context"
 	"fmt"
+	"io/fs"
+	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/jackc/pgx/v5/stdlib"
@@ -30,10 +32,33 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 
 // Migrate applies every pending migration. Already-applied migrations are skipped.
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+	return migrate(ctx, pool, migrations.FS)
+}
+
+// gooseTemplate marks a file goose created but nobody has written yet.
+const gooseTemplate = "SELECT 'up SQL query';"
+
+func migrate(ctx context.Context, pool *pgxpool.Pool, fsys fs.FS) error {
+	// Live reload (`just dev`) rebuilds as soon as goose creates a file: applying
+	// the template would record the version and the real SQL would never run.
+	names, err := fs.Glob(fsys, "*.sql")
+	if err != nil {
+		return fmt.Errorf("listing migrations: %w", err)
+	}
+	for _, name := range names {
+		b, err := fs.ReadFile(fsys, name)
+		if err != nil {
+			return fmt.Errorf("reading migration: %w", err)
+		}
+		if strings.Contains(string(b), gooseTemplate) {
+			return fmt.Errorf("migration %s is still goose's template: write it before running the server", name)
+		}
+	}
+
 	db := stdlib.OpenDBFromPool(pool)
 	defer db.Close() // closes only the database/sql wrapper, not the shared pool
 
-	provider, err := goose.NewProvider(goose.DialectPostgres, db, migrations.FS)
+	provider, err := goose.NewProvider(goose.DialectPostgres, db, fsys)
 	if err != nil {
 		return fmt.Errorf("creating migration provider: %w", err)
 	}

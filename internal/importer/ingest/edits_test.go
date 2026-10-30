@@ -232,6 +232,14 @@ func TestMergeThenUndo(t *testing.T) {
 			t.Fatalf("merged samples out of order at %d", i)
 		}
 	}
+	v, err := e.svc.View(ctx, e.get(t, a.ID))
+	if err != nil {
+		t.Fatal(err)
+	}
+	segs, err := e.svc.Segments(ctx, e.alice, v, 1_000_000)
+	if err != nil || len(segs) != 2 || len(segs[0])+len(segs[1]) != countA+countB || segs[0][0].Altitude == nil {
+		t.Errorf("segments: %d, %v", len(segs), err)
+	}
 	got := e.effective(t, a.ID)
 	first := a
 	if b.StartTime.Before(a.StartTime) {
@@ -432,6 +440,9 @@ func TestEditsOnBrokenData(t *testing.T) {
 	broken := &Service{pool: closed, jobs: e.svc.jobs}
 	if _, err := broken.View(ctx, a); err == nil {
 		t.Error("View on a closed pool")
+	}
+	if _, err := broken.Segments(ctx, e.alice, View{Segments: []Segment{{ActivityID: a.ID, From: minTime, To: maxTime}}}, 10); err == nil {
+		t.Error("segments read from a closed pool")
 	}
 	if _, err := broken.Samples(ctx, e.alice, View{Segments: []Segment{{ActivityID: a.ID, From: minTime, To: maxTime}}}, &a.StartTime, 10); err == nil {
 		t.Error("Samples on a closed pool")

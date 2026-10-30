@@ -5,6 +5,7 @@ import { navItems } from '@/components/nav-items'
 import { EmptyPage } from '@/components/empty-page'
 import { RequireAuth } from '@/components/require-auth'
 import { ActivitiesPage } from '@/pages/activities'
+import { ActivityComparePage } from '@/pages/activity-compare'
 import { ActivityDetailPage } from '@/pages/activity-detail'
 import { GearPage } from '@/pages/gear'
 import { LoginPage, RegisterPage } from '@/pages/auth'
@@ -30,6 +31,7 @@ export const routes: RouteObject[] = [
             element: pages[path] ?? <EmptyPage title={label} />,
           })),
           { path: '/activities/:id', element: <ActivityDetailPage /> },
+          { path: '/activities/:id/compare/:other', element: <ActivityComparePage /> },
           { path: '*', element: <EmptyPage title="Page not found" /> },
         ],
       },

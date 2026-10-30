@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/iskyd/kudos/internal/store"
 	"github.com/iskyd/kudos/internal/store/db"
@@ -88,5 +89,43 @@ func TestMigrateFailsOnClosedPool(t *testing.T) {
 	pool.Close()
 	if err := store.Migrate(t.Context(), pool); err == nil {
 		t.Fatal("Migrate() error = nil")
+	}
+}
+
+// goose create writes this template; `just dev` rebuilds on every .sql change, so
+// it used to apply the template and record the version before the real SQL was
+// written, leaving the real migration never applied.
+const gooseTemplate = `-- +goose Up
+-- +goose StatementBegin
+SELECT 'up SQL query';
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+SELECT 'down SQL query';
+-- +goose StatementEnd
+`
+
+func TestMigrateRefusesAnUneditedTemplate(t *testing.T) {
+	t.Parallel()
+	ctx := t.Context()
+	pool := pg.NewEmptyDB(t)
+	fsys := fstest.MapFS{
+		"1_first.sql": {Data: []byte("-- +goose Up\nCREATE TABLE first (id int);\n-- +goose Down\nDROP TABLE first;\n")},
+		"2_next.sql":  {Data: []byte(gooseTemplate)},
+	}
+	err := store.MigrateFS(ctx, pool, fsys)
+	if err == nil || !strings.Contains(err.Error(), "2_next.sql") {
+		t.Fatalf("Migrate() error = %v, want one naming 2_next.sql", err)
+	}
+
+	// Once written, the migration applies.
+	fsys["2_next.sql"] = &fstest.MapFile{Data: []byte("-- +goose Up\nCREATE TABLE next (id int);\n-- +goose Down\nDROP TABLE next;\n")}
+	if err := store.MigrateFS(ctx, pool, fsys); err != nil {
+		t.Fatalf("Migrate() after writing it: %v", err)
+	}
+	var n int
+	if err := pool.QueryRow(ctx, "SELECT count(*) FROM next").Scan(&n); err != nil {
+		t.Errorf("the written migration was not applied: %v", err)
 	}
 }

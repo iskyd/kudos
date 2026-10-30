@@ -501,6 +501,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activities/{id}/comparison": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Two activities aligned for overlaying
+         * @description Resamples this activity (a) and another (b) onto one evenly spaced axis,
+         *     from 0 to the longer activity's end: seconds from each activity's first
+         *     sample, or metres covered. Values are interpolated between neighbouring
+         *     samples, never across a pause over 10 s; a value is null where an
+         *     activity has none, and a channel neither point recorded is absent. Edits
+         *     apply as on the streams.
+         */
+        get: operations["getActivityComparison"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -934,6 +959,30 @@ export interface components {
         };
         StrengthSetPage: components["schemas"]["Page"] & {
             items: components["schemas"]["StrengthSet"][];
+        };
+        /**
+         * @default time
+         * @enum {string}
+         */
+        ComparisonAxis: "time" | "distance";
+        ActivityComparison: {
+            axis: components["schemas"]["ComparisonAxis"];
+            /** @description The common axis, in seconds or metres from the start. */
+            x: number[];
+            a: components["schemas"]["ComparedStreams"];
+            b: components["schemas"]["ComparedStreams"];
+        };
+        /** @description One activity's values at each point of x. */
+        ComparedStreams: {
+            /** @description Seconds from the activity's first sample. */
+            elapsedS?: (number | null)[];
+            /** @description Metres covered. */
+            distanceM?: (number | null)[];
+            hrBpm?: (number | null)[];
+            powerW?: (number | null)[];
+            cadence?: (number | null)[];
+            speedMS?: (number | null)[];
+            altitudeM?: (number | null)[];
         };
         ActivityStreams: {
             /** @description Seconds from the activity start. */
@@ -1773,6 +1822,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityStreams"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getActivityComparison: {
+        parameters: {
+            query: {
+                /** @description The other activity. */
+                with: number;
+                axis?: components["schemas"]["ComparisonAxis"];
+                points?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The aligned values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityComparison"];
                 };
             };
             default: components["responses"]["Problem"];
