@@ -58,27 +58,6 @@ func TestPingWorker(t *testing.T) {
 	}
 }
 
-func TestDerivedWorker(t *testing.T) {
-	t.Parallel()
-	ctx := t.Context()
-	pool := pg.NewDB(t)
-
-	w := rivertest.NewWorker(t, riverpgxv5.New(pool), &river.Config{}, &jobs.DerivedWorker{})
-	tx, err := pool.Begin(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer tx.Rollback(ctx) //nolint:errcheck // rollback after the test is best effort
-
-	res, err := w.Work(ctx, t, tx, jobs.DerivedArgs{UserID: 1, ActivityID: 2}, nil)
-	if err != nil {
-		t.Fatalf("Work: %v", err)
-	}
-	if res.EventKind != river.EventKindJobCompleted {
-		t.Fatalf("EventKind = %s, want %s", res.EventKind, river.EventKindJobCompleted)
-	}
-}
-
 func TestInsertTxCommitted(t *testing.T) {
 	t.Parallel()
 	ctx := t.Context()
@@ -152,4 +131,19 @@ func TestInsertTxRolledBackNeverRuns(t *testing.T) {
 		t.Fatal("committed job did not complete")
 	}
 	rivertest.RequireManyInserted(ctx, t, riverpgxv5.New(pool), []rivertest.ExpectedJob{{Args: jobs.PingArgs{}}})
+}
+
+// Kinds are stored with queued jobs: renaming one strands the jobs already queued.
+func TestJobKindsAreStable(t *testing.T) {
+	t.Parallel()
+	for got, want := range map[string]string{
+		jobs.PingArgs{}.Kind():         "ping",
+		jobs.DerivedArgs{}.Kind():      "activity_derived",
+		jobs.RecomputeArgs{}.Kind():    "activity_derived_recompute",
+		jobs.RecomputeAllArgs{}.Kind(): "activity_derived_recompute_all",
+	} {
+		if got != want {
+			t.Errorf("Kind() = %q, want %q", got, want)
+		}
+	}
 }

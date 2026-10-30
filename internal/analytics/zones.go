@@ -137,6 +137,38 @@ func reserve(maxHR, restingHR float64) []Zone {
 	return zones(hrrNames, bounds)
 }
 
+// TimeInZones sums, per zone, the time the channel read by value spent in it.
+// Like Summarize, a sample weighs the time to the next sample of its segment,
+// unless that gap is a pause (over MaxGap), so smart recording's irregular gaps
+// count for what they last. Samples without the channel count nowhere. Nil without zones.
+func TimeInZones(segments [][]Sample, zones []Zone, value func(Sample) *float64) []float64 {
+	if zones == nil {
+		return nil
+	}
+	out := make([]float64, len(zones))
+	for _, seg := range segments {
+		for i := 0; i+1 < len(seg); i++ {
+			v := value(seg[i])
+			gap := seg[i+1].Time.Sub(seg[i].Time)
+			if v == nil || gap > MaxGap {
+				continue
+			}
+			out[zoneOf(zones, *v)] += gap.Seconds()
+		}
+	}
+	return out
+}
+
+// zoneOf is the index of the zone [Low, High) holding v; only the last zone is open above.
+func zoneOf(zones []Zone, v float64) int {
+	for i, z := range zones[:len(zones)-1] {
+		if v < *z.High {
+			return i
+		}
+	}
+	return len(zones) - 1
+}
+
 // zones names the ranges between ascending bounds, open at both ends.
 func zones(names []string, bounds []float64) []Zone {
 	out := make([]Zone, len(names))

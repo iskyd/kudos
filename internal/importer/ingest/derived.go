@@ -1,0 +1,220 @@
+package ingest
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/riverqueue/river"
+
+	"github.com/iskyd/kudos/internal/analytics"
+	"github.com/iskyd/kudos/internal/jobs"
+	"github.com/iskyd/kudos/internal/store/db"
+)
+
+// derivedVersion versions the derived values' computation: raising it makes the
+// recompute jobs redo every activity's.
+const derivedVersion = 1
+
+// recomputeBatch is how many activities or users a recompute job reads at once.
+const recomputeBatch = 100
+
+// ResolvedZones are the zones an activity uses: the versions valid on its local date.
+type ResolvedZones struct {
+	Day                         time.Time
+	Sport                       analytics.ZoneSport
+	ZoneSetID, GeneralZoneSetID *int64
+	Zones                       analytics.Zones
+}
+
+// ResolveZones finds the zone versions valid on the activity's local date, after
+// its edits: its sport's and the general one (heart rate reserve).
+func (s *Service) ResolveZones(ctx context.Context, a db.Activity) (ResolvedZones, error) {
+	eff, err := Effective(a)
+	if err != nil {
+		return ResolvedZones{}, err
+	}
+	local := eff.StartTime.Add(time.Duration(eff.UtcOffsetS) * time.Second)
+	out := ResolvedZones{
+		Day:   time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC),
+		Sport: analytics.ZoneSportOf(eff.Sport),
+	}
+	rows, err := db.New(s.pool).ListZoneSetsAt(ctx, db.ListZoneSetsAtParams{UserID: a.UserID, Day: out.Day})
+	if err != nil {
+		return ResolvedZones{}, fmt.Errorf("reading zone versions: %w", err)
+	}
+	var own, general analytics.Thresholds
+	for _, r := range rows {
+		switch {
+		case analytics.ZoneSport(r.Sport) == out.Sport:
+			own, out.ZoneSetID = ZoneThresholds(r), &r.ID
+		case r.Sport == string(analytics.ZoneGeneral):
+			general, out.GeneralZoneSetID = ZoneThresholds(r), &r.ID
+		}
+	}
+	out.Zones = analytics.ZonesFor(out.Sport, own, general)
+	return out, nil
+}
+
+// ZoneThresholds reads a zone version's thresholds in SI units.
+func ZoneThresholds(z db.ZoneSet) analytics.Thresholds {
+	return analytics.Thresholds{
+		LTHR: f64(z.LthrBpm), ThresholdSpeed: f64(z.ThresholdSpeedMS), FTP: f64(z.FtpW),
+		CSS: f64(z.CssMS), MaxHR: f64(z.MaxHrBpm), RestingHR: f64(z.RestingHrBpm),
+	}
+}
+
+// ComputeDerived computes and stores an activity's derived values from its
+// edited samples and the zones valid on its date. Recomputing gives the same
+// values; an activity that no longer exists is skipped.
+func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) error {
+	q := db.New(s.pool)
+	a, err := q.GetActivity(ctx, db.GetActivityParams{UserID: userID, ID: activityID})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("reading activity: %w", err)
+	}
+	v, err := s.View(ctx, a)
+	if err != nil {
+		return err
+	}
+	segs, err := s.Segments(ctx, userID, v, maxSummarySamples)
+	if err != nil {
+		return err
+	}
+	z, err := s.ResolveZones(ctx, a)
+	if err != nil {
+		return err
+	}
+	p := db.UpsertActivityDerivedParams{
+		UserID: userID, ActivityID: activityID, Version: derivedVersion,
+		ZoneSetID: z.ZoneSetID, GeneralZoneSetID: z.GeneralZoneSetID,
+		HrZoneModel: text(z.Zones.HRModel), PaceZoneModel: text(z.Zones.PaceModel), PowerZoneModel: text(z.Zones.PowerModel),
+		HrZoneS:    analytics.TimeInZones(segs, z.Zones.HR, func(s analytics.Sample) *float64 { return s.HR }),
+		PaceZoneS:  analytics.TimeInZones(segs, z.Zones.Pace, func(s analytics.Sample) *float64 { return s.Speed }),
+		PowerZoneS: analytics.TimeInZones(segs, z.Zones.Power, func(s analytics.Sample) *float64 { return s.Power }),
+	}
+	if sum, ok := analytics.Summarize(segs); ok {
+		p.AvgHrBpm, p.AvgPowerW, p.AvgSpeedMS, p.AvgCadence = sum.AvgHR, sum.AvgPower, sum.AvgSpeed, sum.AvgCadence
+	}
+	if err := q.UpsertActivityDerived(ctx, p); err != nil {
+		return fmt.Errorf("storing derived values: %w", err)
+	}
+	return nil
+}
+
+// RecomputeDerived computes the user's derived values that are missing, stale or
+// from an older version, in batches, and returns how many it computed.
+func (s *Service) RecomputeDerived(ctx context.Context, userID int64) (int, error) {
+	q := db.New(s.pool)
+	n := 0
+	for after := int64(0); ; {
+		ids, err := q.ListActivitiesNeedingDerived(ctx, db.ListActivitiesNeedingDerivedParams{
+			UserID: userID, After: after, Version: derivedVersion, MaxRows: recomputeBatch,
+		})
+		if err != nil {
+			return n, fmt.Errorf("listing activities to recompute: %w", err)
+		}
+		if len(ids) == 0 {
+			return n, nil
+		}
+		for _, id := range ids {
+			if err := s.ComputeDerived(ctx, userID, id); err != nil {
+				return n, err
+			}
+			n++
+		}
+		after = ids[len(ids)-1]
+	}
+}
+
+// ChangeZones runs a zone change with the invalidation it causes, in one
+// transaction: change returns the first day it affects, the user's derived
+// values from that day on are marked stale and a recompute is queued.
+func (s *Service) ChangeZones(ctx context.Context, userID int64, change func(*db.Queries) (time.Time, error)) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		q := db.New(tx)
+		day, err := change(q)
+		if err != nil {
+			return err
+		}
+		if _, err := q.InvalidateDerivedFrom(ctx, db.InvalidateDerivedFromParams{UserID: userID, FromDay: day}); err != nil {
+			return fmt.Errorf("invalidating derived values: %w", err)
+		}
+		if _, err := s.jobs.InsertTx(ctx, tx, jobs.RecomputeArgs{UserID: userID}, nil); err != nil {
+			return fmt.Errorf("enqueueing recompute: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("changing zones: %w", err)
+	}
+	return nil
+}
+
+// recomputeAll queues a recompute for every user.
+func (s *Service) recomputeAll(ctx context.Context) error {
+	q := db.New(s.pool)
+	for after := int64(0); ; {
+		ids, err := q.ListUserIDs(ctx, db.ListUserIDsParams{After: after, MaxRows: recomputeBatch})
+		if err != nil {
+			return fmt.Errorf("listing users: %w", err)
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		params := make([]river.InsertManyParams, len(ids))
+		for i, id := range ids {
+			params[i] = river.InsertManyParams{Args: jobs.RecomputeArgs{UserID: id}}
+		}
+		if _, err := s.jobs.InsertMany(ctx, params); err != nil {
+			return fmt.Errorf("enqueueing recomputes: %w", err)
+		}
+		after = ids[len(ids)-1]
+	}
+}
+
+// Workers works the derived-values jobs. Service is set once the ingest service
+// exists, which needs the job client these workers are registered with.
+type Workers struct {
+	Service *Service
+}
+
+// Register adds the derived-values workers.
+func (w *Workers) Register(ws *river.Workers) {
+	river.AddWorker(ws, &derivedWorker{w: w})
+	river.AddWorker(ws, &recomputeWorker{w: w})
+	river.AddWorker(ws, &recomputeAllWorker{w: w})
+}
+
+type derivedWorker struct {
+	river.WorkerDefaults[jobs.DerivedArgs]
+	w *Workers
+}
+
+func (d *derivedWorker) Work(ctx context.Context, j *river.Job[jobs.DerivedArgs]) error {
+	return d.w.Service.ComputeDerived(ctx, j.Args.UserID, j.Args.ActivityID)
+}
+
+type recomputeWorker struct {
+	river.WorkerDefaults[jobs.RecomputeArgs]
+	w *Workers
+}
+
+func (r *recomputeWorker) Work(ctx context.Context, j *river.Job[jobs.RecomputeArgs]) error {
+	_, err := r.w.Service.RecomputeDerived(ctx, j.Args.UserID)
+	return err
+}
+
+type recomputeAllWorker struct {
+	river.WorkerDefaults[jobs.RecomputeAllArgs]
+	w *Workers
+}
+
+func (r *recomputeAllWorker) Work(ctx context.Context, _ *river.Job[jobs.RecomputeAllArgs]) error {
+	return r.w.Service.recomputeAll(ctx)
+}

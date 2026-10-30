@@ -135,14 +135,16 @@ func newEnv(t *testing.T) *env {
 	// Wired as in cmd/server: the worker is registered, then given the ingest service.
 	w := &Worker{Deps: &Deps{Pool: pool, Cipher: cipher, Logger: logger}}
 	sw := &SyncWorker{Deps: w.Deps}
+	derived := &ingest.Workers{}
 	client, err := jobs.NewClient(pool, logger, func(ws *river.Workers) {
 		river.AddWorker(ws, w)
 		river.AddWorker(ws, sw)
-	})
+	}, derived.Register)
 	if err != nil {
 		t.Fatal(err)
 	}
 	w.Ingest = ingest.New(pool, client, t.TempDir())
+	derived.Service = w.Ingest
 	alice, bob := testutil.TwoUsers(t, pool)
 	hour := time.Hour
 	fake := &fakeGarmin{

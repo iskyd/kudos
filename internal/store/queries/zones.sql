@@ -6,8 +6,10 @@ INSERT INTO zone_sets (
 )
 RETURNING *;
 
--- name: DeleteZoneSet :execrows
-DELETE FROM zone_sets WHERE user_id = @user_id AND id = @id;
+-- name: DeleteZoneSet :one
+-- Returns the deleted version's date, from which activities fall back to the version before.
+DELETE FROM zone_sets WHERE user_id = @user_id AND id = @id
+RETURNING effective_from;
 
 -- name: ListZoneSets :many
 -- One page of versions, latest effective date first; after_from and after_id are

@@ -53,7 +53,7 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 	jobClient, err := jobs.NewClient(pool, discard(), func(w *river.Workers) {
 		river.AddWorker(w, &garminsync.Worker{})
 		river.AddWorker(w, &garminsync.SyncWorker{})
-	})
+	}, (&ingest.Workers{}).Register)
 	if err != nil {
 		t.Fatal(err)
 	}

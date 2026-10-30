@@ -120,8 +120,9 @@ func (q *Queries) CreateZoneSet(ctx context.Context, arg CreateZoneSetParams) (Z
 	return i, err
 }
 
-const deleteZoneSet = `-- name: DeleteZoneSet :execrows
+const deleteZoneSet = `-- name: DeleteZoneSet :one
 DELETE FROM zone_sets WHERE user_id = $1 AND id = $2
+RETURNING effective_from
 `
 
 type DeleteZoneSetParams struct {
@@ -129,12 +130,12 @@ type DeleteZoneSetParams struct {
 	ID     int64
 }
 
-func (q *Queries) DeleteZoneSet(ctx context.Context, arg DeleteZoneSetParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteZoneSet, arg.UserID, arg.ID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
+// Returns the deleted version's date, from which activities fall back to the version before.
+func (q *Queries) DeleteZoneSet(ctx context.Context, arg DeleteZoneSetParams) (time.Time, error) {
+	row := q.db.QueryRow(ctx, deleteZoneSet, arg.UserID, arg.ID)
+	var effective_from time.Time
+	err := row.Scan(&effective_from)
+	return effective_from, err
 }
 
 const dismissZoneSuggestion = `-- name: DismissZoneSuggestion :execrows

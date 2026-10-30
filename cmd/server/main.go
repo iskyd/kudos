@@ -68,22 +68,28 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	// the job client the workers are registered with: both are set once it exists.
 	garminDeps := &garminsync.Deps{Pool: pool, Connector: garminClient, Cipher: cipher, Logger: logger}
 	scheduler := &garminsync.ScheduleWorker{Pool: pool}
+	derived := &ingest.Workers{}
 	jobClient, err := jobs.NewClient(pool, logger, func(w *river.Workers) {
 		river.AddWorker(w, &garminsync.Worker{Deps: garminDeps})
 		river.AddWorker(w, &garminsync.SyncWorker{Deps: garminDeps})
 		river.AddWorker(w, scheduler)
-	})
+	}, derived.Register)
 	if err != nil {
 		return fmt.Errorf("creating job client: %w", err)
 	}
 	ingester := ingest.New(pool, jobClient, cfg.DataDir)
 	garminDeps.Ingest = ingester
+	derived.Service = ingester
 	garminSync := garminsync.NewService(pool, jobClient)
 	scheduler.Service = garminSync
 	jobClient.PeriodicJobs().Add(garminsync.SchedulePeriodic())
 	// Detached from the signal context: canceling it would hard-stop running jobs; Stop below drains them.
 	if err := jobClient.Start(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("starting job client: %w", err)
+	}
+	// Brings every activity's derived values up to this version of the computation.
+	if _, err := jobClient.Insert(ctx, jobs.RecomputeAllArgs{}, nil); err != nil {
+		return fmt.Errorf("enqueueing derived values recompute: %w", err)
 	}
 
 	spa, err := web.Handler()
