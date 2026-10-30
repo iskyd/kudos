@@ -318,6 +318,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activities/{id}/annotation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Set what the user adds to an activity
+         * @description Replaces RPE, feel (mood), notes, pain tags and weather; a field left out or
+         *     null is cleared. RPE and feel arrive pre-filled from the watch when it
+         *     recorded them. Tags are trimmed, lowercased and deduplicated.
+         */
+        put: operations["setActivityAnnotation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/activities/{id}/laps": {
         parameters: {
             query?: never;
@@ -604,8 +626,24 @@ export interface components {
             /** @enum {string} */
             weatherCondition?: "sun" | "cloud" | "rain" | "wind" | "snow";
             workout?: components["schemas"]["RecordedWorkout"];
+            painTags: string[];
             /** @description Every leg of the multisport activity this one belongs to, in order; empty otherwise. */
             legs: components["schemas"]["ActivitySummary"][];
+        };
+        ActivityAnnotation: {
+            /**
+             * Format: float
+             * @description Rating of perceived exertion.
+             */
+            rpe?: number;
+            /** @description Mood after the activity, 0 (very weak) to 100 (very strong), as Garmin records it. */
+            feel?: number;
+            notes?: string;
+            painTags?: string[];
+            /** Format: float */
+            weatherTemperatureC?: number;
+            /** @enum {string} */
+            weatherCondition?: "sun" | "cloud" | "rain" | "wind" | "snow";
         };
         RecordedWorkout: {
             name?: string;
@@ -948,6 +986,8 @@ export interface operations {
                 from?: string;
                 /** @description Last local day, inclusive. */
                 to?: string;
+                /** @description Only activities with this pain tag. */
+                tag?: string;
                 sort?: "date" | "distance" | "duration";
                 /** @description Opaque cursor from a previous page's `nextCursor`. */
                 cursor?: components["parameters"]["Cursor"];
@@ -1245,6 +1285,33 @@ export interface operations {
         requestBody?: never;
         responses: {
             /** @description The activity. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setActivityAnnotation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityAnnotation"];
+            };
+        };
+        responses: {
+            /** @description The activity with its new annotation. */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode, type SubmitEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import {
   type ActivityDetail,
@@ -9,6 +9,7 @@ import {
   useActivityStreams,
   useConfig,
   useLaps,
+  useSetAnnotation,
   useStrengthSets,
   useSwimLengths,
 } from '@/api/activities'
@@ -16,6 +17,11 @@ import { ApiError, problemMessage } from '@/api/problem'
 import { RouteMap } from '@/components/route-map'
 import { StreamChart } from '@/components/stream-chart'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
+import { Textarea } from '@/components/ui/textarea'
+import { parseOptionalNumber, parseTags } from '@/lib/format/input'
 import {
   formatActivityStart,
   formatDistance,
@@ -76,6 +82,7 @@ export function ActivityDetailPage() {
         </p>
       </header>
       <Summary a={a} />
+      <Annotation key={a.id} a={a} />
       {a.legs.length > 0 && <Legs a={a} />}
       <Streams a={a} />
       <Laps a={a} />
@@ -142,6 +149,12 @@ function Streams({ a }: { a: ActivityDetail }) {
   const streams = useActivityStreams(a.id)
   const config = useConfig()
   const [hover, setHover] = useState<number | null>(null)
+  // Stable across hovers: new values or formatters would rebuild every chart,
+  // which resets the shared cursor and loses the hover.
+  const series = useMemo(
+    () => (streams.data ? charts(a.sport, streams.data) : []),
+    [a.sport, streams.data],
+  )
 
   if (streams.isPending) return <p className="text-sm text-muted-foreground">Loading charts…</p>
   if (streams.isError) {
@@ -162,7 +175,7 @@ function Streams({ a }: { a: ActivityDetail }) {
       {lat && s.lon && config.data && (
         <RouteMap tileUrl={config.data.mapTileUrl} lat={lat} lon={s.lon} hoverIndex={hover} />
       )}
-      {charts(a.sport, s).map((c) => (
+      {series.map((c) => (
         <StreamChart key={c.label} {...c} time={s.timeS} onHover={setHover} />
       ))}
     </div>
@@ -359,5 +372,177 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       <h2 className="text-lg font-semibold">{title}</h2>
       {children}
     </section>
+  )
+}
+
+// Garmin's five feel levels, kept as it records them (0–100).
+const moods: { value: number; label: string }[] = [
+  { value: 0, label: 'Very weak' },
+  { value: 25, label: 'Weak' },
+  { value: 50, label: 'Normal' },
+  { value: 75, label: 'Strong' },
+  { value: 100, label: 'Very strong' },
+]
+
+const conditions = ['sun', 'cloud', 'rain', 'wind', 'snow'] as const
+const conditionLabels: Record<(typeof conditions)[number], string> = {
+  sun: 'Sun',
+  cloud: 'Cloud',
+  rain: 'Rain',
+  wind: 'Wind',
+  snow: 'Snow',
+}
+
+const numberText = (v: number | undefined) => (v === undefined ? '' : String(v))
+
+// Annotation is the user's own record of the activity: RPE and mood (pre-filled
+// from the watch when recorded), notes, pain tags and weather.
+function Annotation({ a }: { a: ActivityDetail }) {
+  const save = useSetAnnotation(a.id)
+  const [rpe, setRpe] = useState(numberText(a.rpe))
+  const [feel, setFeel] = useState(numberText(a.feel))
+  const [notes, setNotes] = useState(a.notes ?? '')
+  const [tags, setTags] = useState(a.painTags.join(', '))
+  const [temperature, setTemperature] = useState(numberText(a.weatherTemperatureC))
+  const [condition, setCondition] = useState<string>(a.weatherCondition ?? '')
+  const [invalid, setInvalid] = useState<string | null>(null)
+  const moodOptions =
+    moods.some((m) => String(m.value) === feel) || feel === ''
+      ? moods
+      : [...moods, { value: Number(feel), label: feel }]
+
+  function changed<T>(set: (v: T) => void) {
+    return (v: T) => {
+      set(v)
+      save.reset()
+      setInvalid(null)
+    }
+  }
+
+  function onSubmit(event: SubmitEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const rpeValue = parseOptionalNumber(rpe)
+    const tempValue = parseOptionalNumber(temperature)
+    if (rpeValue === null || (rpeValue !== undefined && (rpeValue < 0 || rpeValue > 10))) {
+      setInvalid('RPE must be a number from 0 to 10.')
+      return
+    }
+    if (tempValue === null) {
+      setInvalid('Temperature must be a number.')
+      return
+    }
+    save.mutate({
+      rpe: rpeValue,
+      feel: feel === '' ? undefined : Number(feel),
+      notes: notes.trim() === '' ? undefined : notes,
+      painTags: parseTags(tags),
+      weatherTemperatureC: tempValue,
+      weatherCondition: condition === '' ? undefined : (condition as (typeof conditions)[number]),
+    })
+  }
+
+  return (
+    <Section title="Notes and feel">
+      <form onSubmit={onSubmit} className="grid gap-4 sm:grid-cols-2">
+        <Field id="rpe" label="RPE (0–10)">
+          <Input
+            id="rpe"
+            inputMode="decimal"
+            value={rpe}
+            onChange={(e) => {
+              changed(setRpe)(e.target.value)
+            }}
+          />
+        </Field>
+        <Field id="feel" label="Mood">
+          <NativeSelect
+            id="feel"
+            value={feel}
+            onChange={(e) => {
+              changed(setFeel)(e.target.value)
+            }}
+          >
+            <NativeSelectOption value="">Not set</NativeSelectOption>
+            {moodOptions.map((m) => (
+              <NativeSelectOption key={m.value} value={String(m.value)}>
+                {m.label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
+        <Field id="pain-tags" label="Pain tags (comma-separated)">
+          <Input
+            id="pain-tags"
+            value={tags}
+            onChange={(e) => {
+              changed(setTags)(e.target.value)
+            }}
+          />
+        </Field>
+        <div className="grid grid-cols-2 gap-4">
+          <Field id="weather-temperature" label="Temperature (°C)">
+            <Input
+              id="weather-temperature"
+              inputMode="decimal"
+              value={temperature}
+              onChange={(e) => {
+                changed(setTemperature)(e.target.value)
+              }}
+            />
+          </Field>
+          <Field id="weather-condition" label="Weather">
+            <NativeSelect
+              id="weather-condition"
+              value={condition}
+              onChange={(e) => {
+                changed(setCondition)(e.target.value)
+              }}
+            >
+              <NativeSelectOption value="">Not set</NativeSelectOption>
+              {conditions.map((c) => (
+                <NativeSelectOption key={c} value={c}>
+                  {conditionLabels[c]}
+                </NativeSelectOption>
+              ))}
+            </NativeSelect>
+          </Field>
+        </div>
+        <div className="sm:col-span-2">
+          <Field id="notes" label="Notes">
+            <Textarea
+              id="notes"
+              value={notes}
+              onChange={(e) => {
+                changed(setNotes)(e.target.value)
+              }}
+            />
+          </Field>
+        </div>
+        <div className="flex items-center gap-4 sm:col-span-2">
+          <Button type="submit" disabled={save.isPending}>
+            Save
+          </Button>
+          {(invalid ?? save.isError) && (
+            <p role="alert" className="text-sm text-destructive">
+              {invalid ?? problemMessage(save.error)}
+            </p>
+          )}
+          {save.isSuccess && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Saved.
+            </p>
+          )}
+        </div>
+      </form>
+    </Section>
+  )
+}
+
+function Field({ id, label, children }: { id: string; label: string; children: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+    </div>
   )
 }

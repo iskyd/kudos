@@ -67,7 +67,7 @@ func (q *Queries) DeleteSwimLengths(ctx context.Context, arg DeleteSwimLengthsPa
 }
 
 const getActivity = `-- name: GetActivity :one
-SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides FROM activities WHERE user_id = $1 AND id = $2
+SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides, pain_tags FROM activities WHERE user_id = $1 AND id = $2
 `
 
 type GetActivityParams struct {
@@ -111,6 +111,7 @@ func (q *Queries) GetActivity(ctx context.Context, arg GetActivityParams) (Activ
 		&i.WeatherTemperatureC,
 		&i.WeatherCondition,
 		&i.Overrides,
+		&i.PainTags,
 	)
 	return i, err
 }
@@ -251,7 +252,7 @@ type InsertSwimLengthsParams struct {
 }
 
 const listActivities = `-- name: ListActivities :many
-SELECT a.id, a.user_id, a.source, a.source_activity_id, a.sport, a.subtype, a.start_time, a.utc_offset_s, a.original_file_id, a.multisport_group_id, a.elapsed_time_s, a.timer_time_s, a.distance_m, a.ascent_m, a.descent_m, a.avg_speed_m_s, a.max_speed_m_s, a.avg_hr_bpm, a.max_hr_bpm, a.avg_power_w, a.max_power_w, a.avg_cadence, a.max_cadence, a.avg_temperature_c, a.pool_length_m, a.calories_kcal, a.rpe, a.feel, a.notes, a.weather_temperature_c, a.weather_condition, a.overrides, k.sort_key
+SELECT a.id, a.user_id, a.source, a.source_activity_id, a.sport, a.subtype, a.start_time, a.utc_offset_s, a.original_file_id, a.multisport_group_id, a.elapsed_time_s, a.timer_time_s, a.distance_m, a.ascent_m, a.descent_m, a.avg_speed_m_s, a.max_speed_m_s, a.avg_hr_bpm, a.max_hr_bpm, a.avg_power_w, a.max_power_w, a.avg_cadence, a.max_cadence, a.avg_temperature_c, a.pool_length_m, a.calories_kcal, a.rpe, a.feel, a.notes, a.weather_temperature_c, a.weather_condition, a.overrides, a.pain_tags, k.sort_key
 FROM activities a,
     LATERAL (SELECT (CASE $1::text
         WHEN 'distance' THEN coalesce(a.distance_m, -1)
@@ -260,19 +261,21 @@ FROM activities a,
     END)::float8 AS sort_key) k
 WHERE a.user_id = $2
     AND ($3::text IS NULL OR a.sport = $3)
-    AND ($4::date IS NULL
-        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= $4)
+    AND ($4::text IS NULL OR $4::text = ANY(a.pain_tags))
     AND ($5::date IS NULL
-        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= $5)
-    AND (k.sort_key, a.id) < ($6::float8, $7::bigint)
+        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= $5)
+    AND ($6::date IS NULL
+        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= $6)
+    AND (k.sort_key, a.id) < ($7::float8, $8::bigint)
 ORDER BY k.sort_key DESC, a.id DESC
-LIMIT $8
+LIMIT $9
 `
 
 type ListActivitiesParams struct {
 	Sort      string
 	UserID    int64
 	Sport     *string
+	Tag       *string
 	FromDay   *time.Time
 	ToDay     *time.Time
 	BeforeKey float64
@@ -293,6 +296,7 @@ func (q *Queries) ListActivities(ctx context.Context, arg ListActivitiesParams) 
 		arg.Sort,
 		arg.UserID,
 		arg.Sport,
+		arg.Tag,
 		arg.FromDay,
 		arg.ToDay,
 		arg.BeforeKey,
@@ -339,6 +343,7 @@ func (q *Queries) ListActivities(ctx context.Context, arg ListActivitiesParams) 
 			&i.Activity.WeatherTemperatureC,
 			&i.Activity.WeatherCondition,
 			&i.Activity.Overrides,
+			&i.Activity.PainTags,
 			&i.SortKey,
 		); err != nil {
 			return nil, err
@@ -463,7 +468,7 @@ func (q *Queries) ListLaps(ctx context.Context, arg ListLapsParams) ([]Lap, erro
 }
 
 const listMultisportLegs = `-- name: ListMultisportLegs :many
-SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides FROM activities
+SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides, pain_tags FROM activities
 WHERE user_id = $1 AND multisport_group_id = $2
 ORDER BY start_time, id
 LIMIT 50
@@ -517,6 +522,7 @@ func (q *Queries) ListMultisportLegs(ctx context.Context, arg ListMultisportLegs
 			&i.WeatherTemperatureC,
 			&i.WeatherCondition,
 			&i.Overrides,
+			&i.PainTags,
 		); err != nil {
 			return nil, err
 		}
@@ -628,6 +634,42 @@ func (q *Queries) ListSwimLengths(ctx context.Context, arg ListSwimLengthsParams
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateActivityAnnotation = `-- name: UpdateActivityAnnotation :execrows
+UPDATE activities SET
+    rpe = $1, feel = $2, notes = $3, pain_tags = $4::text[],
+    weather_temperature_c = $5, weather_condition = $6
+WHERE user_id = $7 AND id = $8
+`
+
+type UpdateActivityAnnotationParams struct {
+	Rpe                 *float32
+	Feel                *int16
+	Notes               *string
+	PainTags            []string
+	WeatherTemperatureC *float32
+	WeatherCondition    *string
+	UserID              int64
+	ID                  int64
+}
+
+// Replaces every user-owned annotation; a nil value clears it.
+func (q *Queries) UpdateActivityAnnotation(ctx context.Context, arg UpdateActivityAnnotationParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updateActivityAnnotation,
+		arg.Rpe,
+		arg.Feel,
+		arg.Notes,
+		arg.PainTags,
+		arg.WeatherTemperatureC,
+		arg.WeatherCondition,
+		arg.UserID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const upsertActivity = `-- name: UpsertActivity :one

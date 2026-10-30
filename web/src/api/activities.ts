@@ -11,6 +11,7 @@ export type ActivitySummary = components['schemas']['ActivitySummary']
 
 export interface ActivityFilters {
   sport?: ActivitySport
+  tag?: string
   from?: string // local day, YYYY-MM-DD
   to?: string
   sort: 'date' | 'distance' | 'duration'
@@ -137,6 +138,27 @@ export function useConfig() {
       const { data, error } = await api.GET('/api/config')
       if (error) throw new ApiError(error)
       return data
+    },
+  })
+}
+
+export type ActivityAnnotation = components['schemas']['ActivityAnnotation']
+
+export function useSetAnnotation(id: number) {
+  const queryClient = useQueryClient()
+  const { csrfToken } = useCurrentUser()
+  return useMutation({
+    mutationFn: async (body: ActivityAnnotation) => {
+      const { data, error } = await api.PUT('/api/activities/{id}/annotation', {
+        params: { path: { id } },
+        body,
+        headers: { 'X-CSRF-Token': csrfToken },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    onSuccess: (detail) => {
+      queryClient.setQueryData([...activitiesKey, id], detail)
     },
   })
 }

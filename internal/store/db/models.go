@@ -41,6 +41,7 @@ type Activity struct {
 	WeatherTemperatureC *float32
 	WeatherCondition    *string
 	Overrides           []byte
+	PainTags            []string
 }
 
 type ActivityStream struct {

@@ -17,3 +17,18 @@ export function parseKilometres(text: string): number | null {
   if (!/^\d+(\.\d+)?$/.test(trimmed)) return null
   return Math.round(Number(trimmed) * 1000 * 1000) / 1000
 }
+
+// parseOptionalNumber reads an optional number field (dot or comma decimal):
+// undefined when blank, null when not a number.
+export function parseOptionalNumber(text: string): number | undefined | null {
+  const trimmed = text.trim().replace(',', '.')
+  if (trimmed === '') return undefined
+  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return null
+  return Number(trimmed)
+}
+
+// parseTags splits comma-separated tags, trimmed and lowercased, without blanks or repeats.
+export function parseTags(text: string): string[] {
+  const tags = text.split(',').map((t) => t.trim().toLowerCase())
+  return [...new Set(tags.filter((t) => t !== ''))]
+}

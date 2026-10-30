@@ -1,4 +1,4 @@
-import { parseDuration, parseKilometres } from '@/lib/format/input'
+import { parseDuration, parseKilometres, parseOptionalNumber, parseTags } from '@/lib/format/input'
 
 describe('parseDuration', () => {
   it.each([
@@ -29,5 +29,27 @@ describe('parseKilometres', () => {
 
   it.each(['', 'ten', '-1', '1.2.3', '1e3'])('rejects %j', (text) => {
     expect(parseKilometres(text)).toBeNull()
+  })
+})
+
+describe('parseOptionalNumber', () => {
+  it.each([
+    ['', undefined],
+    ['  ', undefined],
+    ['7', 7],
+    ['6.5', 6.5],
+    ['6,5', 6.5],
+    ['-2.5', -2.5],
+    ['abc', null],
+    ['1e3', null],
+  ])('%j is %j', (text, want) => {
+    expect(parseOptionalNumber(text)).toBe(want)
+  })
+})
+
+describe('parseTags', () => {
+  it('trims, lowercases and drops blanks and repeats', () => {
+    expect(parseTags(' Left Knee, achilles,,left knee ')).toEqual(['left knee', 'achilles'])
+    expect(parseTags('')).toEqual([])
   })
 })

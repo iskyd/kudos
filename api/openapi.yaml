@@ -166,6 +166,13 @@ paths:
           schema:
             type: string
             format: date
+        - name: tag
+          in: query
+          required: false
+          description: Only activities with this pain tag.
+          schema:
+            type: string
+            maxLength: 40
         - name: sort
           in: query
           required: false
@@ -405,6 +412,32 @@ paths:
       responses:
         "200":
           description: The activity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/activities/{id}/annotation:
+    put:
+      operationId: setActivityAnnotation
+      summary: Set what the user adds to an activity
+      description: |
+        Replaces RPE, feel (mood), notes, pain tags and weather; a field left out or
+        null is cleared. RPE and feel arrive pre-filled from the watch when it
+        recorded them. Tags are trimmed, lowercased and deduplicated.
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityAnnotation"
+      responses:
+        "200":
+          description: The activity with its new annotation.
           content:
             application/json:
               schema:
@@ -826,7 +859,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/ActivitySummary"
         - type: object
-          required: [legs]
+          required: [legs, painTags]
           properties:
             descentM:
               type: number
@@ -865,12 +898,47 @@ components:
               enum: [sun, cloud, rain, wind, snow]
             workout:
               $ref: "#/components/schemas/RecordedWorkout"
+            painTags:
+              type: array
+              items:
+                type: string
             legs:
               type: array
               description: Every leg of the multisport activity this one belongs to, in order; empty otherwise.
               items:
                 $ref: "#/components/schemas/ActivitySummary"
 
+    ActivityAnnotation:
+      type: object
+      properties:
+        rpe:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 10
+          description: Rating of perceived exertion.
+        feel:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Mood after the activity, 0 (very weak) to 100 (very strong), as Garmin records it.
+        notes:
+          type: string
+          maxLength: 2000
+        painTags:
+          type: array
+          maxItems: 10
+          items:
+            type: string
+            maxLength: 40
+        weatherTemperatureC:
+          type: number
+          format: float
+          minimum: -60
+          maximum: 60
+        weatherCondition:
+          type: string
+          enum: [sun, cloud, rain, wind, snow]
     RecordedWorkout:
       type: object
       required: [steps]

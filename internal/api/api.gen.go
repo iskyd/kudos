@@ -18,6 +18,33 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ActivityAnnotationWeatherCondition.
+const (
+	ActivityAnnotationWeatherConditionCloud ActivityAnnotationWeatherCondition = "cloud"
+	ActivityAnnotationWeatherConditionRain  ActivityAnnotationWeatherCondition = "rain"
+	ActivityAnnotationWeatherConditionSnow  ActivityAnnotationWeatherCondition = "snow"
+	ActivityAnnotationWeatherConditionSun   ActivityAnnotationWeatherCondition = "sun"
+	ActivityAnnotationWeatherConditionWind  ActivityAnnotationWeatherCondition = "wind"
+)
+
+// Valid indicates whether the value is a known member of the ActivityAnnotationWeatherCondition enum.
+func (e ActivityAnnotationWeatherCondition) Valid() bool {
+	switch e {
+	case ActivityAnnotationWeatherConditionCloud:
+		return true
+	case ActivityAnnotationWeatherConditionRain:
+		return true
+	case ActivityAnnotationWeatherConditionSnow:
+		return true
+	case ActivityAnnotationWeatherConditionSun:
+		return true
+	case ActivityAnnotationWeatherConditionWind:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ActivityDetailSource.
 const (
 	ActivityDetailSourceGarmin ActivityDetailSource = "garmin"
@@ -65,25 +92,25 @@ func (e ActivityDetailSubtype) Valid() bool {
 
 // Defines values for ActivityDetailWeatherCondition.
 const (
-	Cloud ActivityDetailWeatherCondition = "cloud"
-	Rain  ActivityDetailWeatherCondition = "rain"
-	Snow  ActivityDetailWeatherCondition = "snow"
-	Sun   ActivityDetailWeatherCondition = "sun"
-	Wind  ActivityDetailWeatherCondition = "wind"
+	ActivityDetailWeatherConditionCloud ActivityDetailWeatherCondition = "cloud"
+	ActivityDetailWeatherConditionRain  ActivityDetailWeatherCondition = "rain"
+	ActivityDetailWeatherConditionSnow  ActivityDetailWeatherCondition = "snow"
+	ActivityDetailWeatherConditionSun   ActivityDetailWeatherCondition = "sun"
+	ActivityDetailWeatherConditionWind  ActivityDetailWeatherCondition = "wind"
 )
 
 // Valid indicates whether the value is a known member of the ActivityDetailWeatherCondition enum.
 func (e ActivityDetailWeatherCondition) Valid() bool {
 	switch e {
-	case Cloud:
+	case ActivityDetailWeatherConditionCloud:
 		return true
-	case Rain:
+	case ActivityDetailWeatherConditionRain:
 		return true
-	case Snow:
+	case ActivityDetailWeatherConditionSnow:
 		return true
-	case Sun:
+	case ActivityDetailWeatherConditionSun:
 		return true
-	case Wind:
+	case ActivityDetailWeatherConditionWind:
 		return true
 	default:
 		return false
@@ -357,6 +384,22 @@ func (e ListActivitiesParamsSort) Valid() bool {
 	}
 }
 
+// ActivityAnnotation defines model for ActivityAnnotation.
+type ActivityAnnotation struct {
+	// Feel Mood after the activity, 0 (very weak) to 100 (very strong), as Garmin records it.
+	Feel     *int      `json:"feel,omitempty"`
+	Notes    *string   `json:"notes,omitempty"`
+	PainTags *[]string `json:"painTags,omitempty"`
+
+	// Rpe Rating of perceived exertion.
+	Rpe                 *float32                            `json:"rpe,omitempty"`
+	WeatherCondition    *ActivityAnnotationWeatherCondition `json:"weatherCondition,omitempty"`
+	WeatherTemperatureC *float32                            `json:"weatherTemperatureC,omitempty"`
+}
+
+// ActivityAnnotationWeatherCondition defines model for ActivityAnnotation.WeatherCondition.
+type ActivityAnnotationWeatherCondition string
+
 // ActivityDetail defines model for ActivityDetail.
 type ActivityDetail struct {
 	AscentM         *float32 `json:"ascentM,omitempty"`
@@ -381,6 +424,7 @@ type ActivityDetail struct {
 	MaxPowerW   *int                 `json:"maxPowerW,omitempty"`
 	MaxSpeedMS  *float32             `json:"maxSpeedMS,omitempty"`
 	Notes       *string              `json:"notes,omitempty"`
+	PainTags    []string             `json:"painTags"`
 	PoolLengthM *float32             `json:"poolLengthM,omitempty"`
 	Rpe         *float32             `json:"rpe,omitempty"`
 	Source      ActivityDetailSource `json:"source"`
@@ -814,7 +858,10 @@ type ListActivitiesParams struct {
 	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
 
 	// To Last local day, inclusive.
-	To   *openapi_types.Date       `form:"to,omitempty" json:"to,omitempty"`
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+
+	// Tag Only activities with this pain tag.
+	Tag  *string                   `form:"tag,omitempty" json:"tag,omitempty"`
 	Sort *ListActivitiesParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
 
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
@@ -882,6 +929,9 @@ type CreateActivityJSONRequestBody = ManualActivityRequest
 // UploadActivityMultipartRequestBody defines body for UploadActivity for multipart/form-data ContentType.
 type UploadActivityMultipartRequestBody UploadActivityMultipartBody
 
+// SetActivityAnnotationJSONRequestBody defines body for SetActivityAnnotation for application/json ContentType.
+type SetActivityAnnotationJSONRequestBody = ActivityAnnotation
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -917,6 +967,9 @@ type ServerInterface interface {
 	// GetActivity Activity detail
 	// (GET /api/activities/{id})
 	GetActivity(w http.ResponseWriter, r *http.Request, id ActivityID)
+	// SetActivityAnnotation Set what the user adds to an activity
+	// (PUT /api/activities/{id}/annotation)
+	SetActivityAnnotation(w http.ResponseWriter, r *http.Request, id ActivityID)
 	// ListLaps Laps of an activity
 	// (GET /api/activities/{id}/laps)
 	ListLaps(w http.ResponseWriter, r *http.Request, id ActivityID, params ListLapsParams)
@@ -1004,6 +1057,12 @@ func (_ Unimplemented) UploadActivity(w http.ResponseWriter, r *http.Request) {
 // GetActivity Activity detail
 // (GET /api/activities/{id})
 func (_ Unimplemented) GetActivity(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetActivityAnnotation Set what the user adds to an activity
+// (PUT /api/activities/{id}/annotation)
+func (_ Unimplemented) SetActivityAnnotation(w http.ResponseWriter, r *http.Request, id ActivityID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1184,6 +1243,19 @@ func (siw *ServerInterfaceWrapper) ListActivities(w http.ResponseWriter, r *http
 		return
 	}
 
+	// ------------- Optional query parameter "tag" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tag", r.URL.Query(), &params.Tag, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tag"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tag", Err: err})
+		}
+		return
+	}
+
 	// ------------- Optional query parameter "sort" -------------
 
 	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
@@ -1279,6 +1351,32 @@ func (siw *ServerInterfaceWrapper) GetActivity(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetActivity(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetActivityAnnotation operation middleware
+func (siw *ServerInterfaceWrapper) SetActivityAnnotation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetActivityAnnotation(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1938,6 +2036,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/activities/{id}", wrapper.GetActivity)
 	})
 	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/activities/{id}/annotation", wrapper.SetActivityAnnotation)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/laps", wrapper.ListLaps)
 	})
 	r.Group(func(r chi.Router) {
@@ -2100,6 +2201,46 @@ type GetActivitydefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetActivitydefaultApplicationProblemPlusJSONResponse) VisitGetActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetActivityAnnotationRequestObject struct {
+	Id   ActivityID `json:"id"`
+	Body *SetActivityAnnotationJSONRequestBody
+}
+
+type SetActivityAnnotationResponseObject interface {
+	VisitSetActivityAnnotationResponse(w http.ResponseWriter) error
+}
+
+type SetActivityAnnotation200JSONResponse ActivityDetail
+
+func (response SetActivityAnnotation200JSONResponse) VisitSetActivityAnnotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetActivityAnnotationdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response SetActivityAnnotationdefaultApplicationProblemPlusJSONResponse) VisitSetActivityAnnotationResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -2914,6 +3055,9 @@ type StrictServerInterface interface {
 	// GetActivity Activity detail
 	// (GET /api/activities/{id})
 	GetActivity(ctx context.Context, request GetActivityRequestObject) (GetActivityResponseObject, error)
+	// SetActivityAnnotation Set what the user adds to an activity
+	// (PUT /api/activities/{id}/annotation)
+	SetActivityAnnotation(ctx context.Context, request SetActivityAnnotationRequestObject) (SetActivityAnnotationResponseObject, error)
 	// ListLaps Laps of an activity
 	// (GET /api/activities/{id}/laps)
 	ListLaps(ctx context.Context, request ListLapsRequestObject) (ListLapsResponseObject, error)
@@ -3122,6 +3266,39 @@ func (sh *strictHandler) GetActivity(w http.ResponseWriter, r *http.Request, id 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetActivityResponseObject); ok {
 		if err := validResponse.VisitGetActivityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetActivityAnnotation operation middleware
+func (sh *strictHandler) SetActivityAnnotation(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	var request SetActivityAnnotationRequestObject
+
+	request.Id = id
+
+	var body SetActivityAnnotationJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetActivityAnnotation(ctx, request.(SetActivityAnnotationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetActivityAnnotation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetActivityAnnotationResponseObject); ok {
+		if err := validResponse.VisitSetActivityAnnotationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

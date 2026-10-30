@@ -5,12 +5,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 
 	"github.com/iskyd/kudos/internal/analytics"
 	"github.com/iskyd/kudos/internal/importer"
+	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
@@ -38,11 +42,20 @@ func (s *Server) activity(ctx context.Context, id int64) (db.Activity, error) {
 
 // GetActivity returns an activity with its recorded workout and multisport legs.
 func (s *Server) GetActivity(ctx context.Context, req GetActivityRequestObject) (GetActivityResponseObject, error) {
-	userID := sessionFrom(ctx).userID
 	a, err := s.activity(ctx, req.Id)
 	if err != nil {
 		return nil, err
 	}
+	out, err := s.detail(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	return GetActivity200JSONResponse(out), nil
+}
+
+// detail adds the recorded workout and multisport legs to an activity.
+func (s *Server) detail(ctx context.Context, a db.Activity) (ActivityDetail, error) {
+	userID := sessionFrom(ctx).userID
 	sum := activitySummary(a)
 	out := ActivityDetail{
 		Id: sum.Id, Sport: sum.Sport, Subtype: ActivityDetailSubtype(sum.Subtype), Source: ActivityDetailSource(sum.Source), StartTime: sum.StartTime, UtcOffsetS: sum.UtcOffsetS,
@@ -51,30 +64,104 @@ func (s *Server) GetActivity(ctx context.Context, req GetActivityRequestObject) 
 		DescentM: a.DescentM, MaxSpeedMS: a.MaxSpeedMS, MaxHrBpm: intPtr(a.MaxHrBpm), MaxPowerW: intPtr(a.MaxPowerW),
 		AvgCadence: a.AvgCadence, MaxCadence: a.MaxCadence, AvgTemperatureC: a.AvgTemperatureC, PoolLengthM: a.PoolLengthM,
 		CaloriesKcal: int32Ptr(a.CaloriesKcal), Feel: intPtr(a.Feel), Notes: a.Notes, WeatherTemperatureC: a.WeatherTemperatureC,
-		WeatherCondition: (*ActivityDetailWeatherCondition)(a.WeatherCondition), Legs: []ActivitySummary{},
+		WeatherCondition: (*ActivityDetailWeatherCondition)(a.WeatherCondition), Legs: []ActivitySummary{}, PainTags: a.PainTags,
 	}
 
 	w, err := s.q.GetRecordedWorkout(ctx, db.GetRecordedWorkoutParams{UserID: userID, ActivityID: a.ID})
 	switch {
 	case errors.Is(err, pgx.ErrNoRows):
 	case err != nil:
-		return nil, fmt.Errorf("reading the recorded workout: %w", err)
+		return ActivityDetail{}, fmt.Errorf("reading the recorded workout: %w", err)
 	default:
 		if out.Workout, err = recordedWorkout(w); err != nil {
-			return nil, err
+			return ActivityDetail{}, err
 		}
 	}
 
 	if a.MultisportGroupID != nil {
 		legs, err := s.q.ListMultisportLegs(ctx, db.ListMultisportLegsParams{UserID: userID, MultisportGroupID: a.MultisportGroupID})
 		if err != nil {
-			return nil, fmt.Errorf("listing multisport legs: %w", err)
+			return ActivityDetail{}, fmt.Errorf("listing multisport legs: %w", err)
 		}
 		for _, l := range legs {
 			out.Legs = append(out.Legs, activitySummary(l))
 		}
 	}
-	return GetActivity200JSONResponse(out), nil
+	return out, nil
+}
+
+// Keep in step with ActivityAnnotation in api/openapi.yaml.
+const (
+	maxPainTags   = 10
+	maxPainTagLen = 40
+)
+
+// SetActivityAnnotation replaces what the user added to an activity.
+func (s *Server) SetActivityAnnotation(ctx context.Context, req SetActivityAnnotationRequestObject,
+) (SetActivityAnnotationResponseObject, error) {
+	b := req.Body
+	invalid := func(detail string) (SetActivityAnnotationResponseObject, error) {
+		return nil, &Error{Kind: KindInvalidRequest, Detail: detail}
+	}
+	if b.Rpe != nil && !(*b.Rpe >= 0 && *b.Rpe <= 10) {
+		return invalid("rpe must be 0 to 10")
+	}
+	if b.Feel != nil && (*b.Feel < 0 || *b.Feel > 100) {
+		return invalid("feel must be 0 to 100")
+	}
+	if b.Notes != nil && utf8.RuneCountInString(*b.Notes) > maxNotesLen {
+		return invalid(fmt.Sprintf("notes are limited to %d characters", maxNotesLen))
+	}
+	if b.WeatherTemperatureC != nil && !(*b.WeatherTemperatureC >= -60 && *b.WeatherTemperatureC <= 60) {
+		return invalid("weatherTemperatureC must be -60 to 60")
+	}
+	if b.WeatherCondition != nil && !b.WeatherCondition.Valid() {
+		return invalid("unknown weather condition")
+	}
+	var tags []string
+	if b.PainTags != nil {
+		for _, t := range *b.PainTags {
+			t = strings.ToLower(strings.TrimSpace(t))
+			if t == "" || slices.Contains(tags, t) {
+				continue
+			}
+			if utf8.RuneCountInString(t) > maxPainTagLen {
+				return invalid(fmt.Sprintf("pain tags are limited to %d characters", maxPainTagLen))
+			}
+			tags = append(tags, t)
+		}
+	}
+	if len(tags) > maxPainTags {
+		return invalid(fmt.Sprintf("at most %d pain tags", maxPainTags))
+	}
+	var notes *string
+	if b.Notes != nil && strings.TrimSpace(*b.Notes) != "" {
+		notes = b.Notes
+	}
+	var feel *int16
+	if b.Feel != nil {
+		feel = new(int16(*b.Feel)) //nolint:gosec // G115: checked to be 0–100
+	}
+
+	err := s.ingest.Annotate(ctx, sessionFrom(ctx).userID, req.Id, ingest.Annotation{
+		RPE: b.Rpe, Feel: feel, Notes: notes, PainTags: tags,
+		WeatherTemperature: b.WeatherTemperatureC, WeatherCondition: (*string)(b.WeatherCondition),
+	})
+	if errors.Is(err, ingest.ErrNotFound) {
+		return nil, errActivityNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("annotating: %w", err)
+	}
+	a, err := s.activity(ctx, req.Id)
+	if err != nil {
+		return nil, err
+	}
+	out, err := s.detail(ctx, a)
+	if err != nil {
+		return nil, err
+	}
+	return SetActivityAnnotation200JSONResponse(out), nil
 }
 
 func recordedWorkout(w db.RecordedWorkout) (*RecordedWorkout, error) {

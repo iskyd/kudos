@@ -239,15 +239,19 @@ describe('activity list', () => {
     renderApp('/activities')
     await screen.findByRole('cell', { name: 'Running' })
     await userEvent.selectOptions(screen.getByLabelText('Sport'), 'Running')
+    await userEvent.type(screen.getByLabelText('Pain tag'), 'knee')
     await userEvent.type(screen.getByLabelText('From'), '2026-10-01')
     await userEvent.type(screen.getByLabelText('To'), '2026-10-31')
     await userEvent.selectOptions(screen.getByLabelText('Sort by'), 'Longest distance')
     await screen.findByRole('cell', { name: 'Running' })
     expect(queries[0]).toBe('?sort=date')
-    expect(queries.at(-1)).toBe('?sort=distance&sport=running&from=2026-10-01&to=2026-10-31')
+    expect(queries.at(-1)).toBe(
+      '?sort=distance&sport=running&tag=knee&from=2026-10-01&to=2026-10-31',
+    )
 
     await userEvent.selectOptions(screen.getByLabelText('Sport'), 'All sports')
     await userEvent.clear(screen.getByLabelText('From'))
+    await userEvent.clear(screen.getByLabelText('Pain tag'))
     expect(queries.at(-1)).toBe('?sort=distance&to=2026-10-31')
   })
 

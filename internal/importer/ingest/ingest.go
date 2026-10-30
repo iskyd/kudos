@@ -33,6 +33,7 @@ import (
 var (
 	ErrUnsupportedFormat = errors.New("unsupported file format; upload a .fit, .gpx or .tcx file")
 	ErrInvalidFile       = errors.New("the file could not be read")
+	ErrNotFound          = errors.New("no such activity")
 )
 
 // Service ingests activities.
@@ -421,4 +422,43 @@ func zones(vs []float64) []int16 {
 		}
 	}
 	return out
+}
+
+// Annotation is what the user adds to an activity. Nil (or no tags) clears a field.
+type Annotation struct {
+	RPE                *float32 // 0–10
+	Feel               *int16   // 0–100, the mood
+	Notes              *string
+	PainTags           []string
+	WeatherTemperature *float32 // °C
+	WeatherCondition   *string
+}
+
+// Annotate replaces the activity's annotation and queues its derived values for
+// recomputation, since session-RPE load depends on RPE (invariant 23).
+func (s *Service) Annotate(ctx context.Context, userID, activityID int64, a Annotation) error {
+	tags := a.PainTags
+	if tags == nil {
+		tags = []string{}
+	}
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		n, err := db.New(tx).UpdateActivityAnnotation(ctx, db.UpdateActivityAnnotationParams{
+			UserID: userID, ID: activityID, Rpe: a.RPE, Feel: a.Feel, Notes: a.Notes, PainTags: tags,
+			WeatherTemperatureC: a.WeatherTemperature, WeatherCondition: a.WeatherCondition,
+		})
+		if err != nil {
+			return fmt.Errorf("storing: %w", err)
+		}
+		if n == 0 {
+			return ErrNotFound
+		}
+		if _, err := s.jobs.InsertTx(ctx, tx, jobs.DerivedArgs{UserID: userID, ActivityID: activityID}, nil); err != nil {
+			return fmt.Errorf("enqueueing derived values: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("annotating activity: %w", err)
+	}
+	return nil
 }
