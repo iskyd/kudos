@@ -105,6 +105,22 @@ export function useActivityStreams(id: number) {
   })
 }
 
+export type ActivityComparison = components['schemas']['ActivityComparison']
+export type ComparisonAxis = components['schemas']['ComparisonAxis']
+
+export function useComparison(id: number, other: number, axis: ComparisonAxis) {
+  return useQuery({
+    queryKey: [...activitiesKey, id, 'comparison', other, axis],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/activities/{id}/comparison', {
+        params: { path: { id }, query: { with: other, axis, points: chartPoints } },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+  })
+}
+
 type ChildPath =
   '/api/activities/{id}/laps' | '/api/activities/{id}/lengths' | '/api/activities/{id}/sets'
 

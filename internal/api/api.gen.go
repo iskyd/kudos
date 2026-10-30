@@ -282,6 +282,24 @@ func (e ActivitySummarySubtype) Valid() bool {
 	}
 }
 
+// Defines values for ComparisonAxis.
+const (
+	ComparisonAxisDistance ComparisonAxis = "distance"
+	ComparisonAxisTime     ComparisonAxis = "time"
+)
+
+// Valid indicates whether the value is a known member of the ComparisonAxis enum.
+func (e ComparisonAxis) Valid() bool {
+	switch e {
+	case ComparisonAxisDistance:
+		return true
+	case ComparisonAxisTime:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GarminBackfillPauseReason.
 const (
 	GarminBackfillPauseReasonDisconnected GarminBackfillPauseReason = "disconnected"
@@ -482,19 +500,19 @@ func (e SwimLengthStroke) Valid() bool {
 
 // Defines values for ListActivitiesParamsSort.
 const (
-	Date     ListActivitiesParamsSort = "date"
-	Distance ListActivitiesParamsSort = "distance"
-	Duration ListActivitiesParamsSort = "duration"
+	ListActivitiesParamsSortDate     ListActivitiesParamsSort = "date"
+	ListActivitiesParamsSortDistance ListActivitiesParamsSort = "distance"
+	ListActivitiesParamsSortDuration ListActivitiesParamsSort = "duration"
 )
 
 // Valid indicates whether the value is a known member of the ListActivitiesParamsSort enum.
 func (e ListActivitiesParamsSort) Valid() bool {
 	switch e {
-	case Date:
+	case ListActivitiesParamsSortDate:
 		return true
-	case Distance:
+	case ListActivitiesParamsSortDistance:
 		return true
-	case Duration:
+	case ListActivitiesParamsSortDuration:
 		return true
 	default:
 		return false
@@ -519,6 +537,19 @@ type ActivityAnnotation struct {
 
 // ActivityAnnotationWeatherCondition defines model for ActivityAnnotation.WeatherCondition.
 type ActivityAnnotationWeatherCondition string
+
+// ActivityComparison defines model for ActivityComparison.
+type ActivityComparison struct {
+	// A One activity's values at each point of x.
+	A    ComparedStreams `json:"a"`
+	Axis ComparisonAxis  `json:"axis"`
+
+	// B One activity's values at each point of x.
+	B ComparedStreams `json:"b"`
+
+	// X The common axis, in seconds or metres from the start.
+	X []float64 `json:"x"`
+}
 
 // ActivityDetail defines model for ActivityDetail.
 type ActivityDetail struct {
@@ -709,6 +740,24 @@ type ActivitySummarySource string
 
 // ActivitySummarySubtype defines model for ActivitySummary.Subtype.
 type ActivitySummarySubtype string
+
+// ComparedStreams One activity's values at each point of x.
+type ComparedStreams struct {
+	AltitudeM *[]*float64 `json:"altitudeM,omitempty"`
+	Cadence   *[]*float64 `json:"cadence,omitempty"`
+
+	// DistanceM Metres covered.
+	DistanceM *[]*float64 `json:"distanceM,omitempty"`
+
+	// ElapsedS Seconds from the activity's first sample.
+	ElapsedS *[]*float64 `json:"elapsedS,omitempty"`
+	HrBpm    *[]*float64 `json:"hrBpm,omitempty"`
+	PowerW   *[]*float64 `json:"powerW,omitempty"`
+	SpeedMS  *[]*float64 `json:"speedMS,omitempty"`
+}
+
+// ComparisonAxis defines model for ComparisonAxis.
+type ComparisonAxis string
 
 // Config defines model for Config.
 type Config struct {
@@ -1110,6 +1159,14 @@ type UploadActivityMultipartBody struct {
 	File openapi_types.File `json:"file"`
 }
 
+// GetActivityComparisonParams defines parameters for GetActivityComparison.
+type GetActivityComparisonParams struct {
+	// With The other activity.
+	With   int64           `form:"with" json:"with"`
+	Axis   *ComparisonAxis `form:"axis,omitempty" json:"axis,omitempty"`
+	Points *int            `form:"points,omitempty" json:"points,omitempty"`
+}
+
 // ListLapsParams defines parameters for ListLaps.
 type ListLapsParams struct {
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
@@ -1219,6 +1276,9 @@ type ServerInterface interface {
 	// SetActivityAnnotation Set what the user adds to an activity
 	// (PUT /api/activities/{id}/annotation)
 	SetActivityAnnotation(w http.ResponseWriter, r *http.Request, id ActivityID)
+	// GetActivityComparison Two activities aligned for overlaying
+	// (GET /api/activities/{id}/comparison)
+	GetActivityComparison(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityComparisonParams)
 	// AddActivityEdit Edit an activity
 	// (POST /api/activities/{id}/edits)
 	AddActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID)
@@ -1330,6 +1390,12 @@ func (_ Unimplemented) GetActivity(w http.ResponseWriter, r *http.Request, id Ac
 // SetActivityAnnotation Set what the user adds to an activity
 // (PUT /api/activities/{id}/annotation)
 func (_ Unimplemented) SetActivityAnnotation(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetActivityComparison Two activities aligned for overlaying
+// (GET /api/activities/{id}/comparison)
+func (_ Unimplemented) GetActivityComparison(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityComparisonParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1693,6 +1759,74 @@ func (siw *ServerInterfaceWrapper) SetActivityAnnotation(w http.ResponseWriter, 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetActivityAnnotation(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActivityComparison operation middleware
+func (siw *ServerInterfaceWrapper) GetActivityComparison(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetActivityComparisonParams
+
+	// ------------- Required query parameter "with" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "with", r.URL.Query(), &params.With, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "with"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "with", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "axis" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "axis", r.URL.Query(), &params.Axis, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "axis"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "axis", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "points" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "points", r.URL.Query(), &params.Points, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "points"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "points", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActivityComparison(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2557,6 +2691,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/streams", wrapper.GetActivityStreams)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}/comparison", wrapper.GetActivityComparison)
+	})
 
 	return r
 }
@@ -2748,6 +2885,46 @@ type SetActivityAnnotationdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response SetActivityAnnotationdefaultApplicationProblemPlusJSONResponse) VisitSetActivityAnnotationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityComparisonRequestObject struct {
+	Id     ActivityID `json:"id"`
+	Params GetActivityComparisonParams
+}
+
+type GetActivityComparisonResponseObject interface {
+	VisitGetActivityComparisonResponse(w http.ResponseWriter) error
+}
+
+type GetActivityComparison200JSONResponse ActivityComparison
+
+func (response GetActivityComparison200JSONResponse) VisitGetActivityComparisonResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityComparisondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetActivityComparisondefaultApplicationProblemPlusJSONResponse) VisitGetActivityComparisonResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3796,6 +3973,9 @@ type StrictServerInterface interface {
 	// SetActivityAnnotation Set what the user adds to an activity
 	// (PUT /api/activities/{id}/annotation)
 	SetActivityAnnotation(ctx context.Context, request SetActivityAnnotationRequestObject) (SetActivityAnnotationResponseObject, error)
+	// GetActivityComparison Two activities aligned for overlaying
+	// (GET /api/activities/{id}/comparison)
+	GetActivityComparison(ctx context.Context, request GetActivityComparisonRequestObject) (GetActivityComparisonResponseObject, error)
 	// AddActivityEdit Edit an activity
 	// (POST /api/activities/{id}/edits)
 	AddActivityEdit(ctx context.Context, request AddActivityEditRequestObject) (AddActivityEditResponseObject, error)
@@ -4055,6 +4235,33 @@ func (sh *strictHandler) SetActivityAnnotation(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetActivityAnnotationResponseObject); ok {
 		if err := validResponse.VisitSetActivityAnnotationResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActivityComparison operation middleware
+func (sh *strictHandler) GetActivityComparison(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityComparisonParams) {
+	var request GetActivityComparisonRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActivityComparison(ctx, request.(GetActivityComparisonRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActivityComparison")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActivityComparisonResponseObject); ok {
+		if err := validResponse.VisitGetActivityComparisonResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

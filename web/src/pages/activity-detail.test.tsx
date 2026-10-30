@@ -121,6 +121,28 @@ describe('ActivityDetailPage', () => {
     expect(rows[3]).toHaveTextContent('3rest1:00—')
   })
 
+  it('compares with a recent activity of the same sport', async () => {
+    serve(run, runStreams)
+    const filters: string[] = []
+    server.use(
+      http.get('/api/activities', ({ request }) => {
+        filters.push(new URL(request.url).search)
+        return HttpResponse.json({
+          items: [run, { ...run, id: 4, startTime: '2026-10-03T05:30:00Z', distanceM: 8000 }],
+        })
+      }),
+      http.get('/api/activities/:id/comparison', () =>
+        HttpResponse.json({ axis: 'distance', x: [0, 1], a: {}, b: {} }),
+      ),
+    )
+    renderApp('/activities/1')
+    const form = within(await screen.findByRole('form', { name: 'Compare' }))
+    expect(form.getByRole('option')).toHaveTextContent('3 Oct 2026, 07:30 · 8.00 km')
+    expect(filters).toContain('?sport=running&sort=date')
+    await userEvent.click(form.getByRole('button', { name: 'Compare' }))
+    expect(await screen.findByRole('heading', { name: 'Comparison' })).toBeInTheDocument()
+  })
+
   it('keeps the page when the browser cannot draw maps', async () => {
     serve(run, runStreams, laps)
     server.use(

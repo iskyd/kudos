@@ -237,6 +237,15 @@ func (s *Service) Samples(ctx context.Context, userID int64, v View, after *time
 	return slices.Concat(segs...), nil
 }
 
+// Segments returns up to limit samples of the view, per segment, for analysis.
+func (s *Service) Segments(ctx context.Context, userID int64, v View, limit int) ([][]analytics.Sample, error) {
+	segs, err := segmentSamples(ctx, db.New(s.pool), userID, v, minTime, limit)
+	if err != nil {
+		return nil, err
+	}
+	return samples(segs), nil
+}
+
 func listEdits(ctx context.Context, q *db.Queries, userID, activityID int64) ([]Edit, error) {
 	rows, err := q.ListActivityEdits(ctx, db.ListActivityEditsParams{UserID: userID, ActivityID: activityID})
 	if err != nil {
@@ -332,6 +341,7 @@ func samples(segs [][]db.ActivityStream) [][]analytics.Sample {
 			out[i][j] = analytics.Sample{
 				Time: r.Time, HR: f64(r.HrBpm), Power: f64(r.PowerW), Cadence: f64(r.Cadence),
 				Speed: f64(r.SpeedMS), Distance: r.DistanceM, Temperature: f64(r.TemperatureC),
+				Altitude: f64(r.AltitudeM),
 			}
 		}
 	}

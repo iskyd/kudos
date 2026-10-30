@@ -1,10 +1,9 @@
 import { useMemo, useState, type ReactNode, type SubmitEvent } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import {
   type ActivityDetail,
-  type ActivitySport,
-  type ActivityStreams,
   type Lap,
+  useActivities,
   useActivity,
   useActivityStreams,
   useConfig,
@@ -29,34 +28,10 @@ import {
   formatDistance,
   formatDuration,
   formatPace,
-  formatSpeed,
   formatWhole,
-  paceSeconds,
 } from '@/lib/format/units'
+import { charts, dash, pacePer, speedText } from '@/lib/activity-display'
 import { sportLabels } from '@/lib/sports'
-
-// Pace is shown per km on foot and per 100 m in the water; other sports show speed.
-function pacePer(sport: ActivitySport): number | null {
-  switch (sport) {
-    case 'running':
-    case 'trail_running':
-    case 'hiking':
-      return 1000
-    case 'pool_swimming':
-    case 'open_water_swimming':
-      return 100
-    default:
-      return null
-  }
-}
-
-function speedText(sport: ActivitySport, speed: number | undefined): string {
-  if (speed === undefined) return '—'
-  const per = pacePer(sport)
-  return per === null ? formatSpeed(speed) : formatPace(speed, per)
-}
-
-const dash = (v: number | undefined, f: (v: number) => string) => (v === undefined ? '—' : f(v))
 
 export function ActivityDetailPage() {
   const id = Number(useParams().id)
@@ -86,6 +61,7 @@ export function ActivityDetailPage() {
       <Summary a={a} />
       <Annotation key={a.id} a={a} />
       <ActivityEdits a={a} />
+      <Compare a={a} />
       {a.legs.length > 0 && <Legs a={a} />}
       <Streams a={a} />
       <Laps a={a} />
@@ -118,6 +94,43 @@ function Summary({ a }: { a: ActivityDetail }) {
   )
 }
 
+// Compare offers recent activities of the same sport to overlay with this one.
+function Compare({ a }: { a: ActivityDetail }) {
+  const navigate = useNavigate()
+  const recent = useActivities({ sport: a.sport, sort: 'date' })
+  const candidates = (recent.data?.pages[0]?.items ?? []).filter((o) => o.id !== a.id)
+  if (a.mergedInto !== undefined || candidates.length === 0) return null
+  return (
+    <Section title="Compare">
+      <form
+        aria-label="Compare"
+        className="flex flex-wrap items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const other = new FormData(e.currentTarget).get('compare-with')
+          if (typeof other === 'string') {
+            void navigate(`/activities/${String(a.id)}/compare/${other}`)
+          }
+        }}
+      >
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="compare-with">Compare with</Label>
+          <NativeSelect id="compare-with" name="compare-with">
+            {candidates.map((o) => (
+              <NativeSelectOption key={o.id} value={o.id}>
+                {`${formatActivityStart(o.startTime, o.utcOffsetS)} · ${dash(o.distanceM, formatDistance)}`}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <Button type="submit" variant="outline">
+          Compare
+        </Button>
+      </form>
+    </Section>
+  )
+}
+
 function Legs({ a }: { a: ActivityDetail }) {
   return (
     <Section title="Legs">
@@ -144,9 +157,6 @@ function Legs({ a }: { a: ActivityDetail }) {
     </Section>
   )
 }
-
-// Paces slower than this (stops, standing at lights) would flatten the pace chart.
-const slowestChartPace = 30 * 60
 
 function Streams({ a }: { a: ActivityDetail }) {
   const streams = useActivityStreams(a.id)
@@ -183,36 +193,6 @@ function Streams({ a }: { a: ActivityDetail }) {
       ))}
     </div>
   )
-}
-
-function charts(sport: ActivitySport, s: ActivityStreams) {
-  const out: {
-    label: string
-    values: (number | null)[]
-    format: (v: number) => string
-    invert?: boolean
-  }[] = []
-  if (s.hrBpm)
-    out.push({ label: 'Heart rate', values: s.hrBpm, format: (v) => formatWhole(v, 'bpm') })
-  const per = pacePer(sport)
-  if (s.speedMS && per === null) {
-    out.push({ label: 'Speed', values: s.speedMS, format: formatSpeed })
-  } else if (s.speedMS && per !== null) {
-    const values = s.speedMS.map((v) => {
-      const p = v === null ? null : paceSeconds(v, per)
-      return p === null || p > slowestChartPace ? null : p
-    })
-    out.push({ label: 'Pace', values, format: formatDuration, invert: true })
-  }
-  if (s.powerW) out.push({ label: 'Power', values: s.powerW, format: (v) => formatWhole(v, 'W') })
-  if (s.cadence) {
-    const unit = sport === 'cycling' ? 'rpm' : 'spm'
-    out.push({ label: 'Cadence', values: s.cadence, format: (v) => formatWhole(v, unit) })
-  }
-  if (s.altitudeM) {
-    out.push({ label: 'Elevation', values: s.altitudeM, format: (v) => formatWhole(v, 'm') })
-  }
-  return out
 }
 
 function Laps({ a }: { a: ActivityDetail }) {

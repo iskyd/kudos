@@ -658,6 +658,49 @@ paths:
                 $ref: "#/components/schemas/ActivityStreams"
         default:
           $ref: "#/components/responses/Problem"
+  /api/activities/{id}/comparison:
+    get:
+      operationId: getActivityComparison
+      summary: Two activities aligned for overlaying
+      description: |
+        Resamples this activity (a) and another (b) onto one evenly spaced axis,
+        from 0 to the longer activity's end: seconds from each activity's first
+        sample, or metres covered. Values are interpolated between neighbouring
+        samples, never across a pause over 10 s; a value is null where an
+        activity has none, and a channel neither point recorded is absent. Edits
+        apply as on the streams.
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+        - name: with
+          in: query
+          required: true
+          description: The other activity.
+          schema:
+            type: integer
+            format: int64
+        - name: axis
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ComparisonAxis"
+        - name: points
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 2
+            maximum: 5000
+            default: 1000
+      responses:
+        "200":
+          description: The aligned values.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityComparison"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -1395,6 +1438,53 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/StrengthSet"
+    ComparisonAxis:
+      type: string
+      enum: [time, distance]
+      default: time
+    ActivityComparison:
+      type: object
+      required: [axis, x, a, b]
+      properties:
+        axis:
+          $ref: "#/components/schemas/ComparisonAxis"
+        x:
+          type: array
+          description: The common axis, in seconds or metres from the start.
+          items:
+            type: number
+            format: double
+        a:
+          $ref: "#/components/schemas/ComparedStreams"
+        b:
+          $ref: "#/components/schemas/ComparedStreams"
+    ComparedStreams:
+      type: object
+      description: One activity's values at each point of x.
+      properties:
+        elapsedS:
+          type: array
+          description: Seconds from the activity's first sample.
+          items: {type: number, format: double, nullable: true}
+        distanceM:
+          type: array
+          description: Metres covered.
+          items: {type: number, format: double, nullable: true}
+        hrBpm:
+          type: array
+          items: {type: number, format: double, nullable: true}
+        powerW:
+          type: array
+          items: {type: number, format: double, nullable: true}
+        cadence:
+          type: array
+          items: {type: number, format: double, nullable: true}
+        speedMS:
+          type: array
+          items: {type: number, format: double, nullable: true}
+        altitudeM:
+          type: array
+          items: {type: number, format: double, nullable: true}
     ActivityStreams:
       type: object
       required: [timeS]

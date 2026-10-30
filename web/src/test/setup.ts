@@ -29,6 +29,7 @@ vi.mock('uplot', () => ({
       el: ChartElement,
     ) {
       el.dataset.points = String(data[0]?.length ?? 0)
+      el.dataset.series = String(data.length - 1)
       el.dataset.builds = String(Number(el.dataset.builds ?? 0) + 1)
       el.setCursor = (idx) => {
         opts.hooks.setCursor[0]?.({ cursor: { idx } })
