@@ -1,4 +1,4 @@
-import { useState, type ReactNode, type SubmitEvent } from 'react'
+import { useMemo, useState, type ReactNode, type SubmitEvent } from 'react'
 import { Link, useParams } from 'react-router'
 import {
   type ActivityDetail,
@@ -149,6 +149,12 @@ function Streams({ a }: { a: ActivityDetail }) {
   const streams = useActivityStreams(a.id)
   const config = useConfig()
   const [hover, setHover] = useState<number | null>(null)
+  // Stable across hovers: new values or formatters would rebuild every chart,
+  // which resets the shared cursor and loses the hover.
+  const series = useMemo(
+    () => (streams.data ? charts(a.sport, streams.data) : []),
+    [a.sport, streams.data],
+  )
 
   if (streams.isPending) return <p className="text-sm text-muted-foreground">Loading charts…</p>
   if (streams.isError) {
@@ -169,7 +175,7 @@ function Streams({ a }: { a: ActivityDetail }) {
       {lat && s.lon && config.data && (
         <RouteMap tileUrl={config.data.mapTileUrl} lat={lat} lon={s.lon} hoverIndex={hover} />
       )}
-      {charts(a.sport, s).map((c) => (
+      {series.map((c) => (
         <StreamChart key={c.label} {...c} time={s.timeS} onHover={setHover} />
       ))}
     </div>

@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import type {
@@ -10,6 +10,7 @@ import type {
 } from '@/api/activities'
 import { ann, loggedInAs, problem, renderApp } from '@/test/render'
 import { server } from '@/test/server'
+import { hoverChart } from '@/test/setup'
 
 // Shaped like the corpus: the interval run, the pool swim, the strength session,
 // the Zwift ride and a triathlon.
@@ -129,6 +130,29 @@ describe('ActivityDetailPage', () => {
     renderApp('/activities/1')
     expect(await screen.findByRole('note')).toHaveTextContent('This browser cannot display maps')
     expect(screen.getByRole('img', { name: 'Heart rate chart' })).toBeInTheDocument()
+  })
+
+  it('moves the map marker as a chart is hovered, without rebuilding the charts', async () => {
+    serve(run, runStreams, laps)
+    renderApp('/activities/1')
+    const hr = await screen.findByRole('img', { name: 'Heart rate chart' })
+    await screen.findByRole('region', { name: 'Route map' })
+    act(() => {
+      hoverChart(hr, 1)
+    })
+    expect(document.body.dataset.marker).toBe('-30.0001,45.3001')
+    // The third sample has no position: no marker.
+    act(() => {
+      hoverChart(hr, 2)
+    })
+    expect(document.body.dataset.marker).toBeUndefined()
+    act(() => {
+      hoverChart(hr, 0)
+    })
+    expect(document.body.dataset.marker).toBe('-30,45.3')
+    for (const chart of screen.getAllByRole('img')) {
+      expect(chart).toHaveAttribute('data-builds', '1')
+    }
   })
 
   it('never maps a virtual ride, and shows speed and power', async () => {
