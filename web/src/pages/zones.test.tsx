@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import type { ZoneSet } from '@/api/zones'
+import type { ZoneSet, ZoneSuggestion } from '@/api/zones'
 import { ann, loggedInAs, problem, renderApp } from '@/test/render'
 import { server } from '@/test/server'
 
@@ -38,6 +38,7 @@ function serve(items: ZoneSet[]) {
   const sent: { created?: unknown; csrf?: string | null; deleted?: unknown } = {}
   server.use(
     http.get('/api/zones', () => HttpResponse.json({ items })),
+    http.get('/api/zones/suggestions', () => HttpResponse.json({ items: [] })),
     http.post('/api/zones', async ({ request }) => {
       sent.created = await request.json()
       sent.csrf = request.headers.get('X-CSRF-Token')
@@ -180,5 +181,70 @@ describe('ZonesPage', () => {
     expect(
       await screen.findByRole('heading', { name: 'Training zones', level: 1 }),
     ).toBeInTheDocument()
+  })
+
+  it('confirms or dismisses suggestions from recorded files', async () => {
+    serve([running])
+    const suggestion: ZoneSuggestion = {
+      id: 9,
+      sport: 'running',
+      effectiveFrom: '2026-10-15',
+      lthrBpm: 171,
+      maxHrBpm: 187,
+      restingHrBpm: 58,
+      activityId: 4,
+      current: { ...running, lthrBpm: 176, maxHrBpm: 187 },
+    }
+    const answered: string[] = []
+    server.use(
+      http.get('/api/zones/suggestions', () => HttpResponse.json({ items: [suggestion] })),
+      http.post('/api/zones/suggestions/:id/:answer', ({ params, request }) => {
+        answered.push(
+          `${String(params.answer)} ${String(params.id)} ${request.headers.get('X-CSRF-Token') ?? ''}`,
+        )
+        return params.answer === 'confirm'
+          ? HttpResponse.json(running, { status: 201 })
+          : new HttpResponse(null, { status: 204 })
+      }),
+    )
+    renderApp('/settings/zones')
+    const card = within(
+      await screen.findByRole('article', { name: 'Running from 15 October 2026' }),
+    )
+    expect(
+      card.getByText('LTHR 171 bpm (was 176), max HR 187 bpm, resting HR 58 bpm'),
+    ).toBeInTheDocument()
+    expect(card.getByRole('link', { name: 'Recorded in this activity' })).toHaveAttribute(
+      'href',
+      '/activities/4',
+    )
+    await userEvent.click(card.getByRole('button', { name: 'Confirm' }))
+    await userEvent.click(card.getByRole('button', { name: 'Dismiss' }))
+    await vi.waitFor(() => {
+      expect(answered).toEqual(['confirm 9 csrf-ann', 'dismiss 9 csrf-ann'])
+    })
+  })
+
+  it('shows suggestion errors', async () => {
+    serve([])
+    server.use(
+      http.get('/api/zones/suggestions', () =>
+        HttpResponse.json({
+          items: [{ id: 1, sport: 'general', effectiveFrom: '2026-03-23', maxHrBpm: 192 }],
+        }),
+      ),
+      http.post('/api/zones/suggestions/:id/confirm', () =>
+        problem(
+          400,
+          'invalid-request',
+          'Invalid request',
+          'general needs maxHrBpm and restingHrBpm',
+        ),
+      ),
+    )
+    renderApp('/settings/zones')
+    const section = within(await screen.findByRole('region', { name: 'Suggestions' }))
+    await userEvent.click(await section.findByRole('button', { name: 'Confirm' }))
+    expect(await section.findByText('general needs maxHrBpm and restingHrBpm')).toBeInTheDocument()
   })
 })

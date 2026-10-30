@@ -1325,6 +1325,32 @@ type ZoneSetPage struct {
 // ZoneSport Sports that share thresholds; general holds max and resting HR for any sport.
 type ZoneSport string
 
+// ZoneSuggestion defines model for ZoneSuggestion.
+type ZoneSuggestion struct {
+	// ActivityId The activity whose file carried them.
+	ActivityId *int64   `json:"activityId,omitempty"`
+	Current    *ZoneSet `json:"current,omitempty"`
+
+	// EffectiveFrom The local date of the first file that carried these values.
+	EffectiveFrom openapi_types.Date `json:"effectiveFrom"`
+	FtpW          *int               `json:"ftpW,omitempty"`
+	Id            int64              `json:"id"`
+	LthrBpm       *int               `json:"lthrBpm,omitempty"`
+	MaxHrBpm      *int               `json:"maxHrBpm,omitempty"`
+	RestingHrBpm  *int               `json:"restingHrBpm,omitempty"`
+
+	// Sport Sports that share thresholds; general holds max and resting HR for any sport.
+	Sport ZoneSport `json:"sport"`
+}
+
+// ZoneSuggestionPage defines model for ZoneSuggestionPage.
+type ZoneSuggestionPage struct {
+	Items []ZoneSuggestion `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
 // Zones Zones per metric with the model each comes from: friel_run_hr,
 // friel_bike_hr or heart_rate_reserve (bpm); friel_run_pace or css (m/s,
 // slow to fast); coggan_power (W). A metric without a model is absent.
@@ -1348,6 +1374,9 @@ type GearID = int64
 
 // Limit defines model for Limit.
 type Limit = int
+
+// SuggestionID defines model for SuggestionID.
+type SuggestionID = int64
 
 // ListActivitiesParams defines parameters for ListActivities.
 type ListActivitiesParams struct {
@@ -1446,6 +1475,15 @@ type ListGearParams struct {
 type ListZoneSetsParams struct {
 	Sport *ZoneSport `form:"sport,omitempty" json:"sport,omitempty"`
 
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListZoneSuggestionsParams defines parameters for ListZoneSuggestions.
+type ListZoneSuggestionsParams struct {
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -1602,6 +1640,15 @@ type ServerInterface interface {
 	// CreateZoneSet Add a zone version
 	// (POST /api/zones)
 	CreateZoneSet(w http.ResponseWriter, r *http.Request)
+	// ListZoneSuggestions Pending zone suggestions
+	// (GET /api/zones/suggestions)
+	ListZoneSuggestions(w http.ResponseWriter, r *http.Request, params ListZoneSuggestionsParams)
+	// ConfirmZoneSuggestion Confirm a zone suggestion
+	// (POST /api/zones/suggestions/{suggestionId}/confirm)
+	ConfirmZoneSuggestion(w http.ResponseWriter, r *http.Request, suggestionId SuggestionID)
+	// DismissZoneSuggestion Dismiss a zone suggestion
+	// (POST /api/zones/suggestions/{suggestionId}/dismiss)
+	DismissZoneSuggestion(w http.ResponseWriter, r *http.Request, suggestionId SuggestionID)
 	// DeleteZoneSet Delete a zone version
 	// (DELETE /api/zones/{zoneSetId})
 	DeleteZoneSet(w http.ResponseWriter, r *http.Request, zoneSetId int64)
@@ -1821,6 +1868,24 @@ func (_ Unimplemented) ListZoneSets(w http.ResponseWriter, r *http.Request, para
 // CreateZoneSet Add a zone version
 // (POST /api/zones)
 func (_ Unimplemented) CreateZoneSet(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListZoneSuggestions Pending zone suggestions
+// (GET /api/zones/suggestions)
+func (_ Unimplemented) ListZoneSuggestions(w http.ResponseWriter, r *http.Request, params ListZoneSuggestionsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ConfirmZoneSuggestion Confirm a zone suggestion
+// (POST /api/zones/suggestions/{suggestionId}/confirm)
+func (_ Unimplemented) ConfirmZoneSuggestion(w http.ResponseWriter, r *http.Request, suggestionId SuggestionID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DismissZoneSuggestion Dismiss a zone suggestion
+// (POST /api/zones/suggestions/{suggestionId}/dismiss)
+func (_ Unimplemented) DismissZoneSuggestion(w http.ResponseWriter, r *http.Request, suggestionId SuggestionID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2877,6 +2942,104 @@ func (siw *ServerInterfaceWrapper) CreateZoneSet(w http.ResponseWriter, r *http.
 	handler.ServeHTTP(w, r)
 }
 
+// ListZoneSuggestions operation middleware
+func (siw *ServerInterfaceWrapper) ListZoneSuggestions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListZoneSuggestionsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListZoneSuggestions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConfirmZoneSuggestion operation middleware
+func (siw *ServerInterfaceWrapper) ConfirmZoneSuggestion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "suggestionId" -------------
+	var suggestionId SuggestionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "suggestionId", chi.URLParam(r, "suggestionId"), &suggestionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "suggestionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConfirmZoneSuggestion(w, r, suggestionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DismissZoneSuggestion operation middleware
+func (siw *ServerInterfaceWrapper) DismissZoneSuggestion(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "suggestionId" -------------
+	var suggestionId SuggestionID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "suggestionId", chi.URLParam(r, "suggestionId"), &suggestionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "suggestionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DismissZoneSuggestion(w, r, suggestionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteZoneSet operation middleware
 func (siw *ServerInterfaceWrapper) DeleteZoneSet(w http.ResponseWriter, r *http.Request) {
 
@@ -3140,6 +3303,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/zones", wrapper.GetActivityZones)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/zones/suggestions", wrapper.ListZoneSuggestions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/zones/suggestions/{suggestionId}/confirm", wrapper.ConfirmZoneSuggestion)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/zones/suggestions/{suggestionId}/dismiss", wrapper.DismissZoneSuggestion)
 	})
 
 	return r
@@ -4524,6 +4696,117 @@ func (response CreateZoneSetdefaultApplicationProblemPlusJSONResponse) VisitCrea
 	return err
 }
 
+type ListZoneSuggestionsRequestObject struct {
+	Params ListZoneSuggestionsParams
+}
+
+type ListZoneSuggestionsResponseObject interface {
+	VisitListZoneSuggestionsResponse(w http.ResponseWriter) error
+}
+
+type ListZoneSuggestions200JSONResponse ZoneSuggestionPage
+
+func (response ListZoneSuggestions200JSONResponse) VisitListZoneSuggestionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListZoneSuggestionsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListZoneSuggestionsdefaultApplicationProblemPlusJSONResponse) VisitListZoneSuggestionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmZoneSuggestionRequestObject struct {
+	SuggestionId SuggestionID `json:"suggestionId"`
+}
+
+type ConfirmZoneSuggestionResponseObject interface {
+	VisitConfirmZoneSuggestionResponse(w http.ResponseWriter) error
+}
+
+type ConfirmZoneSuggestion201JSONResponse ZoneSet
+
+func (response ConfirmZoneSuggestion201JSONResponse) VisitConfirmZoneSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConfirmZoneSuggestiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ConfirmZoneSuggestiondefaultApplicationProblemPlusJSONResponse) VisitConfirmZoneSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DismissZoneSuggestionRequestObject struct {
+	SuggestionId SuggestionID `json:"suggestionId"`
+}
+
+type DismissZoneSuggestionResponseObject interface {
+	VisitDismissZoneSuggestionResponse(w http.ResponseWriter) error
+}
+
+type DismissZoneSuggestion204Response struct {
+}
+
+func (response DismissZoneSuggestion204Response) VisitDismissZoneSuggestionResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DismissZoneSuggestiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DismissZoneSuggestiondefaultApplicationProblemPlusJSONResponse) VisitDismissZoneSuggestionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteZoneSetRequestObject struct {
 	ZoneSetId int64 `json:"zoneSetId"`
 }
@@ -4699,6 +4982,15 @@ type StrictServerInterface interface {
 	// CreateZoneSet Add a zone version
 	// (POST /api/zones)
 	CreateZoneSet(ctx context.Context, request CreateZoneSetRequestObject) (CreateZoneSetResponseObject, error)
+	// ListZoneSuggestions Pending zone suggestions
+	// (GET /api/zones/suggestions)
+	ListZoneSuggestions(ctx context.Context, request ListZoneSuggestionsRequestObject) (ListZoneSuggestionsResponseObject, error)
+	// ConfirmZoneSuggestion Confirm a zone suggestion
+	// (POST /api/zones/suggestions/{suggestionId}/confirm)
+	ConfirmZoneSuggestion(ctx context.Context, request ConfirmZoneSuggestionRequestObject) (ConfirmZoneSuggestionResponseObject, error)
+	// DismissZoneSuggestion Dismiss a zone suggestion
+	// (POST /api/zones/suggestions/{suggestionId}/dismiss)
+	DismissZoneSuggestion(ctx context.Context, request DismissZoneSuggestionRequestObject) (DismissZoneSuggestionResponseObject, error)
 	// DeleteZoneSet Delete a zone version
 	// (DELETE /api/zones/{zoneSetId})
 	DeleteZoneSet(ctx context.Context, request DeleteZoneSetRequestObject) (DeleteZoneSetResponseObject, error)
@@ -5717,6 +6009,84 @@ func (sh *strictHandler) CreateZoneSet(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(CreateZoneSetResponseObject); ok {
 		if err := validResponse.VisitCreateZoneSetResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListZoneSuggestions operation middleware
+func (sh *strictHandler) ListZoneSuggestions(w http.ResponseWriter, r *http.Request, params ListZoneSuggestionsParams) {
+	var request ListZoneSuggestionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListZoneSuggestions(ctx, request.(ListZoneSuggestionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListZoneSuggestions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListZoneSuggestionsResponseObject); ok {
+		if err := validResponse.VisitListZoneSuggestionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConfirmZoneSuggestion operation middleware
+func (sh *strictHandler) ConfirmZoneSuggestion(w http.ResponseWriter, r *http.Request, suggestionId SuggestionID) {
+	var request ConfirmZoneSuggestionRequestObject
+
+	request.SuggestionId = suggestionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConfirmZoneSuggestion(ctx, request.(ConfirmZoneSuggestionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConfirmZoneSuggestion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConfirmZoneSuggestionResponseObject); ok {
+		if err := validResponse.VisitConfirmZoneSuggestionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DismissZoneSuggestion operation middleware
+func (sh *strictHandler) DismissZoneSuggestion(w http.ResponseWriter, r *http.Request, suggestionId SuggestionID) {
+	var request DismissZoneSuggestionRequestObject
+
+	request.SuggestionId = suggestionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DismissZoneSuggestion(ctx, request.(DismissZoneSuggestionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DismissZoneSuggestion")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DismissZoneSuggestionResponseObject); ok {
+		if err := validResponse.VisitDismissZoneSuggestionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

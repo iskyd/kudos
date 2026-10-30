@@ -5,10 +5,13 @@ import {
   type ZoneSet,
   type ZoneSetInput,
   type ZoneSport,
+  type ZoneSuggestion,
   type Zones,
+  useAnswerSuggestion,
   useCreateZoneSet,
   useDeleteZoneSet,
   useZoneSets,
+  useZoneSuggestions,
 } from '@/api/zones'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +52,7 @@ export function ZonesPage() {
           valid on its date.
         </p>
       </header>
+      <Suggestions />
       <AddVersion />
       <section aria-label="Versions" className="flex flex-col gap-6">
         {zones.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
@@ -186,6 +190,97 @@ function AddVersion() {
       </form>
     </section>
   )
+}
+
+// Suggestions lists thresholds recorded files carried that differ from the
+// version valid on their date; only the user's confirmation creates a version.
+function Suggestions() {
+  const suggestions = useZoneSuggestions()
+  const answer = useAnswerSuggestion()
+  const items = suggestions.data?.pages.flatMap((p) => p.items) ?? []
+  if (suggestions.isPending || (suggestions.isSuccess && items.length === 0)) return null
+  return (
+    <section aria-label="Suggestions" className="flex flex-col gap-4">
+      <h2 className="text-lg font-semibold">Suggestions from your files</h2>
+      {suggestions.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(suggestions.error)}
+        </p>
+      )}
+      {items.map((s) => {
+        const title = `${sportLabels[s.sport]} from ${formatDay(s.effectiveFrom)}`
+        return (
+          <article
+            key={s.id}
+            aria-label={title}
+            className="flex flex-col gap-2 rounded-md border p-4"
+          >
+            <h3 className="font-medium">{title}</h3>
+            <p className="text-sm">{suggestionText(s)}</p>
+            {s.activityId !== undefined && (
+              <Link to={`/activities/${String(s.activityId)}`} className="text-sm underline">
+                Recorded in this activity
+              </Link>
+            )}
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                disabled={answer.isPending}
+                onClick={() => {
+                  answer.mutate({ id: s.id, confirm: true })
+                }}
+              >
+                Confirm
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={answer.isPending}
+                onClick={() => {
+                  answer.mutate({ id: s.id, confirm: false })
+                }}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </article>
+        )
+      })}
+      {answer.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(answer.error)}
+        </p>
+      )}
+      {suggestions.hasNextPage && (
+        <Button
+          variant="outline"
+          disabled={suggestions.isFetchingNextPage}
+          onClick={() => {
+            void suggestions.fetchNextPage()
+          }}
+        >
+          Load more suggestions
+        </Button>
+      )}
+    </section>
+  )
+}
+
+// suggestionText lists the suggested values with what the current version has.
+function suggestionText(s: ZoneSuggestion): string {
+  const parts: [string, number | undefined, number | undefined, string][] = [
+    ['LTHR', s.lthrBpm, s.current?.lthrBpm, 'bpm'],
+    ['FTP', s.ftpW, s.current?.ftpW, 'W'],
+    ['max HR', s.maxHrBpm, s.current?.maxHrBpm, 'bpm'],
+    ['resting HR', s.restingHrBpm, s.current?.restingHrBpm, 'bpm'],
+  ]
+  return parts
+    .filter(([, v]) => v !== undefined)
+    .map(([label, v, was, unit]) => {
+      const now = `${label} ${String(v)} ${unit}`
+      return was === undefined || was === v ? now : `${now} (was ${String(was)})`
+    })
+    .join(', ')
 }
 
 function Version({ z }: { z: ZoneSet }) {

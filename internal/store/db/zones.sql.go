@@ -10,6 +10,66 @@ import (
 	"time"
 )
 
+const confirmZoneSuggestion = `-- name: ConfirmZoneSuggestion :one
+WITH confirmed AS (
+    DELETE FROM zone_suggestions
+    WHERE zone_suggestions.user_id = $9 AND zone_suggestions.id = $10 AND zone_suggestions.status = 'pending'
+    RETURNING zone_suggestions.user_id
+)
+INSERT INTO zone_sets (
+    user_id, sport, effective_from, lthr_bpm, threshold_speed_m_s, ftp_w, css_m_s, max_hr_bpm, resting_hr_bpm
+)
+SELECT confirmed.user_id, $1, $2, $3, $4, $5, $6, $7, $8
+FROM confirmed
+RETURNING id, user_id, sport, effective_from, lthr_bpm, threshold_speed_m_s, ftp_w, css_m_s, max_hr_bpm, resting_hr_bpm, created_at
+`
+
+type ConfirmZoneSuggestionParams struct {
+	Sport            string
+	EffectiveFrom    time.Time
+	LthrBpm          *int16
+	ThresholdSpeedMS *float32
+	FtpW             *int16
+	CssMS            *float32
+	MaxHrBpm         *int16
+	RestingHrBpm     *int16
+	UserID           int64
+	ID               int64
+}
+
+// Turns a pending suggestion into a zone version in one statement: the version
+// is created only if the suggestion was pending, and the suggestion goes only
+// if the version could be created.
+func (q *Queries) ConfirmZoneSuggestion(ctx context.Context, arg ConfirmZoneSuggestionParams) (ZoneSet, error) {
+	row := q.db.QueryRow(ctx, confirmZoneSuggestion,
+		arg.Sport,
+		arg.EffectiveFrom,
+		arg.LthrBpm,
+		arg.ThresholdSpeedMS,
+		arg.FtpW,
+		arg.CssMS,
+		arg.MaxHrBpm,
+		arg.RestingHrBpm,
+		arg.UserID,
+		arg.ID,
+	)
+	var i ZoneSet
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Sport,
+		&i.EffectiveFrom,
+		&i.LthrBpm,
+		&i.ThresholdSpeedMS,
+		&i.FtpW,
+		&i.CssMS,
+		&i.MaxHrBpm,
+		&i.RestingHrBpm,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const createZoneSet = `-- name: CreateZoneSet :one
 INSERT INTO zone_sets (
     user_id, sport, effective_from, lthr_bpm, threshold_speed_m_s, ftp_w, css_m_s, max_hr_bpm, resting_hr_bpm
@@ -75,6 +135,182 @@ func (q *Queries) DeleteZoneSet(ctx context.Context, arg DeleteZoneSetParams) (i
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const dismissZoneSuggestion = `-- name: DismissZoneSuggestion :execrows
+UPDATE zone_suggestions SET status = 'dismissed' WHERE user_id = $1 AND id = $2 AND status = 'pending'
+`
+
+type DismissZoneSuggestionParams struct {
+	UserID int64
+	ID     int64
+}
+
+func (q *Queries) DismissZoneSuggestion(ctx context.Context, arg DismissZoneSuggestionParams) (int64, error) {
+	result, err := q.db.Exec(ctx, dismissZoneSuggestion, arg.UserID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getNextZoneSuggestion = `-- name: GetNextZoneSuggestion :one
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions
+WHERE user_id = $1 AND sport = $2 AND effective_from > $3::date
+ORDER BY effective_from
+LIMIT 1
+`
+
+type GetNextZoneSuggestionParams struct {
+	UserID int64
+	Sport  string
+	Day    time.Time
+}
+
+// The earliest suggestion of a sport after day.
+func (q *Queries) GetNextZoneSuggestion(ctx context.Context, arg GetNextZoneSuggestionParams) (ZoneSuggestion, error) {
+	row := q.db.QueryRow(ctx, getNextZoneSuggestion, arg.UserID, arg.Sport, arg.Day)
+	var i ZoneSuggestion
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Sport,
+		&i.EffectiveFrom,
+		&i.LthrBpm,
+		&i.FtpW,
+		&i.MaxHrBpm,
+		&i.RestingHrBpm,
+		&i.ActivityID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getPendingZoneSuggestion = `-- name: GetPendingZoneSuggestion :one
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions WHERE user_id = $1 AND id = $2 AND status = 'pending'
+`
+
+type GetPendingZoneSuggestionParams struct {
+	UserID int64
+	ID     int64
+}
+
+func (q *Queries) GetPendingZoneSuggestion(ctx context.Context, arg GetPendingZoneSuggestionParams) (ZoneSuggestion, error) {
+	row := q.db.QueryRow(ctx, getPendingZoneSuggestion, arg.UserID, arg.ID)
+	var i ZoneSuggestion
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Sport,
+		&i.EffectiveFrom,
+		&i.LthrBpm,
+		&i.FtpW,
+		&i.MaxHrBpm,
+		&i.RestingHrBpm,
+		&i.ActivityID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getZoneSetAt = `-- name: GetZoneSetAt :one
+SELECT id, user_id, sport, effective_from, lthr_bpm, threshold_speed_m_s, ftp_w, css_m_s, max_hr_bpm, resting_hr_bpm, created_at FROM zone_sets
+WHERE user_id = $1 AND sport = $2 AND effective_from <= $3::date
+ORDER BY effective_from DESC
+LIMIT 1
+`
+
+type GetZoneSetAtParams struct {
+	UserID int64
+	Sport  string
+	Day    time.Time
+}
+
+// The version of one sport valid on day.
+func (q *Queries) GetZoneSetAt(ctx context.Context, arg GetZoneSetAtParams) (ZoneSet, error) {
+	row := q.db.QueryRow(ctx, getZoneSetAt, arg.UserID, arg.Sport, arg.Day)
+	var i ZoneSet
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Sport,
+		&i.EffectiveFrom,
+		&i.LthrBpm,
+		&i.ThresholdSpeedMS,
+		&i.FtpW,
+		&i.CssMS,
+		&i.MaxHrBpm,
+		&i.RestingHrBpm,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getZoneSuggestionAt = `-- name: GetZoneSuggestionAt :one
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions
+WHERE user_id = $1 AND sport = $2 AND effective_from <= $3::date
+ORDER BY effective_from DESC
+LIMIT 1
+`
+
+type GetZoneSuggestionAtParams struct {
+	UserID int64
+	Sport  string
+	Day    time.Time
+}
+
+// The latest suggestion of a sport, pending or dismissed, on or before day.
+func (q *Queries) GetZoneSuggestionAt(ctx context.Context, arg GetZoneSuggestionAtParams) (ZoneSuggestion, error) {
+	row := q.db.QueryRow(ctx, getZoneSuggestionAt, arg.UserID, arg.Sport, arg.Day)
+	var i ZoneSuggestion
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Sport,
+		&i.EffectiveFrom,
+		&i.LthrBpm,
+		&i.FtpW,
+		&i.MaxHrBpm,
+		&i.RestingHrBpm,
+		&i.ActivityID,
+		&i.Status,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const insertZoneSuggestion = `-- name: InsertZoneSuggestion :exec
+INSERT INTO zone_suggestions (user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (user_id, sport, effective_from) DO NOTHING
+`
+
+type InsertZoneSuggestionParams struct {
+	UserID        int64
+	Sport         string
+	EffectiveFrom time.Time
+	LthrBpm       *int16
+	FtpW          *int16
+	MaxHrBpm      *int16
+	RestingHrBpm  *int16
+	ActivityID    *int64
+}
+
+// The first file of a day wins: another one on the same day changes nothing.
+func (q *Queries) InsertZoneSuggestion(ctx context.Context, arg InsertZoneSuggestionParams) error {
+	_, err := q.db.Exec(ctx, insertZoneSuggestion,
+		arg.UserID,
+		arg.Sport,
+		arg.EffectiveFrom,
+		arg.LthrBpm,
+		arg.FtpW,
+		arg.MaxHrBpm,
+		arg.RestingHrBpm,
+		arg.ActivityID,
+	)
+	return err
 }
 
 const listZoneSets = `-- name: ListZoneSets :many
@@ -178,4 +414,81 @@ func (q *Queries) ListZoneSetsAt(ctx context.Context, arg ListZoneSetsAtParams) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const listZoneSuggestions = `-- name: ListZoneSuggestions :many
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions
+WHERE user_id = $1 AND status = 'pending'
+    AND ($2::date IS NULL
+        OR (effective_from, id) < ($2::date, $3::bigint))
+ORDER BY effective_from DESC, id DESC
+LIMIT $4
+`
+
+type ListZoneSuggestionsParams struct {
+	UserID    int64
+	AfterFrom *time.Time
+	AfterID   *int64
+	MaxRows   int32
+}
+
+// One page of pending suggestions, latest first.
+func (q *Queries) ListZoneSuggestions(ctx context.Context, arg ListZoneSuggestionsParams) ([]ZoneSuggestion, error) {
+	rows, err := q.db.Query(ctx, listZoneSuggestions,
+		arg.UserID,
+		arg.AfterFrom,
+		arg.AfterID,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ZoneSuggestion
+	for rows.Next() {
+		var i ZoneSuggestion
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Sport,
+			&i.EffectiveFrom,
+			&i.LthrBpm,
+			&i.FtpW,
+			&i.MaxHrBpm,
+			&i.RestingHrBpm,
+			&i.ActivityID,
+			&i.Status,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const moveZoneSuggestion = `-- name: MoveZoneSuggestion :exec
+UPDATE zone_suggestions SET effective_from = $1, activity_id = $2
+WHERE user_id = $3 AND id = $4
+`
+
+type MoveZoneSuggestionParams struct {
+	EffectiveFrom time.Time
+	ActivityID    *int64
+	UserID        int64
+	ID            int64
+}
+
+// An older file with the same values moves a suggestion back to its date.
+func (q *Queries) MoveZoneSuggestion(ctx context.Context, arg MoveZoneSuggestionParams) error {
+	_, err := q.db.Exec(ctx, moveZoneSuggestion,
+		arg.EffectiveFrom,
+		arg.ActivityID,
+		arg.UserID,
+		arg.ID,
+	)
+	return err
 }

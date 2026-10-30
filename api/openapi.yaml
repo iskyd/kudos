@@ -809,6 +809,60 @@ paths:
                 $ref: "#/components/schemas/ActivityZones"
         default:
           $ref: "#/components/responses/Problem"
+  /api/zones/suggestions:
+    get:
+      operationId: listZoneSuggestions
+      summary: Pending zone suggestions
+      description: |
+        Thresholds recorded files carried that differ from the zone version valid
+        on their date, latest first, each with that version (current) when there
+        is one. Runs suggest running versions, rides cycling ones (a run's FTP is
+        running power and never used), everything else general ones.
+      tags: [zones]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of suggestions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneSuggestionPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/zones/suggestions/{suggestionId}/confirm:
+    post:
+      operationId: confirmZoneSuggestion
+      summary: Confirm a zone suggestion
+      description: |
+        Creates a version from the suggestion's date: the version valid then, with
+        the suggested values over it. The suggestion goes.
+      tags: [zones]
+      parameters:
+        - $ref: "#/components/parameters/SuggestionID"
+      responses:
+        "201":
+          description: The new version.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ZoneSet"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/zones/suggestions/{suggestionId}/dismiss:
+    post:
+      operationId: dismissZoneSuggestion
+      summary: Dismiss a zone suggestion
+      description: The same values from later files are not suggested again.
+      tags: [zones]
+      parameters:
+        - $ref: "#/components/parameters/SuggestionID"
+      responses:
+        "204":
+          description: Dismissed.
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -823,6 +877,13 @@ components:
   parameters:
     ActivityID:
       name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    SuggestionID:
+      name: suggestionId
       in: path
       required: true
       schema:
@@ -1797,6 +1858,43 @@ components:
           description: The general version used for heart rate reserve, if any.
         zones:
           $ref: "#/components/schemas/Zones"
+    ZoneSuggestion:
+      type: object
+      required: [id, sport, effectiveFrom]
+      properties:
+        id:
+          type: integer
+          format: int64
+        sport:
+          $ref: "#/components/schemas/ZoneSport"
+        effectiveFrom:
+          type: string
+          format: date
+          description: The local date of the first file that carried these values.
+        lthrBpm:
+          type: integer
+        ftpW:
+          type: integer
+        maxHrBpm:
+          type: integer
+        restingHrBpm:
+          type: integer
+        activityId:
+          type: integer
+          format: int64
+          description: The activity whose file carried them.
+        current:
+          $ref: "#/components/schemas/ZoneSet"
+    ZoneSuggestionPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ZoneSuggestion"
     ActivityStreams:
       type: object
       required: [timeS]

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/iskyd/kudos/internal/store/db"
@@ -126,5 +127,92 @@ func TestZoneSetsPageAndIsolation(t *testing.T) {
 	}
 	if n, err := q.DeleteZoneSet(ctx, db.DeleteZoneSetParams{UserID: alice.ID, ID: ids[0]}); err != nil || n != 1 {
 		t.Errorf("alice deleted %d: %v", n, err)
+	}
+}
+
+func TestZoneSuggestionsIsolationAndConfirm(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+
+	for _, d := range []string{"2026-03-23", "2026-08-09"} {
+		check(t, q.InsertZoneSuggestion(ctx, db.InsertZoneSuggestionParams{UserID: alice.ID, Sport: "general", EffectiveFrom: date(t, d), MaxHrBpm: ptr[int16](192), RestingHrBpm: ptr[int16](58)}))
+	}
+	// The first suggestion of a day wins.
+	check(t, q.InsertZoneSuggestion(ctx, db.InsertZoneSuggestionParams{UserID: alice.ID, Sport: "general", EffectiveFrom: date(t, "2026-03-23"), MaxHrBpm: ptr[int16](200)}))
+	pending, err := q.ListZoneSuggestions(ctx, db.ListZoneSuggestionsParams{UserID: alice.ID, MaxRows: 1})
+	check(t, err)
+	if len(pending) != 1 || !pending[0].EffectiveFrom.Equal(date(t, "2026-08-09")) {
+		t.Fatalf("latest first: %+v", pending)
+	}
+	pending, err = q.ListZoneSuggestions(ctx, db.ListZoneSuggestionsParams{UserID: alice.ID, AfterFrom: &pending[0].EffectiveFrom, AfterID: &pending[0].ID, MaxRows: 10})
+	check(t, err)
+	if len(pending) != 1 || *pending[0].MaxHrBpm != 192 {
+		t.Fatalf("second page: %+v", pending)
+	}
+	march := pending[0]
+
+	// Bob reaches none of Alice's suggestions.
+	day := date(t, "2026-12-31")
+	if _, err := q.GetPendingZoneSuggestion(ctx, db.GetPendingZoneSuggestionParams{UserID: bob.ID, ID: march.ID}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob read a suggestion: %v", err)
+	}
+	if _, err := q.GetZoneSuggestionAt(ctx, db.GetZoneSuggestionAtParams{UserID: bob.ID, Sport: "general", Day: day}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob read the latest suggestion: %v", err)
+	}
+	if _, err := q.GetNextZoneSuggestion(ctx, db.GetNextZoneSuggestionParams{UserID: bob.ID, Sport: "general", Day: date(t, "2020-01-01")}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob read the next suggestion: %v", err)
+	}
+	if rows, err := q.ListZoneSuggestions(ctx, db.ListZoneSuggestionsParams{UserID: bob.ID, MaxRows: 10}); err != nil || len(rows) != 0 {
+		t.Errorf("bob listed %d: %v", len(rows), err)
+	}
+	if n, err := q.DismissZoneSuggestion(ctx, db.DismissZoneSuggestionParams{UserID: bob.ID, ID: march.ID}); err != nil || n != 0 {
+		t.Errorf("bob dismissed %d: %v", n, err)
+	}
+	check(t, q.MoveZoneSuggestion(ctx, db.MoveZoneSuggestionParams{UserID: bob.ID, ID: march.ID, EffectiveFrom: date(t, "2026-01-01")}))
+	if _, err := q.ConfirmZoneSuggestion(ctx, db.ConfirmZoneSuggestionParams{UserID: bob.ID, ID: march.ID, Sport: "general", EffectiveFrom: march.EffectiveFrom}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob confirmed: %v", err)
+	}
+	if _, err := q.GetZoneSetAt(ctx, db.GetZoneSetAtParams{UserID: bob.ID, Sport: "general", Day: day}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob got a version: %v", err)
+	}
+	got, err := q.GetZoneSuggestionAt(ctx, db.GetZoneSuggestionAtParams{UserID: alice.ID, Sport: "general", Day: date(t, "2026-04-01")})
+	check(t, err)
+	if !got.EffectiveFrom.Equal(march.EffectiveFrom) {
+		t.Errorf("bob moved alice's suggestion to %v", got.EffectiveFrom)
+	}
+
+	// Alice moves it, then confirms it: the version appears and the suggestion goes.
+	check(t, q.MoveZoneSuggestion(ctx, db.MoveZoneSuggestionParams{UserID: alice.ID, ID: march.ID, EffectiveFrom: date(t, "2026-03-01")}))
+	z, err := q.ConfirmZoneSuggestion(ctx, db.ConfirmZoneSuggestionParams{
+		UserID: alice.ID, ID: march.ID, Sport: "general", EffectiveFrom: date(t, "2026-03-01"), MaxHrBpm: ptr[int16](192), RestingHrBpm: ptr[int16](58),
+	})
+	check(t, err)
+	if z.UserID != alice.ID || *z.MaxHrBpm != 192 {
+		t.Errorf("version: %+v", z)
+	}
+	if v, err := q.GetZoneSetAt(ctx, db.GetZoneSetAtParams{UserID: alice.ID, Sport: "general", Day: date(t, "2026-05-01")}); err != nil || v.ID != z.ID {
+		t.Errorf("version at May: %+v, %v", v, err)
+	}
+	if _, err := q.GetPendingZoneSuggestion(ctx, db.GetPendingZoneSuggestionParams{UserID: alice.ID, ID: march.ID}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("confirmed suggestion still pending: %v", err)
+	}
+
+	// A version already on that day keeps the suggestion.
+	rows, err := q.ListZoneSuggestions(ctx, db.ListZoneSuggestionsParams{UserID: alice.ID, MaxRows: 10})
+	check(t, err)
+	august := rows[0]
+	_, err = q.CreateZoneSet(ctx, db.CreateZoneSetParams{UserID: alice.ID, Sport: "general", EffectiveFrom: august.EffectiveFrom, MaxHrBpm: ptr[int16](190), RestingHrBpm: ptr[int16](50)})
+	check(t, err)
+	if _, err := q.ConfirmZoneSuggestion(ctx, db.ConfirmZoneSuggestionParams{UserID: alice.ID, ID: august.ID, Sport: "general", EffectiveFrom: august.EffectiveFrom}); err == nil {
+		t.Error("confirmed over an existing version")
+	}
+	if _, err := q.GetPendingZoneSuggestion(ctx, db.GetPendingZoneSuggestionParams{UserID: alice.ID, ID: august.ID}); err != nil {
+		t.Errorf("suggestion lost after a failed confirm: %v", err)
+	}
+	if n, err := q.DismissZoneSuggestion(ctx, db.DismissZoneSuggestionParams{UserID: alice.ID, ID: august.ID}); err != nil || n != 1 {
+		t.Errorf("dismissed %d: %v", n, err)
 	}
 }

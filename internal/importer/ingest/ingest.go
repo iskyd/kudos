@@ -285,6 +285,9 @@ func upsertActivity(ctx context.Context, q *db.Queries, userID int64, loc *time.
 		}); err != nil {
 			return 0, fmt.Errorf("storing thresholds: %w", err)
 		}
+		if err := suggestZones(ctx, q, userID, id, a, offset(a, loc)); err != nil {
+			return 0, err
+		}
 	}
 	return id, nil
 }
