@@ -67,10 +67,17 @@ describe('AppShell', () => {
 
   it('shows the Garmin banner on every page with a link to Settings', async () => {
     server.use(
-      http.get('/api/garmin', () =>
-        HttpResponse.json({ connected: true, status: 'key_rejected', keyExpiresOn: '2099-01-01' }),
-      ),
+      // Answered after the page's own queries, so no other alert may show first.
+      http.get('/api/garmin', async () => {
+        await new Promise((r) => setTimeout(r, 50))
+        return HttpResponse.json({
+          connected: true,
+          status: 'key_rejected',
+          keyExpiresOn: '2099-01-01',
+        })
+      }),
       http.get('/api/garmin/backfill', () => HttpResponse.json({ started: false })),
+      http.get('/api/activities', () => HttpResponse.json({ items: [] })),
     )
     renderApp('/activities')
     expect(await screen.findByRole('alert')).toHaveTextContent('Garmin rejected the key.')
