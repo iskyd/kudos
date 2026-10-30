@@ -166,3 +166,10 @@ WHERE activity_thresholds.user_id = EXCLUDED.user_id;
 
 -- name: GetActivityThresholds :one
 SELECT * FROM activity_thresholds WHERE user_id = $1 AND activity_id = $2;
+
+-- name: ListMultisportLegs :many
+-- A multisport group holds a handful of legs; the limit is a guard.
+SELECT * FROM activities
+WHERE user_id = $1 AND multisport_group_id = $2
+ORDER BY start_time, id
+LIMIT 50;

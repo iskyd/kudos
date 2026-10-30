@@ -462,6 +462,72 @@ func (q *Queries) ListLaps(ctx context.Context, arg ListLapsParams) ([]Lap, erro
 	return items, nil
 }
 
+const listMultisportLegs = `-- name: ListMultisportLegs :many
+SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides FROM activities
+WHERE user_id = $1 AND multisport_group_id = $2
+ORDER BY start_time, id
+LIMIT 50
+`
+
+type ListMultisportLegsParams struct {
+	UserID            int64
+	MultisportGroupID *int64
+}
+
+// A multisport group holds a handful of legs; the limit is a guard.
+func (q *Queries) ListMultisportLegs(ctx context.Context, arg ListMultisportLegsParams) ([]Activity, error) {
+	rows, err := q.db.Query(ctx, listMultisportLegs, arg.UserID, arg.MultisportGroupID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Activity
+	for rows.Next() {
+		var i Activity
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Source,
+			&i.SourceActivityID,
+			&i.Sport,
+			&i.Subtype,
+			&i.StartTime,
+			&i.UtcOffsetS,
+			&i.OriginalFileID,
+			&i.MultisportGroupID,
+			&i.ElapsedTimeS,
+			&i.TimerTimeS,
+			&i.DistanceM,
+			&i.AscentM,
+			&i.DescentM,
+			&i.AvgSpeedMS,
+			&i.MaxSpeedMS,
+			&i.AvgHrBpm,
+			&i.MaxHrBpm,
+			&i.AvgPowerW,
+			&i.MaxPowerW,
+			&i.AvgCadence,
+			&i.MaxCadence,
+			&i.AvgTemperatureC,
+			&i.PoolLengthM,
+			&i.CaloriesKcal,
+			&i.Rpe,
+			&i.Feel,
+			&i.Notes,
+			&i.WeatherTemperatureC,
+			&i.WeatherCondition,
+			&i.Overrides,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listStrengthSets = `-- name: ListStrengthSets :many
 SELECT user_id, activity_id, set_index, start_time, duration_s, active, reps, weight_kg, exercise_category, exercise_number, exercise_name, workout_step_index FROM strength_sets
 WHERE user_id = $1 AND activity_id = $2 AND set_index > $3::integer

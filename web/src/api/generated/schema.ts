@@ -281,6 +281,102 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activities/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activity detail
+         * @description The activity's summary, its recorded workout and, for a multisport activity, all its legs.
+         */
+        get: operations["getActivity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activities/{id}/laps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Laps of an activity */
+        get: operations["listLaps"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activities/{id}/lengths": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pool lengths of an activity */
+        get: operations["listSwimLengths"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activities/{id}/sets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Strength sets of an activity */
+        get: operations["listStrengthSets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activities/{id}/streams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sample streams of an activity
+         * @description Columnar arrays sharing one time axis (seconds from the activity start); a
+         *     channel the activity never recorded is absent, and gaps are null. Without
+         *     maxPoints, full resolution comes in pages of up to 5000 samples. With
+         *     maxPoints, each channel is reduced to at most that many points by LTTB for
+         *     charts (the union of the points kept per channel, in one response); stored
+         *     samples are never reduced.
+         */
+        get: operations["getActivityStreams"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -467,6 +563,156 @@ export interface components {
         GarminImportFailurePage: components["schemas"]["Page"] & {
             items: components["schemas"]["GarminImportFailure"][];
         };
+        ActivityDetail: components["schemas"]["ActivitySummary"] & {
+            /** Format: float */
+            descentM?: number;
+            /** Format: float */
+            maxSpeedMS?: number;
+            maxHrBpm?: number;
+            maxPowerW?: number;
+            /** Format: float */
+            avgCadence?: number;
+            /** Format: float */
+            maxCadence?: number;
+            /** Format: float */
+            avgTemperatureC?: number;
+            /** Format: float */
+            poolLengthM?: number;
+            caloriesKcal?: number;
+            /** @description Workout feel, 0 to 100. */
+            feel?: number;
+            notes?: string;
+            /** Format: float */
+            weatherTemperatureC?: number;
+            /** @enum {string} */
+            weatherCondition?: "sun" | "cloud" | "rain" | "wind" | "snow";
+            workout?: components["schemas"]["RecordedWorkout"];
+            /** @description Every leg of the multisport activity this one belongs to, in order; empty otherwise. */
+            legs: components["schemas"]["ActivitySummary"][];
+        };
+        RecordedWorkout: {
+            name?: string;
+            steps: components["schemas"]["WorkoutStep"][];
+        };
+        /** @description Values in SI units; duration is s for time, m for distance, a count for reps. */
+        WorkoutStep: {
+            index: number;
+            name?: string;
+            intensity?: string;
+            durationType: string;
+            /** Format: double */
+            duration?: number;
+            targetType?: string;
+            /** Format: double */
+            targetLow?: number;
+            /** Format: double */
+            targetHigh?: number;
+            targetZone?: number;
+            repeatFrom?: number;
+            repeatCount?: number;
+            exerciseCategory?: number;
+            exerciseNumber?: number;
+            /** Format: double */
+            weightKg?: number;
+        };
+        Lap: {
+            index: number;
+            /** Format: date-time */
+            startTime: string;
+            /** Format: double */
+            elapsedTimeS?: number;
+            /** Format: double */
+            timerTimeS?: number;
+            /** Format: double */
+            distanceM?: number;
+            /** Format: float */
+            ascentM?: number;
+            /** Format: float */
+            descentM?: number;
+            /** Format: float */
+            avgSpeedMS?: number;
+            /** Format: float */
+            maxSpeedMS?: number;
+            avgHrBpm?: number;
+            maxHrBpm?: number;
+            avgPowerW?: number;
+            maxPowerW?: number;
+            /** Format: float */
+            avgCadence?: number;
+            /** @enum {string} */
+            intensity?: "active" | "rest" | "warmup" | "cooldown" | "recovery" | "interval" | "other";
+            workoutStepIndex?: number;
+        };
+        SwimLength: {
+            index: number;
+            /** Format: date-time */
+            startTime: string;
+            /** Format: double */
+            elapsedTimeS?: number;
+            /** Format: double */
+            timerTimeS?: number;
+            /** @description False for rest (idle) lengths. */
+            active: boolean;
+            /** @enum {string} */
+            stroke?: "freestyle" | "backstroke" | "breaststroke" | "butterfly" | "drill" | "mixed" | "im";
+            strokes?: number;
+            /** Format: float */
+            avgSpeedMS?: number;
+            /**
+             * Format: double
+             * @description Length time in seconds plus strokes, computed by KudOS.
+             */
+            swolf?: number;
+        };
+        StrengthSet: {
+            index: number;
+            /** Format: date-time */
+            startTime: string;
+            /** Format: double */
+            durationS?: number;
+            /** @description False for rest sets. */
+            active: boolean;
+            reps?: number;
+            /** Format: float */
+            weightKg?: number;
+            exerciseName?: string;
+            exerciseCategory?: number;
+            exerciseNumber?: number;
+            workoutStepIndex?: number;
+        };
+        LapPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["Lap"][];
+        };
+        SwimLengthPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["SwimLength"][];
+        };
+        StrengthSetPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["StrengthSet"][];
+        };
+        ActivityStreams: {
+            /** @description Seconds from the activity start. */
+            timeS: number[];
+            /** @description Degrees. */
+            lat?: (number | null)[];
+            /** @description Degrees. */
+            lon?: (number | null)[];
+            /** @description Metres. */
+            altitudeM?: (number | null)[];
+            /** @description Beats per minute. */
+            hrBpm?: (number | null)[];
+            /** @description Watts. */
+            powerW?: (number | null)[];
+            /** @description Steps per minute for running and hiking, rpm for cycling. */
+            cadence?: (number | null)[];
+            /** @description Metres per second. */
+            speedMS?: (number | null)[];
+            /** @description Metres from the start. */
+            distanceM?: (number | null)[];
+            /** @description Degrees Celsius. */
+            temperatureC?: (number | null)[];
+            /** @description Cursor for the next page of full-resolution samples; absent on the last page. */
+            nextCursor?: string;
+        };
         /** @description RFC 9457 problem details. */
         Problem: {
             /** @description Stable URI identifying the error kind, e.g. urn:kudos:problem:not-found. */
@@ -498,6 +744,7 @@ export interface components {
         };
     };
     parameters: {
+        ActivityID: number;
         /** @description Opaque cursor from a previous page's `nextCursor`. */
         Cursor: string;
         /** @description Maximum number of items to return. */
@@ -939,6 +1186,140 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SyncQueued"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The activity. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listLaps: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Laps in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LapPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listSwimLengths: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Lengths in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SwimLengthPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listStrengthSets: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sets in order. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StrengthSetPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getActivityStreams: {
+        parameters: {
+            query?: {
+                maxPoints?: number;
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The samples. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityStreams"];
                 };
             };
             default: components["responses"]["Problem"];
