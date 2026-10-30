@@ -1,5 +1,13 @@
 import { useState, type ReactNode, type SubmitEvent } from 'react'
-import { useCreateActivity, useUploadActivity, type Sport } from '@/api/activities'
+import {
+  type ActivityFilters,
+  type ActivitySport,
+  type ActivitySummary,
+  useActivities,
+  useCreateActivity,
+  useUploadActivity,
+  type Sport,
+} from '@/api/activities'
 import { problemMessage } from '@/api/problem'
 import { Button } from '@/components/ui/button'
 import {
@@ -15,6 +23,7 @@ import { Label } from '@/components/ui/label'
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { parseDuration, parseKilometres } from '@/lib/format/input'
+import { formatActivityStart, formatDistance, formatDuration } from '@/lib/format/units'
 
 const sports: { value: Sport; label: string }[] = [
   { value: 'running', label: 'Running' },
@@ -25,6 +34,17 @@ const sports: { value: Sport; label: string }[] = [
   { value: 'hiking', label: 'Hiking' },
   { value: 'strength', label: 'Strength' },
   { value: 'other', label: 'Other' },
+]
+
+const sportLabels: Record<ActivitySport, string> = {
+  ...(Object.fromEntries(sports.map((s) => [s.value, s.label])) as Record<Sport, string>),
+  transition: 'Transition',
+}
+
+const sortOptions: { value: ActivityFilters['sort']; label: string }[] = [
+  { value: 'date', label: 'Newest' },
+  { value: 'distance', label: 'Longest distance' },
+  { value: 'duration', label: 'Longest duration' },
 ]
 
 export function ActivitiesPage() {
@@ -43,7 +63,135 @@ export function ActivitiesPage() {
           {message}
         </p>
       )}
+      <ActivityList />
     </div>
+  )
+}
+
+function ActivityList() {
+  const [filters, setFilters] = useState<ActivityFilters>({ sort: 'date' })
+  const activities = useActivities(filters)
+  const items = activities.data?.pages.flatMap((page) => page.items) ?? []
+  const filtered = Boolean(filters.sport ?? filters.from ?? filters.to)
+
+  return (
+    <section aria-label="Activity list" className="flex flex-col gap-4">
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="filter-sport">Sport</Label>
+          <NativeSelect
+            id="filter-sport"
+            value={filters.sport ?? ''}
+            onChange={(event) => {
+              const sport = event.target.value as ActivitySport | ''
+              setFilters({ ...filters, sport: sport || undefined })
+            }}
+          >
+            <NativeSelectOption value="">All sports</NativeSelectOption>
+            {Object.entries(sportLabels).map(([value, label]) => (
+              <NativeSelectOption key={value} value={value}>
+                {label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="filter-from">From</Label>
+          <Input
+            id="filter-from"
+            type="date"
+            value={filters.from ?? ''}
+            onChange={(event) => {
+              setFilters({ ...filters, from: event.target.value || undefined })
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="filter-to">To</Label>
+          <Input
+            id="filter-to"
+            type="date"
+            value={filters.to ?? ''}
+            onChange={(event) => {
+              setFilters({ ...filters, to: event.target.value || undefined })
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="sort">Sort by</Label>
+          <NativeSelect
+            id="sort"
+            value={filters.sort}
+            onChange={(event) => {
+              setFilters({ ...filters, sort: event.target.value as ActivityFilters['sort'] })
+            }}
+          >
+            {sortOptions.map(({ value, label }) => (
+              <NativeSelectOption key={value} value={value}>
+                {label}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </div>
+      </div>
+
+      {activities.isPending && <p className="text-sm text-muted-foreground">Loading…</p>}
+      {activities.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(activities.error)}
+        </p>
+      )}
+      {activities.isSuccess && items.length === 0 && (
+        <p className="text-sm text-muted-foreground">
+          {filtered
+            ? 'No activities match these filters.'
+            : 'No activities yet. Upload a file, add one manually or connect Garmin in Settings.'}
+        </p>
+      )}
+      {items.length > 0 && (
+        <table className="w-full text-left text-sm">
+          <thead className="text-muted-foreground">
+            <tr>
+              <th className="py-2 font-medium">Date</th>
+              <th className="py-2 font-medium">Sport</th>
+              <th className="py-2 text-right font-medium">Duration</th>
+              <th className="py-2 text-right font-medium">Distance</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((a) => (
+              <ActivityRow key={a.id} activity={a} />
+            ))}
+          </tbody>
+        </table>
+      )}
+      {activities.hasNextPage && (
+        <Button
+          variant="outline"
+          className="self-start"
+          disabled={activities.isFetchingNextPage}
+          onClick={() => {
+            void activities.fetchNextPage()
+          }}
+        >
+          Show more
+        </Button>
+      )}
+    </section>
+  )
+}
+
+function ActivityRow({ activity: a }: { activity: ActivitySummary }) {
+  const duration = a.timerTimeS ?? a.elapsedTimeS
+  return (
+    <tr className="border-t border-border">
+      <td className="py-2">{formatActivityStart(a.startTime, a.utcOffsetS)}</td>
+      <td className="py-2">{sportLabels[a.sport]}</td>
+      <td className="py-2 text-right">{duration === undefined ? '—' : formatDuration(duration)}</td>
+      <td className="py-2 text-right">
+        {a.distanceM === undefined ? '—' : formatDistance(a.distanceM)}
+      </td>
+    </tr>
   )
 }
 

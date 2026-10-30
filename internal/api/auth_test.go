@@ -62,7 +62,7 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 	if logs != nil {
 		logger = slog.New(slog.NewJSONHandler(logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
 	}
-	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), cursors, Garmin{
+	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), cursors, GarminDeps{
 		Auth: fakeGarmin{}, Cipher: testCipher(t), Sync: garminsync.NewService(pool, jobClient),
 	}, registration, cheapArgon()), spaStub)
 	return &apiClient{t: t, h: h}, q

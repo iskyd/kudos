@@ -251,24 +251,51 @@ type InsertSwimLengthsParams struct {
 }
 
 const listActivities = `-- name: ListActivities :many
-SELECT id, user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s, original_file_id, multisport_group_id, elapsed_time_s, timer_time_s, distance_m, ascent_m, descent_m, avg_speed_m_s, max_speed_m_s, avg_hr_bpm, max_hr_bpm, avg_power_w, max_power_w, avg_cadence, max_cadence, avg_temperature_c, pool_length_m, calories_kcal, rpe, feel, notes, weather_temperature_c, weather_condition, overrides FROM activities
-WHERE user_id = $1 AND (start_time, id) < ($2::timestamptz, $3::bigint)
-ORDER BY start_time DESC, id DESC
-LIMIT $4
+SELECT a.id, a.user_id, a.source, a.source_activity_id, a.sport, a.subtype, a.start_time, a.utc_offset_s, a.original_file_id, a.multisport_group_id, a.elapsed_time_s, a.timer_time_s, a.distance_m, a.ascent_m, a.descent_m, a.avg_speed_m_s, a.max_speed_m_s, a.avg_hr_bpm, a.max_hr_bpm, a.avg_power_w, a.max_power_w, a.avg_cadence, a.max_cadence, a.avg_temperature_c, a.pool_length_m, a.calories_kcal, a.rpe, a.feel, a.notes, a.weather_temperature_c, a.weather_condition, a.overrides, k.sort_key
+FROM activities a,
+    LATERAL (SELECT (CASE $1::text
+        WHEN 'distance' THEN coalesce(a.distance_m, -1)
+        WHEN 'duration' THEN coalesce(a.timer_time_s, a.elapsed_time_s, -1)
+        ELSE extract(epoch FROM a.start_time)
+    END)::float8 AS sort_key) k
+WHERE a.user_id = $2
+    AND ($3::text IS NULL OR a.sport = $3)
+    AND ($4::date IS NULL
+        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= $4)
+    AND ($5::date IS NULL
+        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= $5)
+    AND (k.sort_key, a.id) < ($6::float8, $7::bigint)
+ORDER BY k.sort_key DESC, a.id DESC
+LIMIT $8
 `
 
 type ListActivitiesParams struct {
-	UserID      int64
-	BeforeStart time.Time
-	BeforeID    int64
-	MaxRows     int32
+	Sort      string
+	UserID    int64
+	Sport     *string
+	FromDay   *time.Time
+	ToDay     *time.Time
+	BeforeKey float64
+	BeforeID  int64
+	MaxRows   int32
 }
 
-// Newest first. Pass the last row's start_time and id to get the next page.
-func (q *Queries) ListActivities(ctx context.Context, arg ListActivitiesParams) ([]Activity, error) {
+type ListActivitiesRow struct {
+	Activity Activity
+	SortKey  float64
+}
+
+// One page sorted by @sort (date, distance or duration), largest or newest first;
+// activities without the value sort last. Pass the last row's sort_key and id to
+// get the next page. Filters are optional; days are local calendar days.
+func (q *Queries) ListActivities(ctx context.Context, arg ListActivitiesParams) ([]ListActivitiesRow, error) {
 	rows, err := q.db.Query(ctx, listActivities,
+		arg.Sort,
 		arg.UserID,
-		arg.BeforeStart,
+		arg.Sport,
+		arg.FromDay,
+		arg.ToDay,
+		arg.BeforeKey,
 		arg.BeforeID,
 		arg.MaxRows,
 	)
@@ -276,42 +303,43 @@ func (q *Queries) ListActivities(ctx context.Context, arg ListActivitiesParams) 
 		return nil, err
 	}
 	defer rows.Close()
-	var items []Activity
+	var items []ListActivitiesRow
 	for rows.Next() {
-		var i Activity
+		var i ListActivitiesRow
 		if err := rows.Scan(
-			&i.ID,
-			&i.UserID,
-			&i.Source,
-			&i.SourceActivityID,
-			&i.Sport,
-			&i.Subtype,
-			&i.StartTime,
-			&i.UtcOffsetS,
-			&i.OriginalFileID,
-			&i.MultisportGroupID,
-			&i.ElapsedTimeS,
-			&i.TimerTimeS,
-			&i.DistanceM,
-			&i.AscentM,
-			&i.DescentM,
-			&i.AvgSpeedMS,
-			&i.MaxSpeedMS,
-			&i.AvgHrBpm,
-			&i.MaxHrBpm,
-			&i.AvgPowerW,
-			&i.MaxPowerW,
-			&i.AvgCadence,
-			&i.MaxCadence,
-			&i.AvgTemperatureC,
-			&i.PoolLengthM,
-			&i.CaloriesKcal,
-			&i.Rpe,
-			&i.Feel,
-			&i.Notes,
-			&i.WeatherTemperatureC,
-			&i.WeatherCondition,
-			&i.Overrides,
+			&i.Activity.ID,
+			&i.Activity.UserID,
+			&i.Activity.Source,
+			&i.Activity.SourceActivityID,
+			&i.Activity.Sport,
+			&i.Activity.Subtype,
+			&i.Activity.StartTime,
+			&i.Activity.UtcOffsetS,
+			&i.Activity.OriginalFileID,
+			&i.Activity.MultisportGroupID,
+			&i.Activity.ElapsedTimeS,
+			&i.Activity.TimerTimeS,
+			&i.Activity.DistanceM,
+			&i.Activity.AscentM,
+			&i.Activity.DescentM,
+			&i.Activity.AvgSpeedMS,
+			&i.Activity.MaxSpeedMS,
+			&i.Activity.AvgHrBpm,
+			&i.Activity.MaxHrBpm,
+			&i.Activity.AvgPowerW,
+			&i.Activity.MaxPowerW,
+			&i.Activity.AvgCadence,
+			&i.Activity.MaxCadence,
+			&i.Activity.AvgTemperatureC,
+			&i.Activity.PoolLengthM,
+			&i.Activity.CaloriesKcal,
+			&i.Activity.Rpe,
+			&i.Activity.Feel,
+			&i.Activity.Notes,
+			&i.Activity.WeatherTemperatureC,
+			&i.Activity.WeatherCondition,
+			&i.Activity.Overrides,
+			&i.SortKey,
 		); err != nil {
 			return nil, err
 		}

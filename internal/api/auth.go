@@ -30,7 +30,7 @@ type Server struct {
 	q                   *db.Queries
 	ingest              *ingest.Service
 	cursors             *Cursors
-	garmin              Garmin
+	garmin              GarminDeps
 	registrationEnabled bool
 	argon               argonParams
 	// dummyHash is verified against when a username is unknown, so login takes
@@ -41,11 +41,11 @@ type Server struct {
 var _ StrictServerInterface = (*Server)(nil)
 
 // NewServer returns the API server backed by q, storing activities with ingester.
-func NewServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin Garmin, registrationEnabled bool) *Server {
+func NewServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool) *Server {
 	return newServer(q, ingester, cursors, garmin, registrationEnabled, defaultArgon())
 }
 
-func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin Garmin, registrationEnabled bool, p argonParams) *Server {
+func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool, p argonParams) *Server {
 	return &Server{
 		q:                   q,
 		ingest:              ingester,

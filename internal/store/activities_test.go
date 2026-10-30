@@ -202,7 +202,7 @@ func TestUpsertActivityUpdatesSourceFields(t *testing.T) {
 }
 
 func firstPage(userID int64, n int32) db.ListActivitiesParams {
-	return db.ListActivitiesParams{UserID: userID, BeforeStart: time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC), BeforeID: math.MaxInt64, MaxRows: n}
+	return db.ListActivitiesParams{UserID: userID, Sort: "date", BeforeKey: math.MaxFloat64, BeforeID: math.MaxInt64, MaxRows: n}
 }
 
 func TestListActivitiesPagination(t *testing.T) {
@@ -227,14 +227,14 @@ func TestListActivitiesPagination(t *testing.T) {
 	for {
 		page, err := q.ListActivities(ctx, p)
 		check(t, err)
-		for _, a := range page {
-			got = append(got, a.ID)
+		for _, r := range page {
+			got = append(got, r.Activity.ID)
 		}
 		if len(page) < int(p.MaxRows) {
 			break
 		}
 		last := page[len(page)-1]
-		p.BeforeStart, p.BeforeID = last.StartTime, last.ID
+		p.BeforeKey, p.BeforeID = last.SortKey, last.Activity.ID
 	}
 	if want := []int64{ids[2], ids[1], ids[0]}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("pages = %v, want %v", got, want)
@@ -360,5 +360,86 @@ func check(t *testing.T, err error) {
 	t.Helper()
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+// listIDs pages through every activity matching p, two at a time.
+func listIDs(t *testing.T, q *db.Queries, p db.ListActivitiesParams) []string {
+	t.Helper()
+	p.BeforeKey, p.BeforeID, p.MaxRows = math.MaxFloat64, math.MaxInt64, 2
+	var got []string
+	for {
+		page, err := q.ListActivities(t.Context(), p)
+		check(t, err)
+		for _, r := range page {
+			got = append(got, r.Activity.SourceActivityID)
+		}
+		if len(page) < int(p.MaxRows) {
+			return got
+		}
+		last := page[len(page)-1]
+		p.BeforeKey, p.BeforeID = last.SortKey, last.Activity.ID
+	}
+}
+
+func TestListActivitiesFiltersAndSorts(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+
+	// "late" starts 23:30 UTC on 14 Oct, which is 15 Oct where it happened (+2 h).
+	for _, a := range []struct {
+		id, sport string
+		start     time.Time
+		offset    int32
+		distance  *float64
+		timer     *float64
+		elapsed   *float64
+	}{
+		{"run", "running", time.Date(2026, 10, 10, 7, 0, 0, 0, time.UTC), 7200, ptr(10000.0), ptr(3000.0), ptr(3100.0)},
+		{"ride", "cycling", time.Date(2026, 10, 12, 7, 0, 0, 0, time.UTC), 7200, ptr(40000.0), ptr(5400.0), nil},
+		{"late", "running", time.Date(2026, 10, 14, 23, 30, 0, 0, time.UTC), 7200, ptr(5000.0), nil, ptr(1800.0)},
+		{"lift", "strength", time.Date(2026, 10, 16, 7, 0, 0, 0, time.UTC), 7200, nil, ptr(2400.0), nil},
+		{"walk", "hiking", time.Date(2026, 10, 18, 7, 0, 0, 0, time.UTC), 7200, nil, nil, nil},
+	} {
+		_, err := q.UpsertActivity(ctx, db.UpsertActivityParams{
+			UserID: alice.ID, Source: "manual", SourceActivityID: a.id, Sport: a.sport, Subtype: "outdoor",
+			StartTime: a.start, UtcOffsetS: a.offset, DistanceM: a.distance, TimerTimeS: a.timer, ElapsedTimeS: a.elapsed,
+		})
+		check(t, err)
+	}
+	// Bob's activity matches every filter and never shows.
+	_, err := q.UpsertActivity(ctx, db.UpsertActivityParams{
+		UserID: bob.ID, Source: "manual", SourceActivityID: "bob", Sport: "running", Subtype: "outdoor",
+		StartTime: time.Date(2026, 10, 15, 7, 0, 0, 0, time.UTC), DistanceM: ptr(99000.0),
+	})
+	check(t, err)
+
+	running := "running"
+	tests := []struct {
+		name string
+		p    db.ListActivitiesParams
+		want []string
+	}{
+		{"by date", db.ListActivitiesParams{Sort: "date"}, []string{"walk", "lift", "late", "ride", "run"}},
+		{"unknown sort is by date", db.ListActivitiesParams{Sort: ""}, []string{"walk", "lift", "late", "ride", "run"}},
+		{"by distance, missing last", db.ListActivitiesParams{Sort: "distance"}, []string{"ride", "run", "late", "walk", "lift"}},
+		// Timer time, else elapsed time, else last.
+		{"by duration", db.ListActivitiesParams{Sort: "duration"}, []string{"ride", "run", "lift", "late", "walk"}},
+		{"sport", db.ListActivitiesParams{Sort: "date", Sport: &running}, []string{"late", "run"}},
+		{"from a local day", db.ListActivitiesParams{Sort: "date", FromDay: ptr(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC))}, []string{"walk", "lift", "late"}},
+		{"to a local day", db.ListActivitiesParams{Sort: "date", ToDay: ptr(time.Date(2026, 10, 14, 0, 0, 0, 0, time.UTC))}, []string{"ride", "run"}},
+		{"one day", db.ListActivitiesParams{
+			Sort: "distance", FromDay: ptr(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)), ToDay: ptr(time.Date(2026, 10, 15, 0, 0, 0, 0, time.UTC)),
+		}, []string{"late"}},
+		{"nothing matches", db.ListActivitiesParams{Sort: "date", FromDay: ptr(time.Date(2027, 1, 1, 0, 0, 0, 0, time.UTC))}, nil},
+	}
+	for _, tt := range tests {
+		tt.p.UserID = alice.ID
+		if got := listIDs(t, q, tt.p); !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("%s: %v, want %v", tt.name, got, tt.want)
+		}
 	}
 }

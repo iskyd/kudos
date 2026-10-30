@@ -59,10 +59,24 @@ RETURNING id;
 SELECT * FROM activities WHERE user_id = $1 AND id = $2;
 
 -- name: ListActivities :many
--- Newest first. Pass the last row's start_time and id to get the next page.
-SELECT * FROM activities
-WHERE user_id = @user_id AND (start_time, id) < (@before_start::timestamptz, @before_id::bigint)
-ORDER BY start_time DESC, id DESC
+-- One page sorted by @sort (date, distance or duration), largest or newest first;
+-- activities without the value sort last. Pass the last row's sort_key and id to
+-- get the next page. Filters are optional; days are local calendar days.
+SELECT sqlc.embed(a), k.sort_key
+FROM activities a,
+    LATERAL (SELECT (CASE @sort::text
+        WHEN 'distance' THEN coalesce(a.distance_m, -1)
+        WHEN 'duration' THEN coalesce(a.timer_time_s, a.elapsed_time_s, -1)
+        ELSE extract(epoch FROM a.start_time)
+    END)::float8 AS sort_key) k
+WHERE a.user_id = @user_id
+    AND (sqlc.narg(sport)::text IS NULL OR a.sport = sqlc.narg(sport))
+    AND (sqlc.narg(from_day)::date IS NULL
+        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= sqlc.narg(from_day))
+    AND (sqlc.narg(to_day)::date IS NULL
+        OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date <= sqlc.narg(to_day))
+    AND (k.sort_key, a.id) < (@before_key::float8, @before_id::bigint)
+ORDER BY k.sort_key DESC, a.id DESC
 LIMIT @max_rows;
 
 -- name: InsertActivityStreams :copyfrom

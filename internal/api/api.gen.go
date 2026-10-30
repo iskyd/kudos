@@ -18,6 +18,90 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ActivitySport.
+const (
+	ActivitySportCycling           ActivitySport = "cycling"
+	ActivitySportHiking            ActivitySport = "hiking"
+	ActivitySportOpenWaterSwimming ActivitySport = "open_water_swimming"
+	ActivitySportOther             ActivitySport = "other"
+	ActivitySportPoolSwimming      ActivitySport = "pool_swimming"
+	ActivitySportRunning           ActivitySport = "running"
+	ActivitySportStrength          ActivitySport = "strength"
+	ActivitySportTrailRunning      ActivitySport = "trail_running"
+	ActivitySportTransition        ActivitySport = "transition"
+)
+
+// Valid indicates whether the value is a known member of the ActivitySport enum.
+func (e ActivitySport) Valid() bool {
+	switch e {
+	case ActivitySportCycling:
+		return true
+	case ActivitySportHiking:
+		return true
+	case ActivitySportOpenWaterSwimming:
+		return true
+	case ActivitySportOther:
+		return true
+	case ActivitySportPoolSwimming:
+		return true
+	case ActivitySportRunning:
+		return true
+	case ActivitySportStrength:
+		return true
+	case ActivitySportTrailRunning:
+		return true
+	case ActivitySportTransition:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ActivitySummarySource.
+const (
+	Garmin ActivitySummarySource = "garmin"
+	Manual ActivitySummarySource = "manual"
+	Upload ActivitySummarySource = "upload"
+)
+
+// Valid indicates whether the value is a known member of the ActivitySummarySource enum.
+func (e ActivitySummarySource) Valid() bool {
+	switch e {
+	case Garmin:
+		return true
+	case Manual:
+		return true
+	case Upload:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ActivitySummarySubtype.
+const (
+	Indoor    ActivitySummarySubtype = "indoor"
+	Outdoor   ActivitySummarySubtype = "outdoor"
+	Treadmill ActivitySummarySubtype = "treadmill"
+	Virtual   ActivitySummarySubtype = "virtual"
+)
+
+// Valid indicates whether the value is a known member of the ActivitySummarySubtype enum.
+func (e ActivitySummarySubtype) Valid() bool {
+	switch e {
+	case Indoor:
+		return true
+	case Outdoor:
+		return true
+	case Treadmill:
+		return true
+	case Virtual:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for GarminBackfillPauseReason.
 const (
 	GarminBackfillPauseReasonDisconnected GarminBackfillPauseReason = "disconnected"
@@ -113,6 +197,68 @@ func (e Sport) Valid() bool {
 		return false
 	}
 }
+
+// Defines values for ListActivitiesParamsSort.
+const (
+	Date     ListActivitiesParamsSort = "date"
+	Distance ListActivitiesParamsSort = "distance"
+	Duration ListActivitiesParamsSort = "duration"
+)
+
+// Valid indicates whether the value is a known member of the ListActivitiesParamsSort enum.
+func (e ListActivitiesParamsSort) Valid() bool {
+	switch e {
+	case Date:
+		return true
+	case Distance:
+		return true
+	case Duration:
+		return true
+	default:
+		return false
+	}
+}
+
+// ActivityPage defines model for ActivityPage.
+type ActivityPage struct {
+	Items []ActivitySummary `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// ActivitySport A stored activity's sport; transition is a multisport leg between disciplines.
+type ActivitySport string
+
+// ActivitySummary defines model for ActivitySummary.
+type ActivitySummary struct {
+	AscentM      *float32              `json:"ascentM,omitempty"`
+	AvgHrBpm     *int                  `json:"avgHrBpm,omitempty"`
+	AvgPowerW    *int                  `json:"avgPowerW,omitempty"`
+	AvgSpeedMS   *float32              `json:"avgSpeedMS,omitempty"`
+	DistanceM    *float64              `json:"distanceM,omitempty"`
+	ElapsedTimeS *float64              `json:"elapsedTimeS,omitempty"`
+	Id           int64                 `json:"id"`
+	Rpe          *float32              `json:"rpe,omitempty"`
+	Source       ActivitySummarySource `json:"source"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport ActivitySport `json:"sport"`
+
+	// StartTime Start in UTC.
+	StartTime  time.Time              `json:"startTime"`
+	Subtype    ActivitySummarySubtype `json:"subtype"`
+	TimerTimeS *float64               `json:"timerTimeS,omitempty"`
+
+	// UtcOffsetS Local offset where the activity happened, in seconds.
+	UtcOffsetS int `json:"utcOffsetS"`
+}
+
+// ActivitySummarySource defines model for ActivitySummary.Source.
+type ActivitySummarySource string
+
+// ActivitySummarySubtype defines model for ActivitySummary.Subtype.
+type ActivitySummarySubtype string
 
 // CreatedActivity defines model for CreatedActivity.
 type CreatedActivity struct {
@@ -320,6 +466,27 @@ type Cursor = string
 // Limit defines model for Limit.
 type Limit = int
 
+// ListActivitiesParams defines parameters for ListActivities.
+type ListActivitiesParams struct {
+	Sport *ActivitySport `form:"sport,omitempty" json:"sport,omitempty"`
+
+	// From First local day, inclusive.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Last local day, inclusive.
+	To   *openapi_types.Date       `form:"to,omitempty" json:"to,omitempty"`
+	Sort *ListActivitiesParamsSort `form:"sort,omitempty" json:"sort,omitempty"`
+
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListActivitiesParamsSort defines parameters for ListActivities.
+type ListActivitiesParamsSort string
+
 // UploadActivityMultipartBody defines parameters for UploadActivity.
 type UploadActivityMultipartBody struct {
 	File openapi_types.File `json:"file"`
@@ -363,6 +530,9 @@ type UpdateMeJSONRequestBody = UpdateMeRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListActivities List activities
+	// (GET /api/activities)
+	ListActivities(w http.ResponseWriter, r *http.Request, params ListActivitiesParams)
 	// CreateActivity Create a manual activity
 	// (POST /api/activities)
 	CreateActivity(w http.ResponseWriter, r *http.Request)
@@ -419,6 +589,12 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListActivities List activities
+// (GET /api/activities)
+func (_ Unimplemented) ListActivities(w http.ResponseWriter, r *http.Request, params ListActivitiesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // CreateActivity Create a manual activity
 // (POST /api/activities)
@@ -530,6 +706,104 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListActivities operation middleware
+func (siw *ServerInterfaceWrapper) ListActivities(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListActivitiesParams
+
+	// ------------- Optional query parameter "sport" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sport", r.URL.Query(), &params.Sport, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sport"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sport", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sort" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sort", r.URL.Query(), &params.Sort, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sort"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sort", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListActivities(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // CreateActivity operation middleware
 func (siw *ServerInterfaceWrapper) CreateActivity(w http.ResponseWriter, r *http.Request) {
@@ -933,6 +1207,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/api/me", wrapper.UpdateMe)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities", wrapper.ListActivities)
+	})
+	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/activities", wrapper.CreateActivity)
 	})
 	r.Group(func(r chi.Router) {
@@ -970,6 +1247,45 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 }
 
 type ProblemApplicationProblemPlusJSONResponse Problem
+
+type ListActivitiesRequestObject struct {
+	Params ListActivitiesParams
+}
+
+type ListActivitiesResponseObject interface {
+	VisitListActivitiesResponse(w http.ResponseWriter) error
+}
+
+type ListActivities200JSONResponse ActivityPage
+
+func (response ListActivities200JSONResponse) VisitListActivitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListActivitiesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListActivitiesdefaultApplicationProblemPlusJSONResponse) VisitListActivitiesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type CreateActivityRequestObject struct {
 	Body *CreateActivityJSONRequestBody
@@ -1642,6 +1958,9 @@ func (response GetHealthzdefaultApplicationProblemPlusJSONResponse) VisitGetHeal
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListActivities List activities
+	// (GET /api/activities)
+	ListActivities(ctx context.Context, request ListActivitiesRequestObject) (ListActivitiesResponseObject, error)
 	// CreateActivity Create a manual activity
 	// (POST /api/activities)
 	CreateActivity(ctx context.Context, request CreateActivityRequestObject) (CreateActivityResponseObject, error)
@@ -1732,6 +2051,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListActivities operation middleware
+func (sh *strictHandler) ListActivities(w http.ResponseWriter, r *http.Request, params ListActivitiesParams) {
+	var request ListActivitiesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListActivities(ctx, request.(ListActivitiesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListActivities")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListActivitiesResponseObject); ok {
+		if err := validResponse.VisitListActivitiesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // CreateActivity operation middleware
