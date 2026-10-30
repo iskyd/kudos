@@ -551,6 +551,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List zone versions
+         * @description Latest effective date first, each with the zones its thresholds give
+         *     (heart rate reserve only from its own max and resting HR).
+         */
+        get: operations["listZoneSets"];
+        put?: never;
+        /**
+         * Add a zone version
+         * @description Thresholds valid for a sport from effectiveFrom on; at most one version per
+         *     sport and day. Running needs lthrBpm or thresholdSpeedMS, cycling ftpW or
+         *     lthrBpm, swimming cssMS, general maxHrBpm and restingHrBpm.
+         */
+        post: operations["createZoneSet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/zones/{zoneSetId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete a zone version
+         * @description Activities on its dates fall back to the version before it.
+         */
+        delete: operations["deleteZoneSet"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activities/{id}/zones": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The zones an activity uses
+         * @description The versions valid on the activity's local date: its sport's and the
+         *     general one (for heart rate reserve when the sport has no LTHR).
+         */
+        get: operations["getActivityZones"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1071,6 +1139,80 @@ export interface components {
             avgPowerW?: number;
             /** Format: double */
             withinS: number;
+        };
+        /**
+         * @description Sports that share thresholds; general holds max and resting HR for any sport.
+         * @enum {string}
+         */
+        ZoneSport: "running" | "cycling" | "swimming" | "general";
+        ZoneSetInput: {
+            sport: components["schemas"]["ZoneSport"];
+            /** Format: date */
+            effectiveFrom: string;
+            /** @description Lactate threshold heart rate. */
+            lthrBpm?: number;
+            /**
+             * Format: double
+             * @description Running threshold pace, as a speed.
+             */
+            thresholdSpeedMS?: number;
+            /** @description Cycling functional threshold power. */
+            ftpW?: number;
+            /**
+             * Format: double
+             * @description Critical swim speed.
+             */
+            cssMS?: number;
+            maxHrBpm?: number;
+            restingHrBpm?: number;
+        };
+        ZoneSet: components["schemas"]["ZoneSetInput"] & {
+            /** Format: int64 */
+            id: number;
+            zones: components["schemas"]["Zones"];
+        };
+        ZoneSetPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["ZoneSet"][];
+        };
+        /**
+         * @description Zones per metric with the model each comes from: friel_run_hr,
+         *     friel_bike_hr or heart_rate_reserve (bpm); friel_run_pace or css (m/s,
+         *     slow to fast); coggan_power (W). A metric without a model is absent.
+         */
+        Zones: {
+            hrModel?: string;
+            hr?: components["schemas"]["Zone"][];
+            paceModel?: string;
+            pace?: components["schemas"]["Zone"][];
+            powerModel?: string;
+            power?: components["schemas"]["Zone"][];
+        };
+        /** @description The range [low, high); low is absent for the first zone and high for the last. */
+        Zone: {
+            name: string;
+            /** Format: double */
+            low?: number;
+            /** Format: double */
+            high?: number;
+        };
+        ActivityZones: {
+            sport: components["schemas"]["ZoneSport"];
+            /**
+             * Format: date
+             * @description The activity's local date.
+             */
+            day: string;
+            /**
+             * Format: int64
+             * @description The sport's version used, if any.
+             */
+            zoneSetId?: number;
+            /**
+             * Format: int64
+             * @description The general version used for heart rate reserve, if any.
+             */
+            generalZoneSetId?: number;
+            zones: components["schemas"]["Zones"];
         };
         ActivityStreams: {
             /** @description Seconds from the activity start. */
@@ -1961,6 +2103,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["WorkoutExecution"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listZoneSets: {
+        parameters: {
+            query?: {
+                sport?: components["schemas"]["ZoneSport"];
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of versions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneSetPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createZoneSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ZoneSetInput"];
+            };
+        };
+        responses: {
+            /** @description The new version. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneSet"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteZoneSet: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                zoneSetId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getActivityZones: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The zones. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityZones"];
                 };
             };
             default: components["responses"]["Problem"];

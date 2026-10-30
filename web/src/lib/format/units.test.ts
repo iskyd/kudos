@@ -8,6 +8,7 @@ import {
   formatWhole,
   localDay,
   paceSeconds,
+  speedFromPace,
 } from '@/lib/format/units'
 
 describe('formatLocalClock and localDay', () => {
@@ -89,5 +90,13 @@ describe('formatWhole', () => {
     expect(formatWhole(151.6, 'bpm')).toBe('152 bpm')
     expect(formatWhole(0.4, 'W')).toBe('0 W')
     expect(formatWhole(-3.5, 'm')).toBe('-3 m')
+  })
+})
+
+describe('speedFromPace', () => {
+  it('inverts a pace per km or per 100 m', () => {
+    expect(speedFromPace(240)).toBeCloseTo(1000 / 240)
+    expect(speedFromPace(100, 100)).toBe(1)
+    expect(speedFromPace(0)).toBeNull()
   })
 })
