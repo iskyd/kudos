@@ -619,6 +619,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/zones/suggestions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pending zone suggestions
+         * @description Thresholds recorded files carried that differ from the zone version valid
+         *     on their date, latest first, each with that version (current) when there
+         *     is one. Runs suggest running versions, rides cycling ones (a run's FTP is
+         *     running power and never used), everything else general ones.
+         */
+        get: operations["listZoneSuggestions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/zones/suggestions/{suggestionId}/confirm": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a zone suggestion
+         * @description Creates a version from the suggestion's date: the version valid then, with
+         *     the suggested values over it. The suggestion goes.
+         */
+        post: operations["confirmZoneSuggestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/zones/suggestions/{suggestionId}/dismiss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Dismiss a zone suggestion
+         * @description The same values from later files are not suggested again.
+         */
+        post: operations["dismissZoneSuggestion"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1214,6 +1278,29 @@ export interface components {
             generalZoneSetId?: number;
             zones: components["schemas"]["Zones"];
         };
+        ZoneSuggestion: {
+            /** Format: int64 */
+            id: number;
+            sport: components["schemas"]["ZoneSport"];
+            /**
+             * Format: date
+             * @description The local date of the first file that carried these values.
+             */
+            effectiveFrom: string;
+            lthrBpm?: number;
+            ftpW?: number;
+            maxHrBpm?: number;
+            restingHrBpm?: number;
+            /**
+             * Format: int64
+             * @description The activity whose file carried them.
+             */
+            activityId?: number;
+            current?: components["schemas"]["ZoneSet"];
+        };
+        ZoneSuggestionPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["ZoneSuggestion"][];
+        };
         ActivityStreams: {
             /** @description Seconds from the activity start. */
             timeS: number[];
@@ -1274,6 +1361,7 @@ export interface components {
     };
     parameters: {
         ActivityID: number;
+        SuggestionID: number;
         GearID: number;
         /** @description Opaque cursor from a previous page's `nextCursor`. */
         Cursor: string;
@@ -2200,6 +2288,76 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ActivityZones"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listZoneSuggestions: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of suggestions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneSuggestionPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    confirmZoneSuggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestionId: components["parameters"]["SuggestionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The new version. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ZoneSet"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    dismissZoneSuggestion: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                suggestionId: components["parameters"]["SuggestionID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Dismissed. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

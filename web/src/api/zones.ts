@@ -9,6 +9,7 @@ export type ZoneSetInput = components['schemas']['ZoneSetInput']
 export type ZoneSport = components['schemas']['ZoneSport']
 export type Zones = components['schemas']['Zones']
 export type Zone = components['schemas']['Zone']
+export type ZoneSuggestion = components['schemas']['ZoneSuggestion']
 
 export const zonesKey = ['zones'] as const
 
@@ -61,6 +62,39 @@ export function useDeleteZoneSet() {
         params: { path: { zoneSetId } },
         headers: { 'X-CSRF-Token': csrfToken },
       })
+      if (error) throw new ApiError(error)
+    },
+    onSuccess: invalidate,
+  })
+}
+
+// Pending suggestions sit under zonesKey, so any zone change refreshes them too.
+export function useZoneSuggestions() {
+  return useInfiniteQuery({
+    queryKey: [...zonesKey, 'suggestions'],
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await api.GET('/api/zones/suggestions', {
+        params: { query: { cursor: pageParam, limit: 50 } },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    getNextPageParam: (page) => page.nextCursor,
+  })
+}
+
+// useAnswerSuggestion confirms (creating a version) or dismisses a suggestion.
+export function useAnswerSuggestion() {
+  const { csrfToken } = useCurrentUser()
+  const invalidate = useInvalidateZones()
+  return useMutation({
+    mutationFn: async ({ id, confirm }: { id: number; confirm: boolean }) => {
+      const params = { path: { suggestionId: id } }
+      const headers = { 'X-CSRF-Token': csrfToken }
+      const { error } = confirm
+        ? await api.POST('/api/zones/suggestions/{suggestionId}/confirm', { params, headers })
+        : await api.POST('/api/zones/suggestions/{suggestionId}/dismiss', { params, headers })
       if (error) throw new ApiError(error)
     },
     onSuccess: invalidate,
