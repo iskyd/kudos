@@ -48,6 +48,26 @@ type Activity struct {
 	SplitOf    *int64
 }
 
+type ActivityDerived struct {
+	UserID           int64
+	ActivityID       int64
+	Version          int16
+	Stale            bool
+	ComputedAt       time.Time
+	ZoneSetID        *int64
+	GeneralZoneSetID *int64
+	AvgHrBpm         *float64
+	AvgPowerW        *float64
+	AvgSpeedMS       *float64
+	AvgCadence       *float64
+	HrZoneModel      *string
+	HrZoneS          []float64
+	PaceZoneModel    *string
+	PaceZoneS        []float64
+	PowerZoneModel   *string
+	PowerZoneS       []float64
+}
+
 type ActivityEdit struct {
 	ID         int64
 	UserID     int64

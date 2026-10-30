@@ -28,7 +28,6 @@ func NewClient(pool *pgxpool.Pool, logger *slog.Logger, register ...func(*river.
 	workers := river.NewWorkers()
 	// AddWorker panics only on a duplicate registration: a programming error caught by any test.
 	river.AddWorker(workers, &PingWorker{})
-	river.AddWorker(workers, &DerivedWorker{})
 	for _, r := range register {
 		r(workers)
 	}

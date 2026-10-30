@@ -52,13 +52,15 @@ type env struct {
 func newEnv(t *testing.T) env {
 	t.Helper()
 	pool := pg.NewDB(t)
-	client, err := jobs.NewClient(pool, slog.New(slog.DiscardHandler))
+	workers := &Workers{}
+	client, err := jobs.NewClient(pool, slog.New(slog.DiscardHandler), workers.Register)
 	if err != nil {
 		t.Fatal(err)
 	}
 	alice, bob := testutil.TwoUsers(t, pool)
 	dir := t.TempDir()
-	return env{pool: pool, svc: New(pool, client, dir), q: db.New(pool), dir: dir, alice: alice.ID, bob: bob.ID}
+	workers.Service = New(pool, client, dir)
+	return env{pool: pool, svc: workers.Service, q: db.New(pool), dir: dir, alice: alice.ID, bob: bob.ID}
 }
 
 func corpus(t *testing.T, path string) []byte {

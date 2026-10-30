@@ -122,11 +122,11 @@ func TestZoneSetsPageAndIsolation(t *testing.T) {
 	if rows, err := q.ListZoneSets(ctx, db.ListZoneSetsParams{UserID: bob.ID, MaxRows: 10}); err != nil || len(rows) != 0 {
 		t.Errorf("bob listed %d: %v", len(rows), err)
 	}
-	if n, err := q.DeleteZoneSet(ctx, db.DeleteZoneSetParams{UserID: bob.ID, ID: ids[0]}); err != nil || n != 0 {
-		t.Errorf("bob deleted %d: %v", n, err)
+	if _, err := q.DeleteZoneSet(ctx, db.DeleteZoneSetParams{UserID: bob.ID, ID: ids[0]}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob deleted: %v", err)
 	}
-	if n, err := q.DeleteZoneSet(ctx, db.DeleteZoneSetParams{UserID: alice.ID, ID: ids[0]}); err != nil || n != 1 {
-		t.Errorf("alice deleted %d: %v", n, err)
+	if from, err := q.DeleteZoneSet(ctx, db.DeleteZoneSetParams{UserID: alice.ID, ID: ids[0]}); err != nil || !from.Equal(date(t, "2026-01-01")) {
+		t.Errorf("alice deleted the version from %v: %v", from, err)
 	}
 }
 

@@ -154,3 +154,29 @@ func TestZoneSportOf(t *testing.T) {
 		}
 	}
 }
+
+func TestTimeInZones(t *testing.T) {
+	t.Parallel()
+	zs := zones([]string{"easy", "hard"}, []float64{150})
+	hr := func(s Sample) *float64 { return s.HR }
+	// 1 s at 140, a 5 s smart-recording gap at 160, a 60 s pause at 140 (not
+	// counted), 2 s at 170 in a second segment; samples without HR count nowhere.
+	got := TimeInZones([][]Sample{
+		{
+			{Time: at(0), HR: new(140.0)},
+			{Time: at(1), HR: new(160.0)},
+			{Time: at(6), HR: new(140.0)},
+			{Time: at(66), HR: new(150.0)},
+			{Time: at(67)},
+			{Time: at(69), HR: new(140.0)},
+		},
+		{{Time: at(100), HR: new(170.0)}, {Time: at(102), HR: new(120.0)}},
+	}, zs, hr)
+	// easy: 1 s; hard: 5 s + 1 s (150 starts hard) + 2 s.
+	if len(got) != 2 || got[0] != 1 || got[1] != 8 {
+		t.Errorf("TimeInZones = %v, want [1 8]", got)
+	}
+	if TimeInZones(nil, nil, hr) != nil {
+		t.Error("time without zones")
+	}
+}

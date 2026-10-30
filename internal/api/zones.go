@@ -72,7 +72,11 @@ func (s *Server) CreateZoneSet(ctx context.Context, req CreateZoneSetRequestObje
 		return nil, err
 	}
 	p.UserID = sessionFrom(ctx).userID
-	z, err := s.q.CreateZoneSet(ctx, p)
+	var z db.ZoneSet
+	err = s.ingest.ChangeZones(ctx, p.UserID, func(q *db.Queries) (time.Time, error) {
+		z, err = q.CreateZoneSet(ctx, p)
+		return p.EffectiveFrom, err
+	})
 	if err := sameDay(err); err != nil {
 		return nil, err
 	}
@@ -125,12 +129,15 @@ func sameDay(err error) error {
 
 // DeleteZoneSet deletes a version; its dates fall back to the one before.
 func (s *Server) DeleteZoneSet(ctx context.Context, req DeleteZoneSetRequestObject) (DeleteZoneSetResponseObject, error) {
-	n, err := s.q.DeleteZoneSet(ctx, db.DeleteZoneSetParams{UserID: sessionFrom(ctx).userID, ID: req.ZoneSetId})
+	userID := sessionFrom(ctx).userID
+	err := s.ingest.ChangeZones(ctx, userID, func(q *db.Queries) (time.Time, error) {
+		return q.DeleteZoneSet(ctx, db.DeleteZoneSetParams{UserID: userID, ID: req.ZoneSetId})
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, &Error{Kind: KindNotFound, Detail: "no such zone version"}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("deleting zone version: %w", err)
-	}
-	if n == 0 {
-		return nil, &Error{Kind: KindNotFound, Detail: "no such zone version"}
 	}
 	return DeleteZoneSet204Response{}, nil
 }
@@ -141,28 +148,14 @@ func (s *Server) GetActivityZones(ctx context.Context, req GetActivityZonesReque
 	if err != nil {
 		return nil, err
 	}
-	if a, err = ingest.Effective(a); err != nil {
+	z, err := s.ingest.ResolveZones(ctx, a)
+	if err != nil {
 		return nil, err
 	}
-	local := a.StartTime.Add(time.Duration(a.UtcOffsetS) * time.Second)
-	day := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC)
-	rows, err := s.q.ListZoneSetsAt(ctx, db.ListZoneSetsAtParams{UserID: sessionFrom(ctx).userID, Day: day})
-	if err != nil {
-		return nil, fmt.Errorf("reading zone versions: %w", err)
-	}
-	sport := analytics.ZoneSportOf(a.Sport)
-	out := ActivityZones{Sport: ZoneSport(sport), Day: openapi_types.Date{Time: day}}
-	var own, general analytics.Thresholds
-	for _, r := range rows {
-		switch {
-		case analytics.ZoneSport(r.Sport) == sport:
-			own, out.ZoneSetId = thresholds(r), &r.ID
-		case r.Sport == string(analytics.ZoneGeneral):
-			general, out.GeneralZoneSetId = thresholds(r), &r.ID
-		}
-	}
-	out.Zones = zonesOut(analytics.ZonesFor(sport, own, general))
-	return GetActivityZones200JSONResponse(out), nil
+	return GetActivityZones200JSONResponse(ActivityZones{
+		Sport: ZoneSport(z.Sport), Day: openapi_types.Date{Time: z.Day},
+		ZoneSetId: z.ZoneSetID, GeneralZoneSetId: z.GeneralZoneSetID, Zones: zonesOut(z.Zones),
+	}), nil
 }
 
 func zoneSet(z db.ZoneSet) ZoneSet {
@@ -170,14 +163,7 @@ func zoneSet(z db.ZoneSet) ZoneSet {
 		Id: z.ID, Sport: ZoneSport(z.Sport), EffectiveFrom: openapi_types.Date{Time: z.EffectiveFrom},
 		LthrBpm: intPtr(z.LthrBpm), ThresholdSpeedMS: f64(z.ThresholdSpeedMS), FtpW: intPtr(z.FtpW),
 		CssMS: f64(z.CssMS), MaxHrBpm: intPtr(z.MaxHrBpm), RestingHrBpm: intPtr(z.RestingHrBpm),
-		Zones: zonesOut(analytics.ZonesFor(analytics.ZoneSport(z.Sport), thresholds(z), analytics.Thresholds{})),
-	}
-}
-
-func thresholds(z db.ZoneSet) analytics.Thresholds {
-	return analytics.Thresholds{
-		LTHR: i16f(z.LthrBpm), ThresholdSpeed: f64(z.ThresholdSpeedMS), FTP: i16f(z.FtpW),
-		CSS: f64(z.CssMS), MaxHR: i16f(z.MaxHrBpm), RestingHR: i16f(z.RestingHrBpm),
+		Zones: zonesOut(analytics.ZonesFor(analytics.ZoneSport(z.Sport), ingest.ZoneThresholds(z), analytics.Thresholds{})),
 	}
 }
 
@@ -300,9 +286,13 @@ func (s *Server) ConfirmZoneSuggestion(ctx context.Context, req ConfirmZoneSugge
 	if err != nil {
 		return nil, err
 	}
-	z, err := s.q.ConfirmZoneSuggestion(ctx, db.ConfirmZoneSuggestionParams{
-		UserID: userID, ID: sug.ID, Sport: p.Sport, EffectiveFrom: p.EffectiveFrom, LthrBpm: p.LthrBpm,
-		ThresholdSpeedMS: p.ThresholdSpeedMS, FtpW: p.FtpW, CssMS: p.CssMS, MaxHrBpm: p.MaxHrBpm, RestingHrBpm: p.RestingHrBpm,
+	var z db.ZoneSet
+	err = s.ingest.ChangeZones(ctx, userID, func(q *db.Queries) (time.Time, error) {
+		z, err = q.ConfirmZoneSuggestion(ctx, db.ConfirmZoneSuggestionParams{
+			UserID: userID, ID: sug.ID, Sport: p.Sport, EffectiveFrom: p.EffectiveFrom, LthrBpm: p.LthrBpm,
+			ThresholdSpeedMS: p.ThresholdSpeedMS, FtpW: p.FtpW, CssMS: p.CssMS, MaxHrBpm: p.MaxHrBpm, RestingHrBpm: p.RestingHrBpm,
+		})
+		return p.EffectiveFrom, err
 	})
 	if errors.Is(err, pgx.ErrNoRows) { // dismissed or confirmed meanwhile
 		return nil, errSuggestionNotFound
