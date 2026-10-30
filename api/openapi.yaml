@@ -380,6 +380,108 @@ paths:
                 $ref: "#/components/schemas/SyncQueued"
         default:
           $ref: "#/components/responses/Problem"
+  /api/activities/{id}:
+    get:
+      operationId: getActivity
+      summary: Activity detail
+      description: The activity's summary, its recorded workout and, for a multisport activity, all its legs.
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+      responses:
+        "200":
+          description: The activity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/activities/{id}/laps:
+    get:
+      operationId: listLaps
+      summary: Laps of an activity
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Laps in order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LapPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/activities/{id}/lengths:
+    get:
+      operationId: listSwimLengths
+      summary: Pool lengths of an activity
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Lengths in order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SwimLengthPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/activities/{id}/sets:
+    get:
+      operationId: listStrengthSets
+      summary: Strength sets of an activity
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Sets in order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StrengthSetPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/activities/{id}/streams:
+    get:
+      operationId: getActivityStreams
+      summary: Sample streams of an activity
+      description: |
+        Columnar arrays sharing one time axis (seconds from the activity start); a
+        channel the activity never recorded is absent, and gaps are null. Without
+        maxPoints, full resolution comes in pages of up to 5000 samples. With
+        maxPoints, each channel is reduced to at most that many points by LTTB for
+        charts (the union of the points kept per channel, in one response); stored
+        samples are never reduced.
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+        - name: maxPoints
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 3
+            maximum: 10000
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          description: The samples.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityStreams"
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -392,6 +494,13 @@ components:
       schema:
         type: string
   parameters:
+    ActivityID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
     Cursor:
       name: cursor
       in: query
@@ -699,6 +808,312 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/GarminImportFailure"
+    ActivityDetail:
+      allOf:
+        - $ref: "#/components/schemas/ActivitySummary"
+        - type: object
+          required: [legs]
+          properties:
+            descentM:
+              type: number
+              format: float
+            maxSpeedMS:
+              type: number
+              format: float
+            maxHrBpm:
+              type: integer
+            maxPowerW:
+              type: integer
+            avgCadence:
+              type: number
+              format: float
+            maxCadence:
+              type: number
+              format: float
+            avgTemperatureC:
+              type: number
+              format: float
+            poolLengthM:
+              type: number
+              format: float
+            caloriesKcal:
+              type: integer
+            feel:
+              type: integer
+              description: Workout feel, 0 to 100.
+            notes:
+              type: string
+            weatherTemperatureC:
+              type: number
+              format: float
+            weatherCondition:
+              type: string
+              enum: [sun, cloud, rain, wind, snow]
+            workout:
+              $ref: "#/components/schemas/RecordedWorkout"
+            legs:
+              type: array
+              description: Every leg of the multisport activity this one belongs to, in order; empty otherwise.
+              items:
+                $ref: "#/components/schemas/ActivitySummary"
+
+    RecordedWorkout:
+      type: object
+      required: [steps]
+      properties:
+        name:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkoutStep"
+    WorkoutStep:
+      type: object
+      required: [index, durationType]
+      description: Values in SI units; duration is s for time, m for distance, a count for reps.
+      properties:
+        index:
+          type: integer
+        name:
+          type: string
+        intensity:
+          type: string
+        durationType:
+          type: string
+        duration:
+          type: number
+          format: double
+        targetType:
+          type: string
+        targetLow:
+          type: number
+          format: double
+        targetHigh:
+          type: number
+          format: double
+        targetZone:
+          type: integer
+        repeatFrom:
+          type: integer
+        repeatCount:
+          type: integer
+        exerciseCategory:
+          type: integer
+        exerciseNumber:
+          type: integer
+        weightKg:
+          type: number
+          format: double
+    Lap:
+      type: object
+      required: [index, startTime]
+      properties:
+        index:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        elapsedTimeS:
+          type: number
+          format: double
+        timerTimeS:
+          type: number
+          format: double
+        distanceM:
+          type: number
+          format: double
+        ascentM:
+          type: number
+          format: float
+        descentM:
+          type: number
+          format: float
+        avgSpeedMS:
+          type: number
+          format: float
+        maxSpeedMS:
+          type: number
+          format: float
+        avgHrBpm:
+          type: integer
+        maxHrBpm:
+          type: integer
+        avgPowerW:
+          type: integer
+        maxPowerW:
+          type: integer
+        avgCadence:
+          type: number
+          format: float
+        intensity:
+          type: string
+          enum: [active, rest, warmup, cooldown, recovery, interval, other]
+        workoutStepIndex:
+          type: integer
+    SwimLength:
+      type: object
+      required: [index, startTime, active]
+      properties:
+        index:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        elapsedTimeS:
+          type: number
+          format: double
+        timerTimeS:
+          type: number
+          format: double
+        active:
+          type: boolean
+          description: False for rest (idle) lengths.
+        stroke:
+          type: string
+          enum: [freestyle, backstroke, breaststroke, butterfly, drill, mixed, im]
+        strokes:
+          type: integer
+        avgSpeedMS:
+          type: number
+          format: float
+        swolf:
+          type: number
+          format: double
+          description: Length time in seconds plus strokes, computed by KudOS.
+    StrengthSet:
+      type: object
+      required: [index, startTime, active]
+      properties:
+        index:
+          type: integer
+        startTime:
+          type: string
+          format: date-time
+        durationS:
+          type: number
+          format: double
+        active:
+          type: boolean
+          description: False for rest sets.
+        reps:
+          type: integer
+        weightKg:
+          type: number
+          format: float
+        exerciseName:
+          type: string
+        exerciseCategory:
+          type: integer
+        exerciseNumber:
+          type: integer
+        workoutStepIndex:
+          type: integer
+    LapPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Lap"
+    SwimLengthPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/SwimLength"
+    StrengthSetPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/StrengthSet"
+    ActivityStreams:
+      type: object
+      required: [timeS]
+      properties:
+        timeS:
+          type: array
+          description: Seconds from the activity start.
+          items:
+            type: number
+            format: double
+        lat:
+          type: array
+          description: Degrees.
+          items:
+            type: number
+            format: double
+            nullable: true
+        lon:
+          type: array
+          description: Degrees.
+          items:
+            type: number
+            format: double
+            nullable: true
+        altitudeM:
+          type: array
+          description: Metres.
+          items:
+            type: number
+            format: double
+            nullable: true
+        hrBpm:
+          type: array
+          description: Beats per minute.
+          items:
+            type: number
+            format: double
+            nullable: true
+        powerW:
+          type: array
+          description: Watts.
+          items:
+            type: number
+            format: double
+            nullable: true
+        cadence:
+          type: array
+          description: Steps per minute for running and hiking, rpm for cycling.
+          items:
+            type: number
+            format: double
+            nullable: true
+        speedMS:
+          type: array
+          description: Metres per second.
+          items:
+            type: number
+            format: double
+            nullable: true
+        distanceM:
+          type: array
+          description: Metres from the start.
+          items:
+            type: number
+            format: double
+            nullable: true
+        temperatureC:
+          type: array
+          description: Degrees Celsius.
+          items:
+            type: number
+            format: double
+            nullable: true
+        nextCursor:
+          type: string
+          description: Cursor for the next page of full-resolution samples; absent on the last page.
     Problem:
       type: object
       description: RFC 9457 problem details.

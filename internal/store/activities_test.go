@@ -443,3 +443,29 @@ func TestListActivitiesFiltersAndSorts(t *testing.T) {
 		}
 	}
 }
+
+func TestListMultisportLegsIsolation(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	group, err := q.UpsertMultisportGroup(ctx, db.UpsertMultisportGroupParams{UserID: alice.ID, Source: "upload", SourceGroupID: "tri"})
+	check(t, err)
+	for i, sport := range []string{"cycling", "open_water_swimming"} {
+		// Inserted out of order: legs come back by start time.
+		_, err := q.UpsertActivity(ctx, db.UpsertActivityParams{
+			UserID: alice.ID, Source: "upload", SourceActivityID: sport, Sport: sport, Subtype: "outdoor",
+			StartTime: start.Add(time.Duration(1-i) * time.Hour), MultisportGroupID: &group,
+		})
+		check(t, err)
+	}
+	legs, err := q.ListMultisportLegs(ctx, db.ListMultisportLegsParams{UserID: alice.ID, MultisportGroupID: &group})
+	check(t, err)
+	if len(legs) != 2 || legs[0].Sport != "open_water_swimming" || legs[1].Sport != "cycling" {
+		t.Errorf("legs = %v", legs)
+	}
+	if legs, err := q.ListMultisportLegs(ctx, db.ListMultisportLegsParams{UserID: bob.ID, MultisportGroupID: &group}); err != nil || len(legs) != 0 {
+		t.Errorf("bob lists %d of alice's legs, %v", len(legs), err)
+	}
+}

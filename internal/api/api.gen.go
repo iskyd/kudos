@@ -18,6 +18,78 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for ActivityDetailSource.
+const (
+	ActivityDetailSourceGarmin ActivityDetailSource = "garmin"
+	ActivityDetailSourceManual ActivityDetailSource = "manual"
+	ActivityDetailSourceUpload ActivityDetailSource = "upload"
+)
+
+// Valid indicates whether the value is a known member of the ActivityDetailSource enum.
+func (e ActivityDetailSource) Valid() bool {
+	switch e {
+	case ActivityDetailSourceGarmin:
+		return true
+	case ActivityDetailSourceManual:
+		return true
+	case ActivityDetailSourceUpload:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ActivityDetailSubtype.
+const (
+	ActivityDetailSubtypeIndoor    ActivityDetailSubtype = "indoor"
+	ActivityDetailSubtypeOutdoor   ActivityDetailSubtype = "outdoor"
+	ActivityDetailSubtypeTreadmill ActivityDetailSubtype = "treadmill"
+	ActivityDetailSubtypeVirtual   ActivityDetailSubtype = "virtual"
+)
+
+// Valid indicates whether the value is a known member of the ActivityDetailSubtype enum.
+func (e ActivityDetailSubtype) Valid() bool {
+	switch e {
+	case ActivityDetailSubtypeIndoor:
+		return true
+	case ActivityDetailSubtypeOutdoor:
+		return true
+	case ActivityDetailSubtypeTreadmill:
+		return true
+	case ActivityDetailSubtypeVirtual:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ActivityDetailWeatherCondition.
+const (
+	Cloud ActivityDetailWeatherCondition = "cloud"
+	Rain  ActivityDetailWeatherCondition = "rain"
+	Snow  ActivityDetailWeatherCondition = "snow"
+	Sun   ActivityDetailWeatherCondition = "sun"
+	Wind  ActivityDetailWeatherCondition = "wind"
+)
+
+// Valid indicates whether the value is a known member of the ActivityDetailWeatherCondition enum.
+func (e ActivityDetailWeatherCondition) Valid() bool {
+	switch e {
+	case Cloud:
+		return true
+	case Rain:
+		return true
+	case Snow:
+		return true
+	case Sun:
+		return true
+	case Wind:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ActivitySport.
 const (
 	ActivitySportCycling           ActivitySport = "cycling"
@@ -59,19 +131,19 @@ func (e ActivitySport) Valid() bool {
 
 // Defines values for ActivitySummarySource.
 const (
-	Garmin ActivitySummarySource = "garmin"
-	Manual ActivitySummarySource = "manual"
-	Upload ActivitySummarySource = "upload"
+	ActivitySummarySourceGarmin ActivitySummarySource = "garmin"
+	ActivitySummarySourceManual ActivitySummarySource = "manual"
+	ActivitySummarySourceUpload ActivitySummarySource = "upload"
 )
 
 // Valid indicates whether the value is a known member of the ActivitySummarySource enum.
 func (e ActivitySummarySource) Valid() bool {
 	switch e {
-	case Garmin:
+	case ActivitySummarySourceGarmin:
 		return true
-	case Manual:
+	case ActivitySummarySourceManual:
 		return true
-	case Upload:
+	case ActivitySummarySourceUpload:
 		return true
 	default:
 		return false
@@ -80,22 +152,22 @@ func (e ActivitySummarySource) Valid() bool {
 
 // Defines values for ActivitySummarySubtype.
 const (
-	Indoor    ActivitySummarySubtype = "indoor"
-	Outdoor   ActivitySummarySubtype = "outdoor"
-	Treadmill ActivitySummarySubtype = "treadmill"
-	Virtual   ActivitySummarySubtype = "virtual"
+	ActivitySummarySubtypeIndoor    ActivitySummarySubtype = "indoor"
+	ActivitySummarySubtypeOutdoor   ActivitySummarySubtype = "outdoor"
+	ActivitySummarySubtypeTreadmill ActivitySummarySubtype = "treadmill"
+	ActivitySummarySubtypeVirtual   ActivitySummarySubtype = "virtual"
 )
 
 // Valid indicates whether the value is a known member of the ActivitySummarySubtype enum.
 func (e ActivitySummarySubtype) Valid() bool {
 	switch e {
-	case Indoor:
+	case ActivitySummarySubtypeIndoor:
 		return true
-	case Outdoor:
+	case ActivitySummarySubtypeOutdoor:
 		return true
-	case Treadmill:
+	case ActivitySummarySubtypeTreadmill:
 		return true
-	case Virtual:
+	case ActivitySummarySubtypeVirtual:
 		return true
 	default:
 		return false
@@ -162,6 +234,39 @@ func (e GarminConnectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for LapIntensity.
+const (
+	LapIntensityActive   LapIntensity = "active"
+	LapIntensityCooldown LapIntensity = "cooldown"
+	LapIntensityInterval LapIntensity = "interval"
+	LapIntensityOther    LapIntensity = "other"
+	LapIntensityRecovery LapIntensity = "recovery"
+	LapIntensityRest     LapIntensity = "rest"
+	LapIntensityWarmup   LapIntensity = "warmup"
+)
+
+// Valid indicates whether the value is a known member of the LapIntensity enum.
+func (e LapIntensity) Valid() bool {
+	switch e {
+	case LapIntensityActive:
+		return true
+	case LapIntensityCooldown:
+		return true
+	case LapIntensityInterval:
+		return true
+	case LapIntensityOther:
+		return true
+	case LapIntensityRecovery:
+		return true
+	case LapIntensityRest:
+		return true
+	case LapIntensityWarmup:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Sport.
 const (
 	SportCycling           Sport = "cycling"
@@ -198,6 +303,39 @@ func (e Sport) Valid() bool {
 	}
 }
 
+// Defines values for SwimLengthStroke.
+const (
+	Backstroke   SwimLengthStroke = "backstroke"
+	Breaststroke SwimLengthStroke = "breaststroke"
+	Butterfly    SwimLengthStroke = "butterfly"
+	Drill        SwimLengthStroke = "drill"
+	Freestyle    SwimLengthStroke = "freestyle"
+	Im           SwimLengthStroke = "im"
+	Mixed        SwimLengthStroke = "mixed"
+)
+
+// Valid indicates whether the value is a known member of the SwimLengthStroke enum.
+func (e SwimLengthStroke) Valid() bool {
+	switch e {
+	case Backstroke:
+		return true
+	case Breaststroke:
+		return true
+	case Butterfly:
+		return true
+	case Drill:
+		return true
+	case Freestyle:
+		return true
+	case Im:
+		return true
+	case Mixed:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListActivitiesParamsSort.
 const (
 	Date     ListActivitiesParamsSort = "date"
@@ -219,6 +357,58 @@ func (e ListActivitiesParamsSort) Valid() bool {
 	}
 }
 
+// ActivityDetail defines model for ActivityDetail.
+type ActivityDetail struct {
+	AscentM         *float32 `json:"ascentM,omitempty"`
+	AvgCadence      *float32 `json:"avgCadence,omitempty"`
+	AvgHrBpm        *int     `json:"avgHrBpm,omitempty"`
+	AvgPowerW       *int     `json:"avgPowerW,omitempty"`
+	AvgSpeedMS      *float32 `json:"avgSpeedMS,omitempty"`
+	AvgTemperatureC *float32 `json:"avgTemperatureC,omitempty"`
+	CaloriesKcal    *int     `json:"caloriesKcal,omitempty"`
+	DescentM        *float32 `json:"descentM,omitempty"`
+	DistanceM       *float64 `json:"distanceM,omitempty"`
+	ElapsedTimeS    *float64 `json:"elapsedTimeS,omitempty"`
+
+	// Feel Workout feel, 0 to 100.
+	Feel *int  `json:"feel,omitempty"`
+	Id   int64 `json:"id"`
+
+	// Legs Every leg of the multisport activity this one belongs to, in order; empty otherwise.
+	Legs        []ActivitySummary    `json:"legs"`
+	MaxCadence  *float32             `json:"maxCadence,omitempty"`
+	MaxHrBpm    *int                 `json:"maxHrBpm,omitempty"`
+	MaxPowerW   *int                 `json:"maxPowerW,omitempty"`
+	MaxSpeedMS  *float32             `json:"maxSpeedMS,omitempty"`
+	Notes       *string              `json:"notes,omitempty"`
+	PoolLengthM *float32             `json:"poolLengthM,omitempty"`
+	Rpe         *float32             `json:"rpe,omitempty"`
+	Source      ActivityDetailSource `json:"source"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport ActivitySport `json:"sport"`
+
+	// StartTime Start in UTC.
+	StartTime  time.Time             `json:"startTime"`
+	Subtype    ActivityDetailSubtype `json:"subtype"`
+	TimerTimeS *float64              `json:"timerTimeS,omitempty"`
+
+	// UtcOffsetS Local offset where the activity happened, in seconds.
+	UtcOffsetS          int                             `json:"utcOffsetS"`
+	WeatherCondition    *ActivityDetailWeatherCondition `json:"weatherCondition,omitempty"`
+	WeatherTemperatureC *float32                        `json:"weatherTemperatureC,omitempty"`
+	Workout             *RecordedWorkout                `json:"workout,omitempty"`
+}
+
+// ActivityDetailSource defines model for ActivityDetail.Source.
+type ActivityDetailSource string
+
+// ActivityDetailSubtype defines model for ActivityDetail.Subtype.
+type ActivityDetailSubtype string
+
+// ActivityDetailWeatherCondition defines model for ActivityDetail.WeatherCondition.
+type ActivityDetailWeatherCondition string
+
 // ActivityPage defines model for ActivityPage.
 type ActivityPage struct {
 	Items []ActivitySummary `json:"items"`
@@ -229,6 +419,42 @@ type ActivityPage struct {
 
 // ActivitySport A stored activity's sport; transition is a multisport leg between disciplines.
 type ActivitySport string
+
+// ActivityStreams defines model for ActivityStreams.
+type ActivityStreams struct {
+	// AltitudeM Metres.
+	AltitudeM *[]*float64 `json:"altitudeM,omitempty"`
+
+	// Cadence Steps per minute for running and hiking, rpm for cycling.
+	Cadence *[]*float64 `json:"cadence,omitempty"`
+
+	// DistanceM Metres from the start.
+	DistanceM *[]*float64 `json:"distanceM,omitempty"`
+
+	// HrBpm Beats per minute.
+	HrBpm *[]*float64 `json:"hrBpm,omitempty"`
+
+	// Lat Degrees.
+	Lat *[]*float64 `json:"lat,omitempty"`
+
+	// Lon Degrees.
+	Lon *[]*float64 `json:"lon,omitempty"`
+
+	// NextCursor Cursor for the next page of full-resolution samples; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+
+	// PowerW Watts.
+	PowerW *[]*float64 `json:"powerW,omitempty"`
+
+	// SpeedMS Metres per second.
+	SpeedMS *[]*float64 `json:"speedMS,omitempty"`
+
+	// TemperatureC Degrees Celsius.
+	TemperatureC *[]*float64 `json:"temperatureC,omitempty"`
+
+	// TimeS Seconds from the activity start.
+	TimeS []float64 `json:"timeS"`
+}
 
 // ActivitySummary defines model for ActivitySummary.
 type ActivitySummary struct {
@@ -328,6 +554,37 @@ type GarminImportFailurePage struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// Lap defines model for Lap.
+type Lap struct {
+	AscentM          *float32      `json:"ascentM,omitempty"`
+	AvgCadence       *float32      `json:"avgCadence,omitempty"`
+	AvgHrBpm         *int          `json:"avgHrBpm,omitempty"`
+	AvgPowerW        *int          `json:"avgPowerW,omitempty"`
+	AvgSpeedMS       *float32      `json:"avgSpeedMS,omitempty"`
+	DescentM         *float32      `json:"descentM,omitempty"`
+	DistanceM        *float64      `json:"distanceM,omitempty"`
+	ElapsedTimeS     *float64      `json:"elapsedTimeS,omitempty"`
+	Index            int           `json:"index"`
+	Intensity        *LapIntensity `json:"intensity,omitempty"`
+	MaxHrBpm         *int          `json:"maxHrBpm,omitempty"`
+	MaxPowerW        *int          `json:"maxPowerW,omitempty"`
+	MaxSpeedMS       *float32      `json:"maxSpeedMS,omitempty"`
+	StartTime        time.Time     `json:"startTime"`
+	TimerTimeS       *float64      `json:"timerTimeS,omitempty"`
+	WorkoutStepIndex *int          `json:"workoutStepIndex,omitempty"`
+}
+
+// LapIntensity defines model for Lap.Intensity.
+type LapIntensity string
+
+// LapPage defines model for LapPage.
+type LapPage struct {
+	Items []Lap `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	Password string `json:"password"`
@@ -393,6 +650,12 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// RecordedWorkout defines model for RecordedWorkout.
+type RecordedWorkout struct {
+	Name  *string       `json:"name,omitempty"`
+	Steps []WorkoutStep `json:"steps"`
+}
+
 // RegisterRequest defines model for RegisterRequest.
 type RegisterRequest struct {
 	Password Password `json:"password"`
@@ -432,6 +695,56 @@ type StartGarminBackfillRequest struct {
 	Days *int `json:"days,omitempty"`
 }
 
+// StrengthSet defines model for StrengthSet.
+type StrengthSet struct {
+	// Active False for rest sets.
+	Active           bool      `json:"active"`
+	DurationS        *float64  `json:"durationS,omitempty"`
+	ExerciseCategory *int      `json:"exerciseCategory,omitempty"`
+	ExerciseName     *string   `json:"exerciseName,omitempty"`
+	ExerciseNumber   *int      `json:"exerciseNumber,omitempty"`
+	Index            int       `json:"index"`
+	Reps             *int      `json:"reps,omitempty"`
+	StartTime        time.Time `json:"startTime"`
+	WeightKg         *float32  `json:"weightKg,omitempty"`
+	WorkoutStepIndex *int      `json:"workoutStepIndex,omitempty"`
+}
+
+// StrengthSetPage defines model for StrengthSetPage.
+type StrengthSetPage struct {
+	Items []StrengthSet `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// SwimLength defines model for SwimLength.
+type SwimLength struct {
+	// Active False for rest (idle) lengths.
+	Active       bool              `json:"active"`
+	AvgSpeedMS   *float32          `json:"avgSpeedMS,omitempty"`
+	ElapsedTimeS *float64          `json:"elapsedTimeS,omitempty"`
+	Index        int               `json:"index"`
+	StartTime    time.Time         `json:"startTime"`
+	Stroke       *SwimLengthStroke `json:"stroke,omitempty"`
+	Strokes      *int              `json:"strokes,omitempty"`
+
+	// Swolf Length time in seconds plus strokes, computed by KudOS.
+	Swolf      *float64 `json:"swolf,omitempty"`
+	TimerTimeS *float64 `json:"timerTimeS,omitempty"`
+}
+
+// SwimLengthStroke defines model for SwimLength.Stroke.
+type SwimLengthStroke string
+
+// SwimLengthPage defines model for SwimLengthPage.
+type SwimLengthPage struct {
+	Items []SwimLength `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
 // SyncQueued defines model for SyncQueued.
 type SyncQueued struct {
 	// Queued False when a sync was already queued or running.
@@ -459,6 +772,27 @@ type UploadResult struct {
 
 // Username 3 to 32 characters among a-z, 0-9, ".", "_" and "-". Case-insensitive; stored lowercase.
 type Username = string
+
+// WorkoutStep Values in SI units; duration is s for time, m for distance, a count for reps.
+type WorkoutStep struct {
+	Duration         *float64 `json:"duration,omitempty"`
+	DurationType     string   `json:"durationType"`
+	ExerciseCategory *int     `json:"exerciseCategory,omitempty"`
+	ExerciseNumber   *int     `json:"exerciseNumber,omitempty"`
+	Index            int      `json:"index"`
+	Intensity        *string  `json:"intensity,omitempty"`
+	Name             *string  `json:"name,omitempty"`
+	RepeatCount      *int     `json:"repeatCount,omitempty"`
+	RepeatFrom       *int     `json:"repeatFrom,omitempty"`
+	TargetHigh       *float64 `json:"targetHigh,omitempty"`
+	TargetLow        *float64 `json:"targetLow,omitempty"`
+	TargetType       *string  `json:"targetType,omitempty"`
+	TargetZone       *int     `json:"targetZone,omitempty"`
+	WeightKg         *float64 `json:"weightKg,omitempty"`
+}
+
+// ActivityID defines model for ActivityID.
+type ActivityID = int64
 
 // Cursor defines model for Cursor.
 type Cursor = string
@@ -490,6 +824,41 @@ type ListActivitiesParamsSort string
 // UploadActivityMultipartBody defines parameters for UploadActivity.
 type UploadActivityMultipartBody struct {
 	File openapi_types.File `json:"file"`
+}
+
+// ListLapsParams defines parameters for ListLaps.
+type ListLapsParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListSwimLengthsParams defines parameters for ListSwimLengths.
+type ListSwimLengthsParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListStrengthSetsParams defines parameters for ListStrengthSets.
+type ListStrengthSetsParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// GetActivityStreamsParams defines parameters for GetActivityStreams.
+type GetActivityStreamsParams struct {
+	MaxPoints *int `form:"maxPoints,omitempty" json:"maxPoints,omitempty"`
+
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
 // ListGarminBackfillFailuresParams defines parameters for ListGarminBackfillFailures.
@@ -539,6 +908,21 @@ type ServerInterface interface {
 	// UploadActivity Upload a FIT, GPX or TCX file
 	// (POST /api/activities/uploads)
 	UploadActivity(w http.ResponseWriter, r *http.Request)
+	// GetActivity Activity detail
+	// (GET /api/activities/{id})
+	GetActivity(w http.ResponseWriter, r *http.Request, id ActivityID)
+	// ListLaps Laps of an activity
+	// (GET /api/activities/{id}/laps)
+	ListLaps(w http.ResponseWriter, r *http.Request, id ActivityID, params ListLapsParams)
+	// ListSwimLengths Pool lengths of an activity
+	// (GET /api/activities/{id}/lengths)
+	ListSwimLengths(w http.ResponseWriter, r *http.Request, id ActivityID, params ListSwimLengthsParams)
+	// ListStrengthSets Strength sets of an activity
+	// (GET /api/activities/{id}/sets)
+	ListStrengthSets(w http.ResponseWriter, r *http.Request, id ActivityID, params ListStrengthSetsParams)
+	// GetActivityStreams Sample streams of an activity
+	// (GET /api/activities/{id}/streams)
+	GetActivityStreams(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityStreamsParams)
 	// Login Log in
 	// (POST /api/auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -605,6 +989,36 @@ func (_ Unimplemented) CreateActivity(w http.ResponseWriter, r *http.Request) {
 // UploadActivity Upload a FIT, GPX or TCX file
 // (POST /api/activities/uploads)
 func (_ Unimplemented) UploadActivity(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetActivity Activity detail
+// (GET /api/activities/{id})
+func (_ Unimplemented) GetActivity(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListLaps Laps of an activity
+// (GET /api/activities/{id}/laps)
+func (_ Unimplemented) ListLaps(w http.ResponseWriter, r *http.Request, id ActivityID, params ListLapsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListSwimLengths Pool lengths of an activity
+// (GET /api/activities/{id}/lengths)
+func (_ Unimplemented) ListSwimLengths(w http.ResponseWriter, r *http.Request, id ActivityID, params ListSwimLengthsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListStrengthSets Strength sets of an activity
+// (GET /api/activities/{id}/sets)
+func (_ Unimplemented) ListStrengthSets(w http.ResponseWriter, r *http.Request, id ActivityID, params ListStrengthSetsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetActivityStreams Sample streams of an activity
+// (GET /api/activities/{id}/streams)
+func (_ Unimplemented) GetActivityStreams(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityStreamsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -824,6 +1238,252 @@ func (siw *ServerInterfaceWrapper) UploadActivity(w http.ResponseWriter, r *http
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UploadActivity(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActivity operation middleware
+func (siw *ServerInterfaceWrapper) GetActivity(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActivity(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListLaps operation middleware
+func (siw *ServerInterfaceWrapper) ListLaps(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListLapsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListLaps(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSwimLengths operation middleware
+func (siw *ServerInterfaceWrapper) ListSwimLengths(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSwimLengthsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSwimLengths(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListStrengthSets operation middleware
+func (siw *ServerInterfaceWrapper) ListStrengthSets(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListStrengthSetsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListStrengthSets(w, r, id, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActivityStreams operation middleware
+func (siw *ServerInterfaceWrapper) GetActivityStreams(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetActivityStreamsParams
+
+	// ------------- Optional query parameter "maxPoints" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "maxPoints", r.URL.Query(), &params.MaxPoints, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "maxPoints"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "maxPoints", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActivityStreams(w, r, id, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1242,6 +1902,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/garmin/sync", wrapper.SyncGarmin)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}", wrapper.GetActivity)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}/laps", wrapper.ListLaps)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}/lengths", wrapper.ListSwimLengths)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}/sets", wrapper.ListStrengthSets)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}/streams", wrapper.GetActivityStreams)
+	})
 
 	return r
 }
@@ -1354,6 +2029,205 @@ type UploadActivitydefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response UploadActivitydefaultApplicationProblemPlusJSONResponse) VisitUploadActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityRequestObject struct {
+	Id ActivityID `json:"id"`
+}
+
+type GetActivityResponseObject interface {
+	VisitGetActivityResponse(w http.ResponseWriter) error
+}
+
+type GetActivity200JSONResponse ActivityDetail
+
+func (response GetActivity200JSONResponse) VisitGetActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivitydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetActivitydefaultApplicationProblemPlusJSONResponse) VisitGetActivityResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLapsRequestObject struct {
+	Id     ActivityID `json:"id"`
+	Params ListLapsParams
+}
+
+type ListLapsResponseObject interface {
+	VisitListLapsResponse(w http.ResponseWriter) error
+}
+
+type ListLaps200JSONResponse LapPage
+
+func (response ListLaps200JSONResponse) VisitListLapsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListLapsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListLapsdefaultApplicationProblemPlusJSONResponse) VisitListLapsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSwimLengthsRequestObject struct {
+	Id     ActivityID `json:"id"`
+	Params ListSwimLengthsParams
+}
+
+type ListSwimLengthsResponseObject interface {
+	VisitListSwimLengthsResponse(w http.ResponseWriter) error
+}
+
+type ListSwimLengths200JSONResponse SwimLengthPage
+
+func (response ListSwimLengths200JSONResponse) VisitListSwimLengthsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSwimLengthsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListSwimLengthsdefaultApplicationProblemPlusJSONResponse) VisitListSwimLengthsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListStrengthSetsRequestObject struct {
+	Id     ActivityID `json:"id"`
+	Params ListStrengthSetsParams
+}
+
+type ListStrengthSetsResponseObject interface {
+	VisitListStrengthSetsResponse(w http.ResponseWriter) error
+}
+
+type ListStrengthSets200JSONResponse StrengthSetPage
+
+func (response ListStrengthSets200JSONResponse) VisitListStrengthSetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListStrengthSetsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListStrengthSetsdefaultApplicationProblemPlusJSONResponse) VisitListStrengthSetsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityStreamsRequestObject struct {
+	Id     ActivityID `json:"id"`
+	Params GetActivityStreamsParams
+}
+
+type GetActivityStreamsResponseObject interface {
+	VisitGetActivityStreamsResponse(w http.ResponseWriter) error
+}
+
+type GetActivityStreams200JSONResponse ActivityStreams
+
+func (response GetActivityStreams200JSONResponse) VisitGetActivityStreamsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityStreamsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetActivityStreamsdefaultApplicationProblemPlusJSONResponse) VisitGetActivityStreamsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -1967,6 +2841,21 @@ type StrictServerInterface interface {
 	// UploadActivity Upload a FIT, GPX or TCX file
 	// (POST /api/activities/uploads)
 	UploadActivity(ctx context.Context, request UploadActivityRequestObject) (UploadActivityResponseObject, error)
+	// GetActivity Activity detail
+	// (GET /api/activities/{id})
+	GetActivity(ctx context.Context, request GetActivityRequestObject) (GetActivityResponseObject, error)
+	// ListLaps Laps of an activity
+	// (GET /api/activities/{id}/laps)
+	ListLaps(ctx context.Context, request ListLapsRequestObject) (ListLapsResponseObject, error)
+	// ListSwimLengths Pool lengths of an activity
+	// (GET /api/activities/{id}/lengths)
+	ListSwimLengths(ctx context.Context, request ListSwimLengthsRequestObject) (ListSwimLengthsResponseObject, error)
+	// ListStrengthSets Strength sets of an activity
+	// (GET /api/activities/{id}/sets)
+	ListStrengthSets(ctx context.Context, request ListStrengthSetsRequestObject) (ListStrengthSetsResponseObject, error)
+	// GetActivityStreams Sample streams of an activity
+	// (GET /api/activities/{id}/streams)
+	GetActivityStreams(ctx context.Context, request GetActivityStreamsRequestObject) (GetActivityStreamsResponseObject, error)
 	// Login Log in
 	// (POST /api/auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
@@ -2134,6 +3023,140 @@ func (sh *strictHandler) UploadActivity(w http.ResponseWriter, r *http.Request) 
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UploadActivityResponseObject); ok {
 		if err := validResponse.VisitUploadActivityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActivity operation middleware
+func (sh *strictHandler) GetActivity(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	var request GetActivityRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActivity(ctx, request.(GetActivityRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActivity")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActivityResponseObject); ok {
+		if err := validResponse.VisitGetActivityResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListLaps operation middleware
+func (sh *strictHandler) ListLaps(w http.ResponseWriter, r *http.Request, id ActivityID, params ListLapsParams) {
+	var request ListLapsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListLaps(ctx, request.(ListLapsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListLaps")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListLapsResponseObject); ok {
+		if err := validResponse.VisitListLapsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSwimLengths operation middleware
+func (sh *strictHandler) ListSwimLengths(w http.ResponseWriter, r *http.Request, id ActivityID, params ListSwimLengthsParams) {
+	var request ListSwimLengthsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSwimLengths(ctx, request.(ListSwimLengthsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSwimLengths")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSwimLengthsResponseObject); ok {
+		if err := validResponse.VisitListSwimLengthsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListStrengthSets operation middleware
+func (sh *strictHandler) ListStrengthSets(w http.ResponseWriter, r *http.Request, id ActivityID, params ListStrengthSetsParams) {
+	var request ListStrengthSetsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListStrengthSets(ctx, request.(ListStrengthSetsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListStrengthSets")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListStrengthSetsResponseObject); ok {
+		if err := validResponse.VisitListStrengthSetsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActivityStreams operation middleware
+func (sh *strictHandler) GetActivityStreams(w http.ResponseWriter, r *http.Request, id ActivityID, params GetActivityStreamsParams) {
+	var request GetActivityStreamsRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActivityStreams(ctx, request.(GetActivityStreamsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActivityStreams")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActivityStreamsResponseObject); ok {
+		if err := validResponse.VisitGetActivityStreamsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -249,7 +249,7 @@ func TestListActivities(t *testing.T) {
 
 	page := decodeJSON[ActivityPage](t, c.do(http.MethodGet, "/api/activities?limit=1", nil, nil), http.StatusOK)
 	a := page.Items[0]
-	if a.Source != Manual || a.Subtype != Indoor || a.TimerTimeS == nil || *a.TimerTimeS != 2400 || a.DistanceM != nil {
+	if a.Source != ActivitySummarySourceManual || a.Subtype != ActivitySummarySubtypeIndoor || a.TimerTimeS == nil || *a.TimerTimeS != 2400 || a.DistanceM != nil {
 		t.Errorf("summary = %+v", a)
 	}
 	empty := decodeJSON[ActivityPage](t, c.do(http.MethodGet, "/api/activities?sport=hiking", nil, nil), http.StatusOK)
