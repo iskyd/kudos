@@ -28,3 +28,26 @@ export function formatActivityStart(startTime: string, utcOffsetS: number): stri
     timeZone: 'UTC',
   })
 }
+
+// paceSeconds turns a speed into seconds per `per` metres (1000 for /km, 100 for
+// swimming); null when standing still.
+export function paceSeconds(metresPerSecond: number, per = 1000): number | null {
+  return metresPerSecond > 0 ? per / metresPerSecond : null
+}
+
+// formatPace renders a speed as a pace: "4:35 /km", or "1:45 /100 m" with per = 100.
+export function formatPace(metresPerSecond: number, per = 1000): string {
+  const s = paceSeconds(metresPerSecond, per)
+  if (s === null) return '—'
+  return `${formatDuration(s)} ${per === 1000 ? '/km' : `/${String(per)} m`}`
+}
+
+// formatSpeed renders metres per second as "28.4 km/h".
+export function formatSpeed(metresPerSecond: number): string {
+  return `${(metresPerSecond * 3.6).toFixed(1)} km/h`
+}
+
+// formatWhole renders a value rounded to a whole number with its unit: "152 bpm".
+export function formatWhole(value: number, unit: string): string {
+  return `${String(Math.round(value))} ${unit}`
+}

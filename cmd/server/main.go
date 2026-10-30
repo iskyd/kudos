@@ -96,7 +96,7 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 		Addr: listenAddr,
 		Handler: api.NewRouter(logger, api.NewServer(db.New(pool), ingester, cursors, api.GarminDeps{
 			Auth: garminClient, Cipher: cipher, Sync: garminSync,
-		}, cfg.RegistrationEnabled), spa),
+		}, cfg.RegistrationEnabled, cfg.MapTileURL), spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 

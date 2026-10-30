@@ -486,6 +486,12 @@ type ActivitySummarySource string
 // ActivitySummarySubtype defines model for ActivitySummary.Subtype.
 type ActivitySummarySubtype string
 
+// Config defines model for Config.
+type Config struct {
+	// MapTileUrl Raster tile URL template with {z}, {x} and {y}.
+	MapTileUrl string `json:"mapTileUrl"`
+}
+
 // CreatedActivity defines model for CreatedActivity.
 type CreatedActivity struct {
 	Id int64 `json:"id"`
@@ -932,6 +938,9 @@ type ServerInterface interface {
 	// Register Create an account and log in
 	// (POST /api/auth/register)
 	Register(w http.ResponseWriter, r *http.Request)
+	// GetConfig Frontend settings
+	// (GET /api/config)
+	GetConfig(w http.ResponseWriter, r *http.Request)
 	// DeleteGarminConnection Disconnect Garmin
 	// (DELETE /api/garmin)
 	DeleteGarminConnection(w http.ResponseWriter, r *http.Request)
@@ -1037,6 +1046,12 @@ func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
 // Register Create an account and log in
 // (POST /api/auth/register)
 func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetConfig Frontend settings
+// (GET /api/config)
+func (_ Unimplemented) GetConfig(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1535,6 +1550,20 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// GetConfig operation middleware
+func (siw *ServerInterfaceWrapper) GetConfig(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteGarminConnection operation middleware
 func (siw *ServerInterfaceWrapper) DeleteGarminConnection(w http.ResponseWriter, r *http.Request) {
 
@@ -1859,6 +1888,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/auth/logout", wrapper.Logout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/config", wrapper.GetConfig)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/me", wrapper.GetMe)
@@ -2377,6 +2409,44 @@ func (response RegisterdefaultApplicationProblemPlusJSONResponse) VisitRegisterR
 	return err
 }
 
+type GetConfigRequestObject struct {
+}
+
+type GetConfigResponseObject interface {
+	VisitGetConfigResponse(w http.ResponseWriter) error
+}
+
+type GetConfig200JSONResponse Config
+
+func (response GetConfig200JSONResponse) VisitGetConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetConfigdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetConfigdefaultApplicationProblemPlusJSONResponse) VisitGetConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type DeleteGarminConnectionRequestObject struct {
 }
 
@@ -2865,6 +2935,9 @@ type StrictServerInterface interface {
 	// Register Create an account and log in
 	// (POST /api/auth/register)
 	Register(ctx context.Context, request RegisterRequestObject) (RegisterResponseObject, error)
+	// GetConfig Frontend settings
+	// (GET /api/config)
+	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
 	// DeleteGarminConnection Disconnect Garmin
 	// (DELETE /api/garmin)
 	DeleteGarminConnection(ctx context.Context, request DeleteGarminConnectionRequestObject) (DeleteGarminConnectionResponseObject, error)
@@ -3243,6 +3316,30 @@ func (sh *strictHandler) Register(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RegisterResponseObject); ok {
 		if err := validResponse.VisitRegisterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetConfig operation middleware
+func (sh *strictHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
+	var request GetConfigRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetConfig(ctx, request.(GetConfigRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetConfig")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetConfigResponseObject); ok {
+		if err := validResponse.VisitGetConfigResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

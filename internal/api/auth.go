@@ -32,6 +32,7 @@ type Server struct {
 	cursors             *Cursors
 	garmin              GarminDeps
 	registrationEnabled bool
+	mapTileURL          string
 	argon               argonParams
 	// dummyHash is verified against when a username is unknown, so login takes
 	// the same time whether or not the account exists.
@@ -41,17 +42,22 @@ type Server struct {
 var _ StrictServerInterface = (*Server)(nil)
 
 // NewServer returns the API server backed by q, storing activities with ingester.
-func NewServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool) *Server {
-	return newServer(q, ingester, cursors, garmin, registrationEnabled, defaultArgon())
+func NewServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool,
+	mapTileURL string,
+) *Server {
+	return newServer(q, ingester, cursors, garmin, registrationEnabled, mapTileURL, defaultArgon())
 }
 
-func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool, p argonParams) *Server {
+func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool,
+	mapTileURL string, p argonParams,
+) *Server {
 	return &Server{
 		q:                   q,
 		ingest:              ingester,
 		cursors:             cursors,
 		garmin:              garmin,
 		registrationEnabled: registrationEnabled,
+		mapTileURL:          mapTileURL,
 		argon:               p,
 		dummyHash:           hashPassword(p, "dummy password"),
 	}
@@ -169,4 +175,9 @@ func validateTimezone(tz string) error {
 		return &Error{Kind: KindInvalidRequest, Detail: "timezone must be an IANA time zone name, e.g. Europe/Rome"}
 	}
 	return nil
+}
+
+// GetConfig returns the settings the frontend needs from the server.
+func (s *Server) GetConfig(context.Context, GetConfigRequestObject) (GetConfigResponseObject, error) {
+	return GetConfig200JSONResponse{MapTileUrl: s.mapTileURL}, nil
 }

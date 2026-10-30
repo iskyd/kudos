@@ -1,4 +1,5 @@
 import { useState, type ReactNode, type SubmitEvent } from 'react'
+import { Link } from 'react-router'
 import {
   type ActivityFilters,
   type ActivitySport,
@@ -24,22 +25,21 @@ import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select'
 import { Textarea } from '@/components/ui/textarea'
 import { parseDuration, parseKilometres } from '@/lib/format/input'
 import { formatActivityStart, formatDistance, formatDuration } from '@/lib/format/units'
+import { sportLabels } from '@/lib/sports'
 
-const sports: { value: Sport; label: string }[] = [
-  { value: 'running', label: 'Running' },
-  { value: 'trail_running', label: 'Trail running' },
-  { value: 'cycling', label: 'Cycling' },
-  { value: 'pool_swimming', label: 'Pool swimming' },
-  { value: 'open_water_swimming', label: 'Open water swimming' },
-  { value: 'hiking', label: 'Hiking' },
-  { value: 'strength', label: 'Strength' },
-  { value: 'other', label: 'Other' },
-]
-
-const sportLabels: Record<ActivitySport, string> = {
-  ...(Object.fromEntries(sports.map((s) => [s.value, s.label])) as Record<Sport, string>),
-  transition: 'Transition',
-}
+// Sports a manual activity can have: every stored sport but multisport transitions.
+const sports: { value: Sport; label: string }[] = (
+  [
+    'running',
+    'trail_running',
+    'cycling',
+    'pool_swimming',
+    'open_water_swimming',
+    'hiking',
+    'strength',
+    'other',
+  ] as const
+).map((value) => ({ value, label: sportLabels[value] }))
 
 const sortOptions: { value: ActivityFilters['sort']; label: string }[] = [
   { value: 'date', label: 'Newest' },
@@ -185,7 +185,11 @@ function ActivityRow({ activity: a }: { activity: ActivitySummary }) {
   const duration = a.timerTimeS ?? a.elapsedTimeS
   return (
     <tr className="border-t border-border">
-      <td className="py-2">{formatActivityStart(a.startTime, a.utcOffsetS)}</td>
+      <td className="py-2">
+        <Link to={`/activities/${String(a.id)}`} className="underline">
+          {formatActivityStart(a.startTime, a.utcOffsetS)}
+        </Link>
+      </td>
       <td className="py-2">{sportLabels[a.sport]}</td>
       <td className="py-2 text-right">{duration === undefined ? '—' : formatDuration(duration)}</td>
       <td className="py-2 text-right">

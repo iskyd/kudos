@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCurrentUser } from '@/api/auth'
 import { api } from '@/api/client'
 import type { components } from '@/api/generated/schema'
@@ -63,6 +63,78 @@ export function useCreateActivity() {
         body,
         headers: { 'X-CSRF-Token': csrfToken },
       })
+      if (error) throw new ApiError(error)
+      return data
+    },
+  })
+}
+
+export type ActivityDetail = components['schemas']['ActivityDetail']
+export type ActivityStreams = components['schemas']['ActivityStreams']
+export type Lap = components['schemas']['Lap']
+export type SwimLength = components['schemas']['SwimLength']
+export type StrengthSet = components['schemas']['StrengthSet']
+
+// Points per channel requested for charts; full resolution stays on the server.
+export const chartPoints = 1000
+
+export function useActivity(id: number) {
+  return useQuery({
+    queryKey: [...activitiesKey, id],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/activities/{id}', { params: { path: { id } } })
+      if (error) throw new ApiError(error)
+      return data
+    },
+  })
+}
+
+export function useActivityStreams(id: number) {
+  return useQuery({
+    queryKey: [...activitiesKey, id, 'streams'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/activities/{id}/streams', {
+        params: { path: { id }, query: { maxPoints: chartPoints } },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+  })
+}
+
+type ChildPath =
+  '/api/activities/{id}/laps' | '/api/activities/{id}/lengths' | '/api/activities/{id}/sets'
+
+// T names the item type of the chosen path, which openapi-fetch types only as a union.
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-type-parameters
+function useChildList<T>(path: ChildPath, id: number, enabled: boolean) {
+  return useInfiniteQuery({
+    queryKey: [...activitiesKey, id, path],
+    enabled,
+    initialPageParam: undefined as string | undefined,
+    queryFn: async ({ pageParam }) => {
+      const { data, error } = await api.GET(path, {
+        params: { path: { id }, query: { cursor: pageParam, limit: 100 } },
+      })
+      if (error) throw new ApiError(error)
+      return data as { items: T[]; nextCursor?: string }
+    },
+    getNextPageParam: (page) => page.nextCursor,
+  })
+}
+
+export const useLaps = (id: number) => useChildList<Lap>('/api/activities/{id}/laps', id, true)
+export const useSwimLengths = (id: number, enabled: boolean) =>
+  useChildList<SwimLength>('/api/activities/{id}/lengths', id, enabled)
+export const useStrengthSets = (id: number, enabled: boolean) =>
+  useChildList<StrengthSet>('/api/activities/{id}/sets', id, enabled)
+
+export function useConfig() {
+  return useQuery({
+    queryKey: ['config'],
+    staleTime: Infinity,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/config')
       if (error) throw new ApiError(error)
       return data
     },

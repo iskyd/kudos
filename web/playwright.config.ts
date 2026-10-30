@@ -9,7 +9,16 @@ export default defineConfig({
   testDir: './e2e',
   forbidOnly: !!process.env.CI,
   use: { baseURL, trace: 'on-first-retry' },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  projects: [
+    {
+      name: 'chromium',
+      use: {
+        ...devices['Desktop Chrome'],
+        // Software WebGL so the map renders in headless and GPU-less CI browsers.
+        launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
+      },
+    },
+  ],
   webServer: [
     {
       // Serves the recorded Garmin fixtures: no test calls Garmin.
@@ -29,6 +38,8 @@ export default defineConfig({
         ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
         REGISTRATION_ENABLED: 'true',
         GARMIN_API_URL: fakeGarminURL,
+        // Map tiles from the fake host too: tests never fetch real tiles (they fail, the map still draws).
+        MAP_TILE_URL: `${fakeGarminURL}/tiles/{z}/{x}/{y}.png`,
       },
     },
   ],
