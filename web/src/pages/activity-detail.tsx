@@ -13,6 +13,7 @@ import {
   useStrengthSets,
   useSwimLengths,
 } from '@/api/activities'
+import { useGear } from '@/api/gear'
 import { ApiError, problemMessage } from '@/api/problem'
 import { RouteMap } from '@/components/route-map'
 import { StreamChart } from '@/components/stream-chart'
@@ -405,6 +406,11 @@ function Annotation({ a }: { a: ActivityDetail }) {
   const [tags, setTags] = useState(a.painTags.join(', '))
   const [temperature, setTemperature] = useState(numberText(a.weatherTemperatureC))
   const [condition, setCondition] = useState<string>(a.weatherCondition ?? '')
+  const [gearId, setGearId] = useState(a.gearId === undefined ? '' : String(a.gearId))
+  // Retired gear stays listed only where it is already assigned.
+  const gear = (useGear().data?.pages[0]?.items ?? []).filter(
+    (g) => !g.retired || String(g.id) === gearId,
+  )
   const [invalid, setInvalid] = useState<string | null>(null)
   const moodOptions =
     moods.some((m) => String(m.value) === feel) || feel === ''
@@ -438,6 +444,7 @@ function Annotation({ a }: { a: ActivityDetail }) {
       painTags: parseTags(tags),
       weatherTemperatureC: tempValue,
       weatherCondition: condition === '' ? undefined : (condition as (typeof conditions)[number]),
+      gearId: gearId === '' ? undefined : Number(gearId),
     })
   }
 
@@ -507,6 +514,22 @@ function Annotation({ a }: { a: ActivityDetail }) {
             </NativeSelect>
           </Field>
         </div>
+        <Field id="gear" label="Gear">
+          <NativeSelect
+            id="gear"
+            value={gearId}
+            onChange={(e) => {
+              changed(setGearId)(e.target.value)
+            }}
+          >
+            <NativeSelectOption value="">None</NativeSelectOption>
+            {gear.map((g) => (
+              <NativeSelectOption key={g.id} value={String(g.id)}>
+                {g.name}
+              </NativeSelectOption>
+            ))}
+          </NativeSelect>
+        </Field>
         <div className="sm:col-span-2">
           <Field id="notes" label="Notes">
             <Textarea

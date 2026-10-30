@@ -2,6 +2,7 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tansta
 import { useCurrentUser } from '@/api/auth'
 import { api } from '@/api/client'
 import type { components } from '@/api/generated/schema'
+import { gearKey } from '@/api/gear'
 import { ApiError } from '@/api/problem'
 
 export type Sport = components['schemas']['Sport']
@@ -11,6 +12,7 @@ export type ActivitySummary = components['schemas']['ActivitySummary']
 
 export interface ActivityFilters {
   sport?: ActivitySport
+  gear?: number
   tag?: string
   from?: string // local day, YYYY-MM-DD
   to?: string
@@ -157,8 +159,15 @@ export function useSetAnnotation(id: number) {
       if (error) throw new ApiError(error)
       return data
     },
-    onSuccess: (detail) => {
+    onSuccess: async (detail) => {
       queryClient.setQueryData([...activitiesKey, id], detail)
+      // Gear totals and the gear filter depend on the assignment.
+      await queryClient.invalidateQueries({ queryKey: gearKey })
+      // Lists only: their key holds the filters object, the detail's holds the ID.
+      await queryClient.invalidateQueries({
+        queryKey: activitiesKey,
+        predicate: (q) => typeof q.queryKey[1] === 'object',
+      })
     },
   })
 }

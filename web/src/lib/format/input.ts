@@ -18,6 +18,11 @@ export function parseKilometres(text: string): number | null {
   return Math.round(Number(trimmed) * 1000 * 1000) / 1000
 }
 
+// kilometresText is the input text for a distance in metres, the inverse of parseKilometres.
+export function kilometresText(metres: number): string {
+  return String(metres / 1000)
+}
+
 // parseOptionalNumber reads an optional number field (dot or comma decimal):
 // undefined when blank, null when not a number.
 export function parseOptionalNumber(text: string): number | undefined | null {

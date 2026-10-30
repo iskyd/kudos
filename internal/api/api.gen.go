@@ -261,6 +261,42 @@ func (e GarminConnectionStatus) Valid() bool {
 	}
 }
 
+// Defines values for GearKind.
+const (
+	GearKindBike  GearKind = "bike"
+	GearKindShoes GearKind = "shoes"
+)
+
+// Valid indicates whether the value is a known member of the GearKind enum.
+func (e GearKind) Valid() bool {
+	switch e {
+	case GearKindBike:
+		return true
+	case GearKindShoes:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GearInputKind.
+const (
+	GearInputKindBike  GearInputKind = "bike"
+	GearInputKindShoes GearInputKind = "shoes"
+)
+
+// Valid indicates whether the value is a known member of the GearInputKind enum.
+func (e GearInputKind) Valid() bool {
+	switch e {
+	case GearInputKindBike:
+		return true
+	case GearInputKindShoes:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LapIntensity.
 const (
 	LapIntensityActive   LapIntensity = "active"
@@ -387,7 +423,10 @@ func (e ListActivitiesParamsSort) Valid() bool {
 // ActivityAnnotation defines model for ActivityAnnotation.
 type ActivityAnnotation struct {
 	// Feel Mood after the activity, 0 (very weak) to 100 (very strong), as Garmin records it.
-	Feel     *int      `json:"feel,omitempty"`
+	Feel *int `json:"feel,omitempty"`
+
+	// GearId The user's own shoes or bike.
+	GearId   *int64    `json:"gearId,omitempty"`
 	Notes    *string   `json:"notes,omitempty"`
 	PainTags *[]string `json:"painTags,omitempty"`
 
@@ -414,8 +453,9 @@ type ActivityDetail struct {
 	ElapsedTimeS    *float64 `json:"elapsedTimeS,omitempty"`
 
 	// Feel Workout feel, 0 to 100.
-	Feel *int  `json:"feel,omitempty"`
-	Id   int64 `json:"id"`
+	Feel   *int   `json:"feel,omitempty"`
+	GearId *int64 `json:"gearId,omitempty"`
+	Id     int64  `json:"id"`
 
 	// Legs Every leg of the multisport activity this one belongs to, in order; empty otherwise.
 	Legs        []ActivitySummary    `json:"legs"`
@@ -599,6 +639,51 @@ type GarminImportFailure struct {
 // GarminImportFailurePage defines model for GarminImportFailurePage.
 type GarminImportFailurePage struct {
 	Items []GarminImportFailure `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// Gear defines model for Gear.
+type Gear struct {
+	Activities int64 `json:"activities"`
+
+	// DistanceM Summed over the assigned activities.
+	DistanceM float64  `json:"distanceM"`
+	Id        int64    `json:"id"`
+	Kind      GearKind `json:"kind"`
+	Name      string   `json:"name"`
+
+	// ReplacementDistanceM Distance at which to replace it; absent for no warning.
+	ReplacementDistanceM *float64 `json:"replacementDistanceM,omitempty"`
+
+	// ReplacementDue The distance has reached the replacement threshold.
+	ReplacementDue bool `json:"replacementDue"`
+	Retired        bool `json:"retired"`
+
+	// TimeS Timer time (else elapsed time) summed over the assigned activities.
+	TimeS float64 `json:"timeS"`
+}
+
+// GearKind defines model for Gear.Kind.
+type GearKind string
+
+// GearInput defines model for GearInput.
+type GearInput struct {
+	Kind GearInputKind `json:"kind"`
+	Name string        `json:"name"`
+
+	// ReplacementDistanceM Distance at which to replace it; absent for no warning.
+	ReplacementDistanceM *float64 `json:"replacementDistanceM,omitempty"`
+	Retired              *bool    `json:"retired,omitempty"`
+}
+
+// GearInputKind defines model for GearInput.Kind.
+type GearInputKind string
+
+// GearPage defines model for GearPage.
+type GearPage struct {
+	Items []Gear `json:"items"`
 
 	// NextCursor Cursor for the next page; absent on the last page.
 	NextCursor *string `json:"nextCursor,omitempty"`
@@ -847,6 +932,9 @@ type ActivityID = int64
 // Cursor defines model for Cursor.
 type Cursor = string
 
+// GearID defines model for GearID.
+type GearID = int64
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -859,6 +947,9 @@ type ListActivitiesParams struct {
 
 	// To Last local day, inclusive.
 	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+
+	// Gear Only activities with this gear.
+	Gear *int64 `form:"gear,omitempty" json:"gear,omitempty"`
 
 	// Tag Only activities with this pain tag.
 	Tag  *string                   `form:"tag,omitempty" json:"tag,omitempty"`
@@ -923,6 +1014,15 @@ type ListGarminBackfillFailuresParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListGearParams defines parameters for ListGear.
+type ListGearParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // CreateActivityJSONRequestBody defines body for CreateActivity for application/json ContentType.
 type CreateActivityJSONRequestBody = ManualActivityRequest
 
@@ -949,6 +1049,12 @@ type SetGarminKeyJSONRequestBody = SetGarminKeyRequest
 
 // SetGarminSyncIntervalJSONRequestBody defines body for SetGarminSyncInterval for application/json ContentType.
 type SetGarminSyncIntervalJSONRequestBody = SetGarminSyncIntervalRequest
+
+// CreateGearJSONRequestBody defines body for CreateGear for application/json ContentType.
+type CreateGearJSONRequestBody = GearInput
+
+// UpdateGearJSONRequestBody defines body for UpdateGear for application/json ContentType.
+type UpdateGearJSONRequestBody = GearInput
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
@@ -1021,6 +1127,18 @@ type ServerInterface interface {
 	// SetGarminSyncInterval Set how often Garmin is synced
 	// (PUT /api/garmin/sync-interval)
 	SetGarminSyncInterval(w http.ResponseWriter, r *http.Request)
+	// ListGear List shoes and bikes
+	// (GET /api/gear)
+	ListGear(w http.ResponseWriter, r *http.Request, params ListGearParams)
+	// CreateGear Add shoes or a bike
+	// (POST /api/gear)
+	CreateGear(w http.ResponseWriter, r *http.Request)
+	// DeleteGear Delete gear
+	// (DELETE /api/gear/{id})
+	DeleteGear(w http.ResponseWriter, r *http.Request, id GearID)
+	// UpdateGear Edit, retire or reactivate gear
+	// (PUT /api/gear/{id})
+	UpdateGear(w http.ResponseWriter, r *http.Request, id GearID)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -1168,6 +1286,30 @@ func (_ Unimplemented) SetGarminSyncInterval(w http.ResponseWriter, r *http.Requ
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListGear List shoes and bikes
+// (GET /api/gear)
+func (_ Unimplemented) ListGear(w http.ResponseWriter, r *http.Request, params ListGearParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateGear Add shoes or a bike
+// (POST /api/gear)
+func (_ Unimplemented) CreateGear(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteGear Delete gear
+// (DELETE /api/gear/{id})
+func (_ Unimplemented) DeleteGear(w http.ResponseWriter, r *http.Request, id GearID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateGear Edit, retire or reactivate gear
+// (PUT /api/gear/{id})
+func (_ Unimplemented) UpdateGear(w http.ResponseWriter, r *http.Request, id GearID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetMe Current user and CSRF token
 // (GET /api/me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
@@ -1239,6 +1381,19 @@ func (siw *ServerInterfaceWrapper) ListActivities(w http.ResponseWriter, r *http
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "gear" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "gear", r.URL.Query(), &params.Gear, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "gear"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "gear", Err: err})
 		}
 		return
 	}
@@ -1820,6 +1975,118 @@ func (siw *ServerInterfaceWrapper) SetGarminSyncInterval(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// ListGear operation middleware
+func (siw *ServerInterfaceWrapper) ListGear(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGearParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGear(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGear operation middleware
+func (siw *ServerInterfaceWrapper) CreateGear(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGear(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteGear operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGear(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GearID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteGear(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateGear operation middleware
+func (siw *ServerInterfaceWrapper) UpdateGear(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GearID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateGear(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -2037,6 +2304,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/activities/{id}/annotation", wrapper.SetActivityAnnotation)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/gear", wrapper.ListGear)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/gear", wrapper.CreateGear)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/gear/{id}", wrapper.DeleteGear)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/gear/{id}", wrapper.UpdateGear)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/laps", wrapper.ListLaps)
@@ -2929,6 +3208,157 @@ func (response SetGarminSyncIntervaldefaultApplicationProblemPlusJSONResponse) V
 	return err
 }
 
+type ListGearRequestObject struct {
+	Params ListGearParams
+}
+
+type ListGearResponseObject interface {
+	VisitListGearResponse(w http.ResponseWriter) error
+}
+
+type ListGear200JSONResponse GearPage
+
+func (response ListGear200JSONResponse) VisitListGearResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGeardefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListGeardefaultApplicationProblemPlusJSONResponse) VisitListGearResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGearRequestObject struct {
+	Body *CreateGearJSONRequestBody
+}
+
+type CreateGearResponseObject interface {
+	VisitCreateGearResponse(w http.ResponseWriter) error
+}
+
+type CreateGear201JSONResponse Gear
+
+func (response CreateGear201JSONResponse) VisitCreateGearResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGeardefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateGeardefaultApplicationProblemPlusJSONResponse) VisitCreateGearResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGearRequestObject struct {
+	Id GearID `json:"id"`
+}
+
+type DeleteGearResponseObject interface {
+	VisitDeleteGearResponse(w http.ResponseWriter) error
+}
+
+type DeleteGear204Response struct {
+}
+
+func (response DeleteGear204Response) VisitDeleteGearResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteGeardefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteGeardefaultApplicationProblemPlusJSONResponse) VisitDeleteGearResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateGearRequestObject struct {
+	Id   GearID `json:"id"`
+	Body *UpdateGearJSONRequestBody
+}
+
+type UpdateGearResponseObject interface {
+	VisitUpdateGearResponse(w http.ResponseWriter) error
+}
+
+type UpdateGear200JSONResponse Gear
+
+func (response UpdateGear200JSONResponse) VisitUpdateGearResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateGeardefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response UpdateGeardefaultApplicationProblemPlusJSONResponse) VisitUpdateGearResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -3109,6 +3539,18 @@ type StrictServerInterface interface {
 	// SetGarminSyncInterval Set how often Garmin is synced
 	// (PUT /api/garmin/sync-interval)
 	SetGarminSyncInterval(ctx context.Context, request SetGarminSyncIntervalRequestObject) (SetGarminSyncIntervalResponseObject, error)
+	// ListGear List shoes and bikes
+	// (GET /api/gear)
+	ListGear(ctx context.Context, request ListGearRequestObject) (ListGearResponseObject, error)
+	// CreateGear Add shoes or a bike
+	// (POST /api/gear)
+	CreateGear(ctx context.Context, request CreateGearRequestObject) (CreateGearResponseObject, error)
+	// DeleteGear Delete gear
+	// (DELETE /api/gear/{id})
+	DeleteGear(ctx context.Context, request DeleteGearRequestObject) (DeleteGearResponseObject, error)
+	// UpdateGear Edit, retire or reactivate gear
+	// (PUT /api/gear/{id})
+	UpdateGear(ctx context.Context, request UpdateGearRequestObject) (UpdateGearResponseObject, error)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -3763,6 +4205,122 @@ func (sh *strictHandler) SetGarminSyncInterval(w http.ResponseWriter, r *http.Re
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(SetGarminSyncIntervalResponseObject); ok {
 		if err := validResponse.VisitSetGarminSyncIntervalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListGear operation middleware
+func (sh *strictHandler) ListGear(w http.ResponseWriter, r *http.Request, params ListGearParams) {
+	var request ListGearRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGear(ctx, request.(ListGearRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGear")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGearResponseObject); ok {
+		if err := validResponse.VisitListGearResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateGear operation middleware
+func (sh *strictHandler) CreateGear(w http.ResponseWriter, r *http.Request) {
+	var request CreateGearRequestObject
+
+	var body CreateGearJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateGear(ctx, request.(CreateGearRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateGear")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateGearResponseObject); ok {
+		if err := validResponse.VisitCreateGearResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteGear operation middleware
+func (sh *strictHandler) DeleteGear(w http.ResponseWriter, r *http.Request, id GearID) {
+	var request DeleteGearRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteGear(ctx, request.(DeleteGearRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteGear")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteGearResponseObject); ok {
+		if err := validResponse.VisitDeleteGearResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateGear operation middleware
+func (sh *strictHandler) UpdateGear(w http.ResponseWriter, r *http.Request, id GearID) {
+	var request UpdateGearRequestObject
+
+	request.Id = id
+
+	var body UpdateGearJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateGear(ctx, request.(UpdateGearRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateGear")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateGearResponseObject); ok {
+		if err := validResponse.VisitUpdateGearResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

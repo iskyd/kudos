@@ -556,4 +556,23 @@ func TestAnnotate(t *testing.T) {
 	if err := e.svc.Annotate(ctx, e.alice, id, Annotation{RPE: &bad}); err == nil {
 		t.Error("an RPE of 11 was stored")
 	}
+
+	// Gear must be the user's own.
+	mine, err := e.q.CreateGear(ctx, db.CreateGearParams{UserID: e.alice, Kind: "shoes", Name: "Trainers"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.Annotate(ctx, e.alice, id, Annotation{GearID: &mine.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if a, _ = e.q.GetActivity(ctx, db.GetActivityParams{UserID: e.alice, ID: id}); a.GearID == nil || *a.GearID != mine.ID {
+		t.Errorf("gear = %v, want %d", a.GearID, mine.ID)
+	}
+	bobs, err := e.q.CreateGear(ctx, db.CreateGearParams{UserID: e.bob, Kind: "shoes", Name: "Bob's"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.svc.Annotate(ctx, e.alice, id, Annotation{GearID: &bobs.ID}); !errors.Is(err, ErrGearNotFound) {
+		t.Errorf("bob's gear: %v, want ErrGearNotFound", err)
+	}
 }

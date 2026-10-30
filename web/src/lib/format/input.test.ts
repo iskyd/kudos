@@ -1,4 +1,10 @@
-import { parseDuration, parseKilometres, parseOptionalNumber, parseTags } from '@/lib/format/input'
+import {
+  kilometresText,
+  parseDuration,
+  parseKilometres,
+  parseOptionalNumber,
+  parseTags,
+} from '@/lib/format/input'
 
 describe('parseDuration', () => {
   it.each([
@@ -14,6 +20,16 @@ describe('parseDuration', () => {
 
   it.each(['', 'abc', '1:2', '1:60', '1:60:00', '-5', '1:00:00:00'])('rejects %j', (text) => {
     expect(parseDuration(text)).toBeNull()
+  })
+})
+
+describe('kilometresText', () => {
+  it.each([
+    [800000, '800'],
+    [21097.5, '21.0975'],
+  ])('writes %d m as %j, which parses back', (metres, want) => {
+    expect(kilometresText(metres)).toBe(want)
+    expect(parseKilometres(want)).toBe(metres)
   })
 })
 

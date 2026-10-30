@@ -65,6 +65,7 @@ func (s *Server) detail(ctx context.Context, a db.Activity) (ActivityDetail, err
 		AvgCadence: a.AvgCadence, MaxCadence: a.MaxCadence, AvgTemperatureC: a.AvgTemperatureC, PoolLengthM: a.PoolLengthM,
 		CaloriesKcal: int32Ptr(a.CaloriesKcal), Feel: intPtr(a.Feel), Notes: a.Notes, WeatherTemperatureC: a.WeatherTemperatureC,
 		WeatherCondition: (*ActivityDetailWeatherCondition)(a.WeatherCondition), Legs: []ActivitySummary{}, PainTags: a.PainTags,
+		GearId: a.GearID,
 	}
 
 	w, err := s.q.GetRecordedWorkout(ctx, db.GetRecordedWorkoutParams{UserID: userID, ActivityID: a.ID})
@@ -145,10 +146,13 @@ func (s *Server) SetActivityAnnotation(ctx context.Context, req SetActivityAnnot
 
 	err := s.ingest.Annotate(ctx, sessionFrom(ctx).userID, req.Id, ingest.Annotation{
 		RPE: b.Rpe, Feel: feel, Notes: notes, PainTags: tags,
-		WeatherTemperature: b.WeatherTemperatureC, WeatherCondition: (*string)(b.WeatherCondition),
+		WeatherTemperature: b.WeatherTemperatureC, WeatherCondition: (*string)(b.WeatherCondition), GearID: b.GearId,
 	})
 	if errors.Is(err, ingest.ErrNotFound) {
 		return nil, errActivityNotFound
+	}
+	if errors.Is(err, ingest.ErrGearNotFound) {
+		return invalid("no such gear")
 	}
 	if err != nil {
 		return nil, fmt.Errorf("annotating: %w", err)

@@ -435,6 +435,39 @@ describe('ActivityDetailPage', () => {
       expect(await screen.findByRole('alert')).toHaveTextContent(message)
     })
 
+    it('assigns gear, offering retired gear only where it is assigned', async () => {
+      const shoes = { kind: 'shoes', distanceM: 0, timeS: 0, activities: 0, replacementDue: false }
+      server.use(
+        http.get('/api/gear', () =>
+          HttpResponse.json({
+            items: [
+              { ...shoes, id: 5, name: 'Trainers', retired: false },
+              { ...shoes, id: 6, name: 'Old racers', retired: true },
+              { ...shoes, id: 7, name: 'Worn out', retired: true },
+            ],
+          }),
+        ),
+      )
+      serve({ ...run, gearId: 6 }, runStreams)
+      let body: unknown
+      server.use(
+        http.put('/api/activities/:id/annotation', async ({ request }) => {
+          body = await request.json()
+          return HttpResponse.json({ ...run, gearId: 5 })
+        }),
+      )
+      renderApp('/activities/1')
+      const gear = await screen.findByRole('combobox', { name: 'Gear' })
+      await screen.findByRole('option', { name: 'Trainers' })
+      expect(gear).toHaveValue('6')
+      expect(screen.queryByRole('option', { name: 'Worn out' })).not.toBeInTheDocument()
+
+      await userEvent.selectOptions(gear, 'Trainers')
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+      expect(await screen.findByText('Saved.')).toBeInTheDocument()
+      expect(body).toMatchObject({ gearId: 5 })
+    })
+
     it('shows save errors', async () => {
       serve(run, runStreams)
       server.use(

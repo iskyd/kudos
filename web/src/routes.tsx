@@ -6,11 +6,13 @@ import { EmptyPage } from '@/components/empty-page'
 import { RequireAuth } from '@/components/require-auth'
 import { ActivitiesPage } from '@/pages/activities'
 import { ActivityDetailPage } from '@/pages/activity-detail'
+import { GearPage } from '@/pages/gear'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { SettingsPage } from '@/pages/settings'
 
 const pages: Partial<Record<string, ReactElement>> = {
   '/activities': <ActivitiesPage />,
+  '/gear': <GearPage />,
   '/settings': <SettingsPage />,
 }
 

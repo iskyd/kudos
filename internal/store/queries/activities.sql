@@ -16,7 +16,7 @@ RETURNING id;
 
 -- name: UpsertActivity :one
 -- Re-importing updates what the source owns and keeps what the user owns
--- (rpe, feel, notes, weather, overrides).
+-- (rpe, feel, notes, pain tags, weather, gear, overrides).
 INSERT INTO activities (
     user_id, source, source_activity_id, sport, subtype, start_time, utc_offset_s,
     original_file_id, multisport_group_id,
@@ -59,7 +59,8 @@ RETURNING id;
 -- Replaces every user-owned annotation; a nil value clears it.
 UPDATE activities SET
     rpe = @rpe, feel = @feel, notes = @notes, pain_tags = @pain_tags::text[],
-    weather_temperature_c = @weather_temperature_c, weather_condition = @weather_condition
+    weather_temperature_c = @weather_temperature_c, weather_condition = @weather_condition,
+    gear_id = @gear_id
 WHERE user_id = @user_id AND id = @id;
 
 -- name: GetActivity :one
@@ -78,6 +79,7 @@ FROM activities a,
     END)::float8 AS sort_key) k
 WHERE a.user_id = @user_id
     AND (sqlc.narg(sport)::text IS NULL OR a.sport = sqlc.narg(sport))
+    AND (sqlc.narg(gear_id)::bigint IS NULL OR a.gear_id = sqlc.narg(gear_id))
     AND (sqlc.narg(tag)::text IS NULL OR sqlc.narg(tag)::text = ANY(a.pain_tags))
     AND (sqlc.narg(from_day)::date IS NULL
         OR (a.start_time AT TIME ZONE 'UTC' + make_interval(secs => a.utc_offset_s))::date >= sqlc.narg(from_day))
