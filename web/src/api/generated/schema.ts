@@ -526,6 +526,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activities/{id}/execution": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How a structured workout was executed
+         * @description For a workout run from the watch (steps), laps are grouped by workout step
+         *     and each run is compared with its target; a step spanning several laps is
+         *     one run, and planned steps nobody ran are listed as skipped. For a workout
+         *     that sets a target power each second (Zwift, target_power), intervals are
+         *     where the target changes and compliance is the time within 10 W of it.
+         *     Kind none when the activity has neither.
+         */
+        get: operations["getActivityExecution"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -983,6 +1008,69 @@ export interface components {
             cadence?: (number | null)[];
             speedMS?: (number | null)[];
             altitudeM?: (number | null)[];
+        };
+        WorkoutExecution: {
+            /** @enum {string} */
+            kind: "none" | "steps" | "target_power";
+            /** @description Runs of the workout's steps in order (kind steps). */
+            steps?: components["schemas"]["StepExecution"][];
+            /** @description Stretches of one target power (kind target_power), at most 1000. */
+            intervals?: components["schemas"]["PowerInterval"][];
+            /**
+             * Format: double
+             * @description Seconds within toleranceW of the target, over the whole workout.
+             */
+            withinS?: number;
+            /**
+             * Format: double
+             * @description Seconds of the workout with recorded power.
+             */
+            totalS?: number;
+            /** Format: double */
+            toleranceW?: number;
+        };
+        StepExecution: {
+            /** @description Index into the recorded workout's steps. */
+            stepIndex: number;
+            /** @description Laps that ran the step; 0 when it was skipped. */
+            laps: number;
+            /** Format: double */
+            timerTimeS?: number;
+            /** Format: double */
+            distanceM?: number;
+            /** Format: double */
+            avgSpeedMS?: number;
+            /** Format: double */
+            avgHrBpm?: number;
+            /** Format: double */
+            avgPowerW?: number;
+            /** Format: double */
+            avgCadence?: number;
+            /**
+             * Format: double
+             * @description The value compared with the step's target, in its unit (m/s, bpm or W).
+             */
+            actual?: number;
+            /**
+             * @description Absent when the step has no target that can be compared.
+             * @enum {string}
+             */
+            result?: "below" | "within" | "above" | "skipped";
+        };
+        PowerInterval: {
+            /**
+             * Format: double
+             * @description Seconds from the activity start.
+             */
+            startS: number;
+            /** Format: double */
+            durationS: number;
+            /** Format: double */
+            targetW: number;
+            /** Format: double */
+            avgPowerW?: number;
+            /** Format: double */
+            withinS: number;
         };
         ActivityStreams: {
             /** @description Seconds from the activity start. */
@@ -1850,6 +1938,29 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityComparison"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getActivityExecution: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The execution. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkoutExecution"];
                 };
             };
             default: components["responses"]["Problem"];

@@ -465,6 +465,30 @@ func (e Sport) Valid() bool {
 	}
 }
 
+// Defines values for StepExecutionResult.
+const (
+	Above   StepExecutionResult = "above"
+	Below   StepExecutionResult = "below"
+	Skipped StepExecutionResult = "skipped"
+	Within  StepExecutionResult = "within"
+)
+
+// Valid indicates whether the value is a known member of the StepExecutionResult enum.
+func (e StepExecutionResult) Valid() bool {
+	switch e {
+	case Above:
+		return true
+	case Below:
+		return true
+	case Skipped:
+		return true
+	case Within:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SwimLengthStroke.
 const (
 	Backstroke   SwimLengthStroke = "backstroke"
@@ -492,6 +516,27 @@ func (e SwimLengthStroke) Valid() bool {
 	case Im:
 		return true
 	case Mixed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkoutExecutionKind.
+const (
+	None        WorkoutExecutionKind = "none"
+	Steps       WorkoutExecutionKind = "steps"
+	TargetPower WorkoutExecutionKind = "target_power"
+)
+
+// Valid indicates whether the value is a known member of the WorkoutExecutionKind enum.
+func (e WorkoutExecutionKind) Valid() bool {
+	switch e {
+	case None:
+		return true
+	case Steps:
+		return true
+	case TargetPower:
 		return true
 	default:
 		return false
@@ -956,6 +1001,17 @@ type Page struct {
 // Password defines model for Password.
 type Password = string
 
+// PowerInterval defines model for PowerInterval.
+type PowerInterval struct {
+	AvgPowerW *float64 `json:"avgPowerW,omitempty"`
+	DurationS float64  `json:"durationS"`
+
+	// StartS Seconds from the activity start.
+	StartS  float64 `json:"startS"`
+	TargetW float64 `json:"targetW"`
+	WithinS float64 `json:"withinS"`
+}
+
 // Problem RFC 9457 problem details.
 type Problem struct {
 	// Detail Explanation of this occurrence.
@@ -1018,6 +1074,30 @@ type StartGarminBackfillRequest struct {
 	// Days How many days of history to import, ending today.
 	Days *int `json:"days,omitempty"`
 }
+
+// StepExecution defines model for StepExecution.
+type StepExecution struct {
+	// Actual The value compared with the step's target, in its unit (m/s, bpm or W).
+	Actual     *float64 `json:"actual,omitempty"`
+	AvgCadence *float64 `json:"avgCadence,omitempty"`
+	AvgHrBpm   *float64 `json:"avgHrBpm,omitempty"`
+	AvgPowerW  *float64 `json:"avgPowerW,omitempty"`
+	AvgSpeedMS *float64 `json:"avgSpeedMS,omitempty"`
+	DistanceM  *float64 `json:"distanceM,omitempty"`
+
+	// Laps Laps that ran the step; 0 when it was skipped.
+	Laps int `json:"laps"`
+
+	// Result Absent when the step has no target that can be compared.
+	Result *StepExecutionResult `json:"result,omitempty"`
+
+	// StepIndex Index into the recorded workout's steps.
+	StepIndex  int      `json:"stepIndex"`
+	TimerTimeS *float64 `json:"timerTimeS,omitempty"`
+}
+
+// StepExecutionResult Absent when the step has no target that can be compared.
+type StepExecutionResult string
 
 // StrengthSet defines model for StrengthSet.
 type StrengthSet struct {
@@ -1096,6 +1176,26 @@ type UploadResult struct {
 
 // Username 3 to 32 characters among a-z, 0-9, ".", "_" and "-". Case-insensitive; stored lowercase.
 type Username = string
+
+// WorkoutExecution defines model for WorkoutExecution.
+type WorkoutExecution struct {
+	// Intervals Stretches of one target power (kind target_power), at most 1000.
+	Intervals *[]PowerInterval     `json:"intervals,omitempty"`
+	Kind      WorkoutExecutionKind `json:"kind"`
+
+	// Steps Runs of the workout's steps in order (kind steps).
+	Steps      *[]StepExecution `json:"steps,omitempty"`
+	ToleranceW *float64         `json:"toleranceW,omitempty"`
+
+	// TotalS Seconds of the workout with recorded power.
+	TotalS *float64 `json:"totalS,omitempty"`
+
+	// WithinS Seconds within toleranceW of the target, over the whole workout.
+	WithinS *float64 `json:"withinS,omitempty"`
+}
+
+// WorkoutExecutionKind defines model for WorkoutExecution.Kind.
+type WorkoutExecutionKind string
 
 // WorkoutStep Values in SI units; duration is s for time, m for distance, a count for reps.
 type WorkoutStep struct {
@@ -1285,6 +1385,9 @@ type ServerInterface interface {
 	// UndoActivityEdit Undo one edit
 	// (DELETE /api/activities/{id}/edits/{editId})
 	UndoActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID, editId int64)
+	// GetActivityExecution How a structured workout was executed
+	// (GET /api/activities/{id}/execution)
+	GetActivityExecution(w http.ResponseWriter, r *http.Request, id ActivityID)
 	// ListLaps Laps of an activity
 	// (GET /api/activities/{id}/laps)
 	ListLaps(w http.ResponseWriter, r *http.Request, id ActivityID, params ListLapsParams)
@@ -1408,6 +1511,12 @@ func (_ Unimplemented) AddActivityEdit(w http.ResponseWriter, r *http.Request, i
 // UndoActivityEdit Undo one edit
 // (DELETE /api/activities/{id}/edits/{editId})
 func (_ Unimplemented) UndoActivityEdit(w http.ResponseWriter, r *http.Request, id ActivityID, editId int64) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetActivityExecution How a structured workout was executed
+// (GET /api/activities/{id}/execution)
+func (_ Unimplemented) GetActivityExecution(w http.ResponseWriter, r *http.Request, id ActivityID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1888,6 +1997,32 @@ func (siw *ServerInterfaceWrapper) UndoActivityEdit(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UndoActivityEdit(w, r, id, editId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetActivityExecution operation middleware
+func (siw *ServerInterfaceWrapper) GetActivityExecution(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id ActivityID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetActivityExecution(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2694,6 +2829,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/comparison", wrapper.GetActivityComparison)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/activities/{id}/execution", wrapper.GetActivityExecution)
+	})
 
 	return r
 }
@@ -3005,6 +3143,45 @@ type UndoActivityEditdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response UndoActivityEditdefaultApplicationProblemPlusJSONResponse) VisitUndoActivityEditResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityExecutionRequestObject struct {
+	Id ActivityID `json:"id"`
+}
+
+type GetActivityExecutionResponseObject interface {
+	VisitGetActivityExecutionResponse(w http.ResponseWriter) error
+}
+
+type GetActivityExecution200JSONResponse WorkoutExecution
+
+func (response GetActivityExecution200JSONResponse) VisitGetActivityExecutionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetActivityExecutiondefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetActivityExecutiondefaultApplicationProblemPlusJSONResponse) VisitGetActivityExecutionResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -3982,6 +4159,9 @@ type StrictServerInterface interface {
 	// UndoActivityEdit Undo one edit
 	// (DELETE /api/activities/{id}/edits/{editId})
 	UndoActivityEdit(ctx context.Context, request UndoActivityEditRequestObject) (UndoActivityEditResponseObject, error)
+	// GetActivityExecution How a structured workout was executed
+	// (GET /api/activities/{id}/execution)
+	GetActivityExecution(ctx context.Context, request GetActivityExecutionRequestObject) (GetActivityExecutionResponseObject, error)
 	// ListLaps Laps of an activity
 	// (GET /api/activities/{id}/laps)
 	ListLaps(ctx context.Context, request ListLapsRequestObject) (ListLapsResponseObject, error)
@@ -4322,6 +4502,32 @@ func (sh *strictHandler) UndoActivityEdit(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UndoActivityEditResponseObject); ok {
 		if err := validResponse.VisitUndoActivityEditResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetActivityExecution operation middleware
+func (sh *strictHandler) GetActivityExecution(w http.ResponseWriter, r *http.Request, id ActivityID) {
+	var request GetActivityExecutionRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetActivityExecution(ctx, request.(GetActivityExecutionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetActivityExecution")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetActivityExecutionResponseObject); ok {
+		if err := validResponse.VisitGetActivityExecutionResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

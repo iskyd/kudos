@@ -17,6 +17,7 @@ import { ApiError, problemMessage } from '@/api/problem'
 import { ActivityEdits } from '@/components/activity-edits'
 import { RouteMap } from '@/components/route-map'
 import { StreamChart } from '@/components/stream-chart'
+import { WorkoutExecutionPanel } from '@/components/workout-execution'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -65,6 +66,7 @@ export function ActivityDetailPage() {
       {a.legs.length > 0 && <Legs a={a} />}
       <Streams a={a} />
       <Laps a={a} />
+      <WorkoutExecutionPanel a={a} />
       {a.sport === 'pool_swimming' && <Lengths id={a.id} />}
       {a.sport === 'strength' && <Sets id={a.id} />}
     </div>
