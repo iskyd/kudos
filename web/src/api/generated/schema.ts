@@ -683,6 +683,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/fitness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Fitness, fatigue and form by day
+         * @description Daily training load summed over activities by local date, with fitness
+         *     (CTL, 42-day), fatigue (ATL, 7-day) and form (TSB, the previous day's
+         *     fitness minus fatigue), computed on demand. The recurrences start from
+         *     zero a year before from, so earlier history weighs under 0.02%. At most
+         *     3660 days per request.
+         */
+        get: operations["getFitness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1300,6 +1324,30 @@ export interface components {
         };
         ZoneSuggestionPage: components["schemas"]["Page"] & {
             items: components["schemas"]["ZoneSuggestion"][];
+        };
+        FitnessDay: {
+            /** Format: date */
+            day: string;
+            /**
+             * Format: double
+             * @description The day's summed training load.
+             */
+            load: number;
+            /**
+             * Format: double
+             * @description Fitness.
+             */
+            ctl: number;
+            /**
+             * Format: double
+             * @description Fatigue.
+             */
+            atl: number;
+            /**
+             * Format: double
+             * @description Form.
+             */
+            tsb: number;
         };
         ActivityStreams: {
             /** @description Seconds from the activity start. */
@@ -2358,6 +2406,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getFitness: {
+        parameters: {
+            query: {
+                /** @description First local day, inclusive. */
+                from: string;
+                /** @description Last local day, inclusive. */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One entry per day from from to to. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FitnessDay"][];
+                };
             };
             default: components["responses"]["Problem"];
         };

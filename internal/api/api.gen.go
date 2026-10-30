@@ -859,6 +859,22 @@ type CreatedActivity struct {
 	Id int64 `json:"id"`
 }
 
+// FitnessDay defines model for FitnessDay.
+type FitnessDay struct {
+	// Atl Fatigue.
+	Atl float64 `json:"atl"`
+
+	// Ctl Fitness.
+	Ctl float64            `json:"ctl"`
+	Day openapi_types.Date `json:"day"`
+
+	// Load The day's summed training load.
+	Load float64 `json:"load"`
+
+	// Tsb Form.
+	Tsb float64 `json:"tsb"`
+}
+
 // GarminBackfill defines model for GarminBackfill.
 type GarminBackfill struct {
 	ActivitiesDone   *int `json:"activitiesDone,omitempty"`
@@ -1453,6 +1469,15 @@ type GetActivityStreamsParams struct {
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// GetFitnessParams defines parameters for GetFitness.
+type GetFitnessParams struct {
+	// From First local day, inclusive.
+	From openapi_types.Date `form:"from" json:"from"`
+
+	// To Last local day, inclusive.
+	To openapi_types.Date `form:"to" json:"to"`
+}
+
 // ListGarminBackfillFailuresParams defines parameters for ListGarminBackfillFailures.
 type ListGarminBackfillFailuresParams struct {
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
@@ -1589,6 +1614,9 @@ type ServerInterface interface {
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(w http.ResponseWriter, r *http.Request)
+	// GetFitness Fitness, fatigue and form by day
+	// (GET /api/fitness)
+	GetFitness(w http.ResponseWriter, r *http.Request, params GetFitnessParams)
 	// DeleteGarminConnection Disconnect Garmin
 	// (DELETE /api/garmin)
 	DeleteGarminConnection(w http.ResponseWriter, r *http.Request)
@@ -1766,6 +1794,12 @@ func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
 // GetConfig Frontend settings
 // (GET /api/config)
 func (_ Unimplemented) GetConfig(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetFitness Fitness, fatigue and form by day
+// (GET /api/fitness)
+func (_ Unimplemented) GetFitness(w http.ResponseWriter, r *http.Request, params GetFitnessParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2571,6 +2605,52 @@ func (siw *ServerInterfaceWrapper) GetConfig(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetFitness operation middleware
+func (siw *ServerInterfaceWrapper) GetFitness(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetFitnessParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetFitness(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // DeleteGarminConnection operation middleware
 func (siw *ServerInterfaceWrapper) DeleteGarminConnection(w http.ResponseWriter, r *http.Request) {
 
@@ -3313,6 +3393,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/zones/suggestions/{suggestionId}/dismiss", wrapper.DismissZoneSuggestion)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/fitness", wrapper.GetFitness)
+	})
 
 	return r
 }
@@ -4038,6 +4121,45 @@ type GetConfigdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetConfigdefaultApplicationProblemPlusJSONResponse) VisitGetConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFitnessRequestObject struct {
+	Params GetFitnessParams
+}
+
+type GetFitnessResponseObject interface {
+	VisitGetFitnessResponse(w http.ResponseWriter) error
+}
+
+type GetFitness200JSONResponse []FitnessDay
+
+func (response GetFitness200JSONResponse) VisitGetFitnessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetFitnessdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetFitnessdefaultApplicationProblemPlusJSONResponse) VisitGetFitnessResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -4931,6 +5053,9 @@ type StrictServerInterface interface {
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
+	// GetFitness Fitness, fatigue and form by day
+	// (GET /api/fitness)
+	GetFitness(ctx context.Context, request GetFitnessRequestObject) (GetFitnessResponseObject, error)
 	// DeleteGarminConnection Disconnect Garmin
 	// (DELETE /api/garmin)
 	DeleteGarminConnection(ctx context.Context, request DeleteGarminConnectionRequestObject) (DeleteGarminConnectionResponseObject, error)
@@ -5535,6 +5660,32 @@ func (sh *strictHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetConfigResponseObject); ok {
 		if err := validResponse.VisitGetConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetFitness operation middleware
+func (sh *strictHandler) GetFitness(w http.ResponseWriter, r *http.Request, params GetFitnessParams) {
+	var request GetFitnessRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetFitness(ctx, request.(GetFitnessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetFitness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetFitnessResponseObject); ok {
+		if err := validResponse.VisitGetFitnessResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

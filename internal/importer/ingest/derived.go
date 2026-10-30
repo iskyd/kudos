@@ -16,16 +16,18 @@ import (
 
 // derivedVersion versions the derived values' computation: raising it makes the
 // recompute jobs redo every activity's.
-const derivedVersion = 1
+const derivedVersion = 2
 
 // recomputeBatch is how many activities or users a recompute job reads at once.
 const recomputeBatch = 100
 
 // ResolvedZones are the zones an activity uses: the versions valid on its local date.
 type ResolvedZones struct {
+	Activity                    db.Activity // after its edits
 	Day                         time.Time
 	Sport                       analytics.ZoneSport
 	ZoneSetID, GeneralZoneSetID *int64
+	Own, General                analytics.Thresholds
 	Zones                       analytics.Zones
 }
 
@@ -38,23 +40,23 @@ func (s *Service) ResolveZones(ctx context.Context, a db.Activity) (ResolvedZone
 	}
 	local := eff.StartTime.Add(time.Duration(eff.UtcOffsetS) * time.Second)
 	out := ResolvedZones{
-		Day:   time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC),
-		Sport: analytics.ZoneSportOf(eff.Sport),
+		Activity: eff,
+		Day:      time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, time.UTC),
+		Sport:    analytics.ZoneSportOf(eff.Sport),
 	}
 	rows, err := db.New(s.pool).ListZoneSetsAt(ctx, db.ListZoneSetsAtParams{UserID: a.UserID, Day: out.Day})
 	if err != nil {
 		return ResolvedZones{}, fmt.Errorf("reading zone versions: %w", err)
 	}
-	var own, general analytics.Thresholds
 	for _, r := range rows {
 		switch {
 		case analytics.ZoneSport(r.Sport) == out.Sport:
-			own, out.ZoneSetID = ZoneThresholds(r), &r.ID
+			out.Own, out.ZoneSetID = ZoneThresholds(r), &r.ID
 		case r.Sport == string(analytics.ZoneGeneral):
-			general, out.GeneralZoneSetID = ZoneThresholds(r), &r.ID
+			out.General, out.GeneralZoneSetID = ZoneThresholds(r), &r.ID
 		}
 	}
-	out.Zones = analytics.ZonesFor(out.Sport, own, general)
+	out.Zones = analytics.ZonesFor(out.Sport, out.Own, out.General)
 	return out, nil
 }
 
@@ -98,13 +100,37 @@ func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) 
 		PaceZoneS:  analytics.TimeInZones(segs, z.Zones.Pace, func(s analytics.Sample) *float64 { return s.Speed }),
 		PowerZoneS: analytics.TimeInZones(segs, z.Zones.Power, func(s analytics.Sample) *float64 { return s.Power }),
 	}
-	if sum, ok := analytics.Summarize(segs); ok {
+	sum, ok := analytics.Summarize(segs)
+	if ok {
 		p.AvgHrBpm, p.AvgPowerW, p.AvgSpeedMS, p.AvgCadence = sum.AvgHR, sum.AvgPower, sum.AvgSpeed, sum.AvgCadence
+	}
+	if load, method, ok := analytics.Load(loadInput(z.Activity, z, segs, sum)); ok {
+		p.Load, p.LoadMethod = &load, text(string(method))
 	}
 	if err := q.UpsertActivityDerived(ctx, p); err != nil {
 		return fmt.Errorf("storing derived values: %w", err)
 	}
 	return nil
+}
+
+// loadInput takes duration and speed from the activity's effective summary,
+// which pool swims fill from lengths and manual activities from the user, and
+// falls back to the samples' summary.
+func loadInput(a db.Activity, z ResolvedZones, segs [][]analytics.Sample, sum analytics.Summary) analytics.LoadInput {
+	in := analytics.LoadInput{
+		Sport: z.Sport, DurationS: sum.TimerS, Segments: segs, AvgSpeed: sum.AvgSpeed, AvgHR: sum.AvgHR,
+		Own: z.Own, General: z.General,
+	}
+	if a.TimerTimeS != nil && *a.TimerTimeS > 0 {
+		in.DurationS = *a.TimerTimeS
+		if a.DistanceM != nil {
+			in.AvgSpeed = new(*a.DistanceM / *a.TimerTimeS)
+		}
+	}
+	if a.Rpe != nil {
+		in.RPE = new(float64(*a.Rpe))
+	}
+	return in
 }
 
 // RecomputeDerived computes the user's derived values that are missing, stale or
