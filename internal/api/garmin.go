@@ -29,8 +29,8 @@ type GarminAuthenticator interface {
 	Authenticate(ctx context.Context, creds connectors.Credentials) (*connectors.Session, error)
 }
 
-// Garmin holds what the Garmin endpoints need.
-type Garmin struct {
+// GarminDeps holds what the Garmin endpoints need.
+type GarminDeps struct {
 	Auth   GarminAuthenticator
 	Cipher *crypto.Cipher      // seals the key and token
 	Sync   *garminsync.Service // backfill and ongoing sync

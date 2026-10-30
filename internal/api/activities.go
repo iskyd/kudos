@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"mime/multipart"
 	"time"
 	"unicode/utf8"
 
 	"github.com/iskyd/kudos/internal/importer"
 	"github.com/iskyd/kudos/internal/importer/ingest"
+	"github.com/iskyd/kudos/internal/store/db"
 )
 
 // Keep in step with api/openapi.yaml.
@@ -112,4 +114,95 @@ func location(tz string) *time.Location {
 		return time.UTC
 	}
 	return loc
+}
+
+// activityCursor is the position after a page's last activity, under one sort.
+type activityCursor struct {
+	Sort string  `json:"s"`
+	Key  float64 `json:"k"`
+	ID   int64   `json:"i"`
+}
+
+// ListActivities returns one page of the user's activities, filtered and sorted.
+func (s *Server) ListActivities(ctx context.Context, req ListActivitiesRequestObject) (ListActivitiesResponseObject, error) {
+	p := req.Params
+	invalid := func(detail string) (ListActivitiesResponseObject, error) {
+		return nil, &Error{Kind: KindInvalidRequest, Detail: detail}
+	}
+	sort := Date
+	if p.Sort != nil {
+		sort = *p.Sort
+	}
+	if !sort.Valid() {
+		return invalid("sort must be date, distance or duration")
+	}
+	limit := defaultPageSize
+	if p.Limit != nil {
+		limit = *p.Limit
+	}
+	if limit < 1 || limit > maxPageSize {
+		return invalid(fmt.Sprintf("limit must be 1 to %d", maxPageSize))
+	}
+	params := db.ListActivitiesParams{
+		UserID: sessionFrom(ctx).userID, Sort: string(sort), BeforeKey: math.MaxFloat64, BeforeID: math.MaxInt64,
+		MaxRows: int32(limit + 1), // one extra row tells whether another page follows
+	}
+	if p.Sport != nil {
+		if !p.Sport.Valid() {
+			return invalid("unknown sport")
+		}
+		params.Sport = (*string)(p.Sport)
+	}
+	if p.From != nil {
+		params.FromDay = &p.From.Time
+	}
+	if p.To != nil {
+		params.ToDay = &p.To.Time
+	}
+	if p.From != nil && p.To != nil && p.To.Before(p.From.Time) {
+		return invalid("to must not be before from")
+	}
+	if p.Cursor != nil {
+		var c activityCursor
+		if err := s.cursors.Decode(*p.Cursor, &c); err != nil || c.Sort != string(sort) {
+			return nil, ErrInvalidCursor
+		}
+		params.BeforeKey, params.BeforeID = c.Key, c.ID
+	}
+
+	rows, err := s.q.ListActivities(ctx, params)
+	if err != nil {
+		return nil, fmt.Errorf("listing activities: %w", err)
+	}
+	page := ActivityPage{Items: []ActivitySummary{}}
+	if len(rows) > limit {
+		rows = rows[:limit]
+		last := rows[limit-1]
+		next, err := s.cursors.Encode(activityCursor{Sort: string(sort), Key: last.SortKey, ID: last.Activity.ID})
+		if err != nil {
+			return nil, err
+		}
+		page.NextCursor = &next
+	}
+	for _, r := range rows {
+		page.Items = append(page.Items, activitySummary(r.Activity))
+	}
+	return ListActivities200JSONResponse(page), nil
+}
+
+func activitySummary(a db.Activity) ActivitySummary {
+	return ActivitySummary{
+		Id: a.ID, Sport: ActivitySport(a.Sport), Subtype: ActivitySummarySubtype(a.Subtype), Source: ActivitySummarySource(a.Source),
+		StartTime: a.StartTime, UtcOffsetS: int(a.UtcOffsetS), ElapsedTimeS: a.ElapsedTimeS, TimerTimeS: a.TimerTimeS,
+		DistanceM: a.DistanceM, AscentM: a.AscentM, AvgSpeedMS: a.AvgSpeedMS, AvgHrBpm: intPtr(a.AvgHrBpm),
+		AvgPowerW: intPtr(a.AvgPowerW), Rpe: a.Rpe,
+	}
+}
+
+func intPtr(v *int16) *int {
+	if v == nil {
+		return nil
+	}
+	n := int(*v)
+	return &n
 }

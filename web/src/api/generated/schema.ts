@@ -97,7 +97,12 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List activities
+         * @description Newest first by default, or largest first by distance or duration (activities
+         *     without the value last). Days are local calendar days, where the activity happened.
+         */
+        get: operations["listActivities"];
         put?: never;
         /**
          * Create a manual activity
@@ -312,6 +317,44 @@ export interface components {
         };
         /** @enum {string} */
         Sport: "running" | "trail_running" | "cycling" | "pool_swimming" | "open_water_swimming" | "hiking" | "strength" | "other";
+        /**
+         * @description A stored activity's sport; transition is a multisport leg between disciplines.
+         * @enum {string}
+         */
+        ActivitySport: "running" | "trail_running" | "cycling" | "pool_swimming" | "open_water_swimming" | "hiking" | "strength" | "transition" | "other";
+        ActivitySummary: {
+            /** Format: int64 */
+            id: number;
+            sport: components["schemas"]["ActivitySport"];
+            /** @enum {string} */
+            subtype: "outdoor" | "indoor" | "virtual" | "treadmill";
+            /** @enum {string} */
+            source: "garmin" | "upload" | "manual";
+            /**
+             * Format: date-time
+             * @description Start in UTC.
+             */
+            startTime: string;
+            /** @description Local offset where the activity happened, in seconds. */
+            utcOffsetS: number;
+            /** Format: double */
+            elapsedTimeS?: number;
+            /** Format: double */
+            timerTimeS?: number;
+            /** Format: double */
+            distanceM?: number;
+            /** Format: float */
+            ascentM?: number;
+            /** Format: float */
+            avgSpeedMS?: number;
+            avgHrBpm?: number;
+            avgPowerW?: number;
+            /** Format: float */
+            rpe?: number;
+        };
+        ActivityPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["ActivitySummary"][];
+        };
         ManualActivityRequest: {
             sport: components["schemas"]["Sport"];
             /**
@@ -603,6 +646,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listActivities: {
+        parameters: {
+            query?: {
+                sport?: components["schemas"]["ActivitySport"];
+                /** @description First local day, inclusive. */
+                from?: string;
+                /** @description Last local day, inclusive. */
+                to?: string;
+                sort?: "date" | "distance" | "duration";
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of activities. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
                 };
             };
             default: components["responses"]["Problem"];

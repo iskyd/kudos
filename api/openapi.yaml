@@ -125,6 +125,51 @@ paths:
         default:
           $ref: "#/components/responses/Problem"
   /api/activities:
+    get:
+      operationId: listActivities
+      summary: List activities
+      description: |
+        Newest first by default, or largest first by distance or duration (activities
+        without the value last). Days are local calendar days, where the activity happened.
+      tags: [activities]
+      parameters:
+        - name: sport
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/ActivitySport"
+        - name: from
+          in: query
+          required: false
+          description: First local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: false
+          description: Last local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [date, distance, duration]
+            default: date
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of activities.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityPage"
+        default:
+          $ref: "#/components/responses/Problem"
     post:
       operationId: createActivity
       summary: Create a manual activity
@@ -423,6 +468,64 @@ components:
     Sport:
       type: string
       enum: [running, trail_running, cycling, pool_swimming, open_water_swimming, hiking, strength, other]
+    ActivitySport:
+      type: string
+      description: A stored activity's sport; transition is a multisport leg between disciplines.
+      enum: [running, trail_running, cycling, pool_swimming, open_water_swimming, hiking, strength, transition, other]
+    ActivitySummary:
+      type: object
+      required: [id, sport, subtype, source, startTime, utcOffsetS]
+      properties:
+        id:
+          type: integer
+          format: int64
+        sport:
+          $ref: "#/components/schemas/ActivitySport"
+        subtype:
+          type: string
+          enum: [outdoor, indoor, virtual, treadmill]
+        source:
+          type: string
+          enum: [garmin, upload, manual]
+        startTime:
+          type: string
+          format: date-time
+          description: Start in UTC.
+        utcOffsetS:
+          type: integer
+          description: Local offset where the activity happened, in seconds.
+        elapsedTimeS:
+          type: number
+          format: double
+        timerTimeS:
+          type: number
+          format: double
+        distanceM:
+          type: number
+          format: double
+        ascentM:
+          type: number
+          format: float
+        avgSpeedMS:
+          type: number
+          format: float
+        avgHrBpm:
+          type: integer
+        avgPowerW:
+          type: integer
+        rpe:
+          type: number
+          format: float
+    ActivityPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ActivitySummary"
     ManualActivityRequest:
       type: object
       required: [sport, localStartTime, durationS]

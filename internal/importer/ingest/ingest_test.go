@@ -72,11 +72,15 @@ func corpus(t *testing.T, path string) []byte {
 
 func (e env) activities(t *testing.T, userID int64) []db.Activity {
 	t.Helper()
-	acts, err := e.q.ListActivities(t.Context(), db.ListActivitiesParams{
-		UserID: userID, BeforeStart: time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC), BeforeID: math.MaxInt64, MaxRows: 100,
+	rows, err := e.q.ListActivities(t.Context(), db.ListActivitiesParams{
+		UserID: userID, Sort: "date", BeforeKey: math.MaxFloat64, BeforeID: math.MaxInt64, MaxRows: 100,
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+	acts := make([]db.Activity, len(rows))
+	for i, r := range rows {
+		acts[i] = r.Activity
 	}
 	return acts
 }

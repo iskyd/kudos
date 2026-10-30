@@ -1,9 +1,25 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import type { ManualActivity } from '@/api/activities'
+import type { ActivitySummary, ManualActivity } from '@/api/activities'
 import { ann, loggedInAs, problem, renderApp } from '@/test/render'
 import { server } from '@/test/server'
+
+function listReturns(items: ActivitySummary[], nextCursor?: string) {
+  server.use(http.get('/api/activities', () => HttpResponse.json({ items, nextCursor })))
+}
+
+const run: ActivitySummary = {
+  id: 1,
+  sport: 'running',
+  subtype: 'outdoor',
+  source: 'garmin',
+  startTime: '2026-10-10T05:30:00Z',
+  utcOffsetS: 7200,
+  timerTimeS: 3723,
+  elapsedTimeS: 3800,
+  distanceM: 10015,
+}
 
 async function openDialog(button: string, title: string) {
   renderApp('/activities')
@@ -14,6 +30,7 @@ async function openDialog(button: string, title: string) {
 describe('upload dialog', () => {
   beforeEach(() => {
     loggedInAs(ann)
+    listReturns([])
   })
 
   it('uploads the file with the CSRF token', async () => {
@@ -78,6 +95,7 @@ describe('upload dialog', () => {
 describe('manual activity dialog', () => {
   beforeEach(() => {
     loggedInAs(ann)
+    listReturns([])
   })
 
   it('sends SI values and the local start time', async () => {
@@ -165,5 +183,110 @@ describe('manual activity dialog', () => {
     await userEvent.type(within(dialog).getByLabelText('Duration'), '200:00:00')
     await userEvent.click(within(dialog).getByRole('button', { name: 'Save' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('at most 7 days')
+  })
+})
+
+describe('activity list', () => {
+  beforeEach(() => {
+    loggedInAs(ann)
+  })
+
+  it('shows each activity in its local time with formatted values', async () => {
+    listReturns([
+      run,
+      {
+        ...run,
+        id: 2,
+        sport: 'strength',
+        subtype: 'indoor',
+        timerTimeS: undefined,
+        elapsedTimeS: 1800,
+        distanceM: undefined,
+      },
+      {
+        ...run,
+        id: 3,
+        sport: 'transition',
+        timerTimeS: undefined,
+        elapsedTimeS: undefined,
+        distanceM: undefined,
+      },
+    ])
+    renderApp('/activities')
+    const rows = await screen.findAllByRole('row')
+    expect(rows).toHaveLength(4)
+    expect(rows[1]).toHaveTextContent('10 Oct 2026, 07:30Running1:02:0310.02 km')
+    expect(rows[2]).toHaveTextContent('Strength30:00—')
+    expect(rows[3]).toHaveTextContent('Transition——')
+  })
+
+  it('explains an empty list', async () => {
+    listReturns([])
+    renderApp('/activities')
+    expect(await screen.findByText(/No activities yet/)).toBeInTheDocument()
+    await userEvent.selectOptions(screen.getByLabelText('Sport'), 'Hiking')
+    expect(await screen.findByText('No activities match these filters.')).toBeInTheDocument()
+  })
+
+  it('sends the filters and sort order', async () => {
+    const queries: string[] = []
+    server.use(
+      http.get('/api/activities', ({ request }) => {
+        queries.push(new URL(request.url).search)
+        return HttpResponse.json({ items: [run] })
+      }),
+    )
+    renderApp('/activities')
+    await screen.findByRole('cell', { name: 'Running' })
+    await userEvent.selectOptions(screen.getByLabelText('Sport'), 'Running')
+    await userEvent.type(screen.getByLabelText('From'), '2026-10-01')
+    await userEvent.type(screen.getByLabelText('To'), '2026-10-31')
+    await userEvent.selectOptions(screen.getByLabelText('Sort by'), 'Longest distance')
+    await screen.findByRole('cell', { name: 'Running' })
+    expect(queries[0]).toBe('?sort=date')
+    expect(queries.at(-1)).toBe('?sort=distance&sport=running&from=2026-10-01&to=2026-10-31')
+
+    await userEvent.selectOptions(screen.getByLabelText('Sport'), 'All sports')
+    await userEvent.clear(screen.getByLabelText('From'))
+    expect(queries.at(-1)).toBe('?sort=distance&to=2026-10-31')
+  })
+
+  it('loads more pages with the cursor', async () => {
+    server.use(
+      http.get('/api/activities', ({ request }) => {
+        const cursor = new URL(request.url).searchParams.get('cursor')
+        return cursor === 'page-2'
+          ? HttpResponse.json({ items: [{ ...run, id: 2, sport: 'cycling' }] })
+          : HttpResponse.json({ items: [run], nextCursor: 'page-2' })
+      }),
+    )
+    renderApp('/activities')
+    await userEvent.click(await screen.findByRole('button', { name: 'Show more' }))
+    expect(await screen.findByRole('cell', { name: 'Cycling' })).toBeInTheDocument()
+    expect(screen.getByRole('cell', { name: 'Running' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show more' })).not.toBeInTheDocument()
+  })
+
+  it('shows loading errors', async () => {
+    server.use(http.get('/api/activities', () => problem(500, 'internal', 'Internal error')))
+    renderApp('/activities')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Internal error')
+  })
+
+  it('refreshes after an upload', async () => {
+    let calls = 0
+    server.use(
+      http.get('/api/activities', () => {
+        calls++
+        return HttpResponse.json({ items: calls > 1 ? [run] : [] })
+      }),
+      http.post('/api/activities/uploads', () =>
+        HttpResponse.json({ activityIds: [1] }, { status: 201 }),
+      ),
+    )
+    const dialog = await openDialog('Upload', 'Upload an activity')
+    await userEvent.upload(within(dialog).getByLabelText('File'), new File(['<gpx/>'], 'run.gpx'))
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Upload' }))
+    expect(await screen.findByRole('cell', { name: 'Running' })).toBeInTheDocument()
   })
 })

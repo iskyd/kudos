@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"mime/multipart"
@@ -194,5 +195,71 @@ func TestLocation(t *testing.T) {
 	t.Parallel()
 	if location("Europe/Rome").String() != "Europe/Rome" || location("Not/AZone") != time.UTC {
 		t.Error("location fallback broken")
+	}
+}
+
+// listAll pages through path, limit 2 per page, and returns the activity notes in order.
+func listAll(t *testing.T, c *apiClient, query string) []string {
+	t.Helper()
+	var got []string
+	path := "/api/activities?limit=2" + query
+	for range 10 {
+		page := decodeJSON[ActivityPage](t, c.do(http.MethodGet, path, nil, nil), http.StatusOK)
+		for _, a := range page.Items {
+			got = append(got, string(a.Sport)+"@"+a.StartTime.Format("01-02"))
+		}
+		if page.NextCursor == nil {
+			return got
+		}
+		path = "/api/activities?limit=2" + query + "&cursor=" + *page.NextCursor
+	}
+	t.Fatal("too many pages")
+	return nil
+}
+
+func TestListActivities(t *testing.T) {
+	t.Parallel()
+	c, _, _ := loggedIn(t, "UTC")
+	for _, a := range []ManualActivityRequest{
+		{Sport: SportRunning, LocalStartTime: "2026-10-10T07:00", DurationS: 3000, DistanceM: new(10000.0)},
+		{Sport: SportCycling, LocalStartTime: "2026-10-12T07:00", DurationS: 5400, DistanceM: new(40000.0)},
+		{Sport: SportRunning, LocalStartTime: "2026-10-14T07:00", DurationS: 1800, DistanceM: new(5000.0)},
+		{Sport: SportStrength, LocalStartTime: "2026-10-16T07:00", DurationS: 2400},
+	} {
+		decodeJSON[CreatedActivity](t, c.do(http.MethodPost, "/api/activities", a, nil), http.StatusCreated)
+	}
+	bob := &apiClient{t: t, h: c.h}
+	bob.session(bob.do(http.MethodPost, "/api/auth/register", register("bob"), nil), http.StatusCreated)
+	decodeJSON[CreatedActivity](t, bob.do(http.MethodPost, "/api/activities",
+		ManualActivityRequest{Sport: SportRunning, LocalStartTime: "2026-10-13T07:00", DurationS: 99999, DistanceM: new(99000.0)}, nil), http.StatusCreated)
+
+	tests := []struct{ query, want string }{
+		{"", "[strength@10-16 running@10-14 cycling@10-12 running@10-10]"},
+		{"&sort=distance", "[cycling@10-12 running@10-10 running@10-14 strength@10-16]"},
+		{"&sort=duration", "[cycling@10-12 running@10-10 strength@10-16 running@10-14]"},
+		{"&sport=running", "[running@10-14 running@10-10]"},
+		{"&from=2026-10-12&to=2026-10-14", "[running@10-14 cycling@10-12]"},
+		{"&sport=hiking", "[]"},
+	}
+	for _, tt := range tests {
+		if got := fmt.Sprint(listAll(t, c, tt.query)); got != tt.want {
+			t.Errorf("%q: %s, want %s", tt.query, got, tt.want)
+		}
+	}
+
+	page := decodeJSON[ActivityPage](t, c.do(http.MethodGet, "/api/activities?limit=1", nil, nil), http.StatusOK)
+	a := page.Items[0]
+	if a.Source != Manual || a.Subtype != Indoor || a.TimerTimeS == nil || *a.TimerTimeS != 2400 || a.DistanceM != nil {
+		t.Errorf("summary = %+v", a)
+	}
+	empty := decodeJSON[ActivityPage](t, c.do(http.MethodGet, "/api/activities?sport=hiking", nil, nil), http.StatusOK)
+	if empty.Items == nil || empty.NextCursor != nil {
+		t.Errorf("empty page = %+v, want an empty items array", empty)
+	}
+
+	// A cursor is bound to its sort order.
+	wantProblem(t, c.do(http.MethodGet, "/api/activities?sort=distance&cursor="+*page.NextCursor, nil, nil), KindInvalidRequest)
+	for _, q := range []string{"sort=load", "limit=0", "limit=101", "sport=curling", "from=2026-10-14&to=2026-10-12", "cursor=bogus", "from=yesterday"} {
+		wantProblem(t, c.do(http.MethodGet, "/api/activities?"+q, nil, nil), KindInvalidRequest)
 	}
 }
