@@ -91,6 +91,20 @@ paths:
               $ref: "#/components/headers/SetSessionCookie"
         default:
           $ref: "#/components/responses/Problem"
+  /api/config:
+    get:
+      operationId: getConfig
+      summary: Frontend settings
+      tags: [config]
+      responses:
+        "200":
+          description: Settings from the server configuration.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Config"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/me:
     get:
       operationId: getMe
@@ -1114,6 +1128,13 @@ components:
         nextCursor:
           type: string
           description: Cursor for the next page of full-resolution samples; absent on the last page.
+    Config:
+      type: object
+      required: [mapTileUrl]
+      properties:
+        mapTileUrl:
+          type: string
+          description: Raster tile URL template with {z}, {x} and {y}.
     Problem:
       type: object
       description: RFC 9457 problem details.

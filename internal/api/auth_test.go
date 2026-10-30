@@ -21,7 +21,10 @@ import (
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
-const testPassword = "correct horse battery staple"
+const (
+	testPassword = "correct horse battery staple"
+	testTileURL  = "https://tiles.example/{z}/{x}/{y}.png"
+)
 
 // testCipher uses a fixed key so tests can decrypt what handlers store.
 func testCipher(t *testing.T) *crypto.Cipher {
@@ -64,7 +67,7 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 	}
 	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), cursors, GarminDeps{
 		Auth: fakeGarmin{}, Cipher: testCipher(t), Sync: garminsync.NewService(pool, jobClient),
-	}, registration, cheapArgon()), spaStub)
+	}, registration, testTileURL, cheapArgon()), spaStub)
 	return &apiClient{t: t, h: h}, q
 }
 
@@ -386,4 +389,14 @@ func TestPublicOperations(t *testing.T) {
 			t.Fatalf("public %s blocked: %v", op, err)
 		}
 	}
+}
+
+func TestGetConfig(t *testing.T) {
+	t.Parallel()
+	c, _, _ := loggedIn(t, "UTC")
+	if got := decodeJSON[Config](t, c.do(http.MethodGet, "/api/config", nil, nil), http.StatusOK); got.MapTileUrl != testTileURL {
+		t.Errorf("config = %+v", got)
+	}
+	anon := &apiClient{t: t, h: c.h}
+	wantProblem(t, anon.do(http.MethodGet, "/api/config", nil, nil), KindUnauthorized)
 }

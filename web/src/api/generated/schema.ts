@@ -72,6 +72,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Frontend settings */
+        get: operations["getConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/me": {
         parameters: {
             query?: never;
@@ -713,6 +730,10 @@ export interface components {
             /** @description Cursor for the next page of full-resolution samples; absent on the last page. */
             nextCursor?: string;
         };
+        Config: {
+            /** @description Raster tile URL template with {z}, {x} and {y}. */
+            mapTileUrl: string;
+        };
         /** @description RFC 9457 problem details. */
         Problem: {
             /** @description Stable URI identifying the error kind, e.g. urn:kudos:problem:not-found. */
@@ -848,6 +869,27 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings from the server configuration. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Config"];
+                };
             };
             default: components["responses"]["Problem"];
         };
