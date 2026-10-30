@@ -40,9 +40,21 @@ type Activity struct {
 	Notes               *string
 	WeatherTemperatureC *float32
 	WeatherCondition    *string
-	Overrides           []byte
-	PainTags            []string
-	GearID              *int64
+	// Effective values computed from activity_edits and the samples (sport, start, summary); recorded columns stay as recorded.
+	Overrides  []byte
+	PainTags   []string
+	GearID     *int64
+	MergedInto *int64
+	SplitOf    *int64
+}
+
+type ActivityEdit struct {
+	ID         int64
+	UserID     int64
+	ActivityID int64
+	Kind       string
+	Params     []byte
+	CreatedAt  time.Time
 }
 
 type ActivityStream struct {

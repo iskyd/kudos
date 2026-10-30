@@ -505,3 +505,60 @@ func TestActivityAnnotationAndTagFilter(t *testing.T) {
 		t.Errorf("bob lists %v", got)
 	}
 }
+
+func TestActivityEditsIsolation(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	id := importActivity(t, q, alice.ID, "a1", nil)
+	other := importActivity(t, q, alice.ID, "a2", nil)
+
+	edit, err := q.InsertActivityEdit(ctx, db.InsertActivityEditParams{UserID: alice.ID, ActivityID: id, Kind: "trim", Params: []byte(`{}`)})
+	check(t, err)
+	var pgErr *pgconn.PgError
+	// Bob cannot attach edits or split parts to alice's activity: the composite keys refuse.
+	if _, err := q.InsertActivityEdit(ctx, db.InsertActivityEditParams{UserID: bob.ID, ActivityID: id, Kind: "trim", Params: []byte(`{}`)}); !errors.As(err, &pgErr) || pgErr.Code != "23503" {
+		t.Errorf("bob adds an edit: %v", err)
+	}
+	if _, err := q.InsertSplitActivity(ctx, db.InsertSplitActivityParams{UserID: bob.ID, SplitOf: &id, Sport: "running", Subtype: "outdoor", StartTime: start}); !errors.As(err, &pgErr) || pgErr.Code != "23503" {
+		t.Errorf("bob splits: %v", err)
+	}
+	if edits, err := q.ListActivityEdits(ctx, db.ListActivityEditsParams{UserID: bob.ID, ActivityID: id}); err != nil || len(edits) != 0 {
+		t.Errorf("bob lists %d edits, %v", len(edits), err)
+	}
+	if _, err := q.DeleteActivityEdit(ctx, db.DeleteActivityEditParams{UserID: bob.ID, ActivityID: id, ID: edit.ID}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob deletes an edit: %v", err)
+	}
+	check(t, q.SetActivityOverrides(ctx, db.SetActivityOverridesParams{UserID: bob.ID, ID: id, Overrides: []byte(`{"sport": "cycling"}`)}))
+	check(t, q.SetActivityMergedInto(ctx, db.SetActivityMergedIntoParams{UserID: bob.ID, ID: id, MergedInto: &other}))
+	if rows, err := q.ListActivityStreamsWindow(ctx, db.ListActivityStreamsWindowParams{
+		UserID: bob.ID, ActivityID: id, FromTime: start.Add(-time.Hour), ToTime: start.Add(time.Hour), MaxRows: 10,
+	}); err != nil || len(rows) != 0 {
+		t.Errorf("bob reads %d samples, %v", len(rows), err)
+	}
+
+	second, err := q.InsertSplitActivity(ctx, db.InsertSplitActivityParams{UserID: alice.ID, SplitOf: &id, Sport: "running", Subtype: "outdoor", StartTime: start.Add(time.Second)})
+	check(t, err)
+	if n, err := q.DeleteSplitActivity(ctx, db.DeleteSplitActivityParams{UserID: bob.ID, SplitOf: &id}); err != nil || n != 0 {
+		t.Errorf("bob deletes %d split parts, %v", n, err)
+	}
+
+	a, err := q.GetActivity(ctx, db.GetActivityParams{UserID: alice.ID, ID: id})
+	check(t, err)
+	if string(a.Overrides) != "{}" || a.MergedInto != nil {
+		t.Errorf("bob changed alice's activity: overrides %s, merged into %v", a.Overrides, a.MergedInto)
+	}
+	if edits, err := q.ListActivityEdits(ctx, db.ListActivityEditsParams{UserID: alice.ID, ActivityID: id}); err != nil || len(edits) != 1 {
+		t.Errorf("alice's edits: %d, %v", len(edits), err)
+	}
+	if _, err := q.GetActivity(ctx, db.GetActivityParams{UserID: alice.ID, ID: second}); err != nil {
+		t.Errorf("alice's split part: %v", err)
+	}
+	if rows, err := q.ListActivityStreamsWindow(ctx, db.ListActivityStreamsWindowParams{
+		UserID: alice.ID, ActivityID: id, After: start, FromTime: start, ToTime: start.Add(2 * time.Second), MaxRows: 10,
+	}); err != nil || len(rows) != 1 {
+		t.Errorf("alice's window: %d samples, %v", len(rows), err)
+	}
+}

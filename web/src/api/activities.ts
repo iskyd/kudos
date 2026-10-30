@@ -171,3 +171,47 @@ export function useSetAnnotation(id: number) {
     },
   })
 }
+
+export type ActivityEdit = components['schemas']['ActivityEdit']
+export type ActivityEditRequest = components['schemas']['ActivityEditRequest']
+
+// Edits change the activity, its streams, the list and, for merge and split, a second
+// activity and gear totals: everything is refreshed.
+function useEditMutation<V>(id: number, run: (v: V, csrf: string) => Promise<ActivityDetail>) {
+  const queryClient = useQueryClient()
+  const { csrfToken } = useCurrentUser()
+  return useMutation({
+    mutationFn: (v: V) => run(v, csrfToken),
+    onSuccess: async (detail) => {
+      queryClient.setQueryData([...activitiesKey, id], detail)
+      await queryClient.invalidateQueries({
+        queryKey: activitiesKey,
+        predicate: (q) => q.queryKey[1] !== id || q.queryKey.length > 2,
+      })
+      await queryClient.invalidateQueries({ queryKey: gearKey })
+    },
+  })
+}
+
+export function useAddEdit(id: number) {
+  return useEditMutation(id, async (body: ActivityEditRequest, csrf) => {
+    const { data, error } = await api.POST('/api/activities/{id}/edits', {
+      params: { path: { id } },
+      body,
+      headers: { 'X-CSRF-Token': csrf },
+    })
+    if (error) throw new ApiError(error)
+    return data
+  })
+}
+
+export function useUndoEdit(id: number) {
+  return useEditMutation(id, async (editId: number, csrf) => {
+    const { data, error } = await api.DELETE('/api/activities/{id}/edits/{editId}', {
+      params: { path: { id, editId } },
+      headers: { 'X-CSRF-Token': csrf },
+    })
+    if (error) throw new ApiError(error)
+    return data
+  })
+}

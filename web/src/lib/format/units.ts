@@ -29,6 +29,17 @@ export function formatActivityStart(startTime: string, utcOffsetS: number): stri
   })
 }
 
+// formatLocalClock renders an instant as the local clock time where the activity
+// happened ("07:30:05").
+export function formatLocalClock(time: string, utcOffsetS: number): string {
+  return new Date(new Date(time).getTime() + utcOffsetS * 1000).toISOString().slice(11, 19)
+}
+
+// localDay is the local calendar day where the activity happened ("2026-10-10").
+export function localDay(time: string, utcOffsetS: number): string {
+  return new Date(new Date(time).getTime() + utcOffsetS * 1000).toISOString().slice(0, 10)
+}
+
 // paceSeconds turns a speed into seconds per `per` metres (1000 for /km, 100 for
 // swimming); null when standing still.
 export function paceSeconds(metresPerSecond: number, per = 1000): number | null {

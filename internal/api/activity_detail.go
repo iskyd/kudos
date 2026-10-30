@@ -53,9 +53,13 @@ func (s *Server) GetActivity(ctx context.Context, req GetActivityRequestObject) 
 	return GetActivity200JSONResponse(out), nil
 }
 
-// detail adds the recorded workout and multisport legs to an activity.
+// detail applies the activity's edits and adds its recorded workout, multisport legs and edits.
 func (s *Server) detail(ctx context.Context, a db.Activity) (ActivityDetail, error) {
 	userID := sessionFrom(ctx).userID
+	a, err := ingest.Effective(a)
+	if err != nil {
+		return ActivityDetail{}, err
+	}
 	sum := activitySummary(a)
 	out := ActivityDetail{
 		Id: sum.Id, Sport: sum.Sport, Subtype: ActivityDetailSubtype(sum.Subtype), Source: ActivityDetailSource(sum.Source), StartTime: sum.StartTime, UtcOffsetS: sum.UtcOffsetS,
@@ -65,7 +69,10 @@ func (s *Server) detail(ctx context.Context, a db.Activity) (ActivityDetail, err
 		AvgCadence: a.AvgCadence, MaxCadence: a.MaxCadence, AvgTemperatureC: a.AvgTemperatureC, PoolLengthM: a.PoolLengthM,
 		CaloriesKcal: int32Ptr(a.CaloriesKcal), Feel: intPtr(a.Feel), Notes: a.Notes, WeatherTemperatureC: a.WeatherTemperatureC,
 		WeatherCondition: (*ActivityDetailWeatherCondition)(a.WeatherCondition), Legs: []ActivitySummary{}, PainTags: a.PainTags,
-		GearId: a.GearID,
+		GearId: a.GearID, MergedInto: a.MergedInto, SplitOf: a.SplitOf,
+	}
+	if out.Edits, err = s.activityEdits(ctx, a.ID); err != nil {
+		return ActivityDetail{}, err
 	}
 
 	w, err := s.q.GetRecordedWorkout(ctx, db.GetRecordedWorkoutParams{UserID: userID, ActivityID: a.ID})
@@ -85,6 +92,9 @@ func (s *Server) detail(ctx context.Context, a db.Activity) (ActivityDetail, err
 			return ActivityDetail{}, fmt.Errorf("listing multisport legs: %w", err)
 		}
 		for _, l := range legs {
+			if l, err = ingest.Effective(l); err != nil {
+				return ActivityDetail{}, err
+			}
 			out.Legs = append(out.Legs, activitySummary(l))
 		}
 	}
@@ -344,20 +354,29 @@ func (s *Server) GetActivityStreams(ctx context.Context, req GetActivityStreamsR
 	if p.MaxPoints != nil && p.Cursor != nil {
 		return nil, &Error{Kind: KindInvalidRequest, Detail: "a reduced stream has no pages"}
 	}
-	params := db.ListActivityStreamsParams{UserID: sessionFrom(ctx).userID, ActivityID: a.ID, MaxRows: streamPageSize + 1}
+	limit := streamPageSize + 1
 	if p.MaxPoints != nil {
-		params.MaxRows = maxDecimatedSamples
+		limit = maxDecimatedSamples
 	}
+	var after *time.Time
 	if p.Cursor != nil {
 		var c streamCursor
 		if err := s.cursors.Decode(*p.Cursor, &c); err != nil {
 			return nil, err
 		}
-		params.After = c.After
+		after = &c.After
 	}
-	rows, err := s.q.ListActivityStreams(ctx, params)
+	// Edits pick the samples (trim, merge, split) and drop excluded heart rate.
+	v, err := s.ingest.View(ctx, a)
+	if err != nil {
+		return nil, fmt.Errorf("reading edits: %w", err)
+	}
+	rows, err := s.ingest.Samples(ctx, sessionFrom(ctx).userID, v, after, limit)
 	if err != nil {
 		return nil, fmt.Errorf("listing streams: %w", err)
+	}
+	if a, err = ingest.Effective(a); err != nil {
+		return nil, err
 	}
 
 	var next *string

@@ -451,6 +451,57 @@ paths:
                 $ref: "#/components/schemas/ActivityDetail"
         default:
           $ref: "#/components/responses/Problem"
+  /api/activities/{id}/edits:
+    post:
+      operationId: addActivityEdit
+      summary: Edit an activity
+      description: |
+        Stores an edit as an override; samples are never changed. Trim, excluded heart
+        rate, sport change, merge and split; each can be undone. Merging hides the other
+        activity; splitting creates a second activity. Derived values are recomputed.
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ActivityEditRequest"
+      responses:
+        "200":
+          description: The edited activity.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/activities/{id}/edits/{editId}:
+    delete:
+      operationId: undoActivityEdit
+      summary: Undo one edit
+      description: |
+        Undoing a merge brings the merged activity back; undoing a split deletes the
+        second part, with what was added to it.
+      tags: [activities]
+      parameters:
+        - $ref: "#/components/parameters/ActivityID"
+        - name: editId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: The activity without that edit.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityDetail"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/gear:
     get:
       operationId: listGear
@@ -727,7 +778,8 @@ components:
           enum: [outdoor, indoor, virtual, treadmill]
         source:
           type: string
-          enum: [garmin, upload, manual]
+          enum: [garmin, upload, manual, split]
+          description: "`split` is the second part of a split activity."
         startTime:
           type: string
           format: date-time
@@ -944,7 +996,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/ActivitySummary"
         - type: object
-          required: [legs, painTags]
+          required: [legs, painTags, edits]
           properties:
             descentM:
               type: number
@@ -990,6 +1042,19 @@ components:
             gearId:
               type: integer
               format: int64
+            edits:
+              type: array
+              description: The user's edits, oldest first; values above already apply them.
+              items:
+                $ref: "#/components/schemas/ActivityEdit"
+            mergedInto:
+              type: integer
+              format: int64
+              description: The activity this one was merged into; it is left out of the list.
+            splitOf:
+              type: integer
+              format: int64
+              description: For the second part of a split, the activity it was split from.
             legs:
               type: array
               description: Every leg of the multisport activity this one belongs to, in order; empty otherwise.
@@ -1031,6 +1096,72 @@ components:
           type: integer
           format: int64
           description: The user's own shoes or bike.
+    ActivityEditKind:
+      type: string
+      enum: [sport, trim, exclude_hr, merge, split]
+    ActivityEdit:
+      type: object
+      required: [id, kind, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        kind:
+          $ref: "#/components/schemas/ActivityEditKind"
+        createdAt:
+          type: string
+          format: date-time
+        sport:
+          $ref: "#/components/schemas/ActivitySport"
+        subtype:
+          type: string
+          enum: [outdoor, indoor, virtual, treadmill]
+        from:
+          type: string
+          format: date-time
+          description: Trim or excluded heart rate range start, inclusive.
+        to:
+          type: string
+          format: date-time
+          description: Range end, inclusive.
+        at:
+          type: string
+          format: date-time
+          description: Where a split's second part starts.
+        activityId:
+          type: integer
+          format: int64
+          description: The activity merged in, or the second part of a split.
+    ActivityEditRequest:
+      type: object
+      required: [kind]
+      description: |
+        Offsets are seconds from the activity's current start. sport: sport and
+        subtype; trim and exclude_hr: fromS and toS (inclusive); split: atS, where
+        the second part starts; merge: activityId, the activity to merge in.
+      properties:
+        kind:
+          $ref: "#/components/schemas/ActivityEditKind"
+        sport:
+          $ref: "#/components/schemas/ActivitySport"
+        subtype:
+          type: string
+          enum: [outdoor, indoor, virtual, treadmill]
+        fromS:
+          type: number
+          format: double
+          minimum: 0
+        toS:
+          type: number
+          format: double
+          minimum: 0
+        atS:
+          type: number
+          format: double
+          minimum: 0
+        activityId:
+          type: integer
+          format: int64
     GearInput:
       type: object
       required: [kind, name]

@@ -340,6 +340,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activities/{id}/edits": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Edit an activity
+         * @description Stores an edit as an override; samples are never changed. Trim, excluded heart
+         *     rate, sport change, merge and split; each can be undone. Merging hides the other
+         *     activity; splitting creates a second activity. Derived values are recomputed.
+         */
+        post: operations["addActivityEdit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/activities/{id}/edits/{editId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Undo one edit
+         * @description Undoing a merge brings the merged activity back; undoing a split deletes the
+         *     second part, with what was added to it.
+         */
+        delete: operations["undoActivityEdit"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/gear": {
         parameters: {
             query?: never;
@@ -505,8 +548,11 @@ export interface components {
             sport: components["schemas"]["ActivitySport"];
             /** @enum {string} */
             subtype: "outdoor" | "indoor" | "virtual" | "treadmill";
-            /** @enum {string} */
-            source: "garmin" | "upload" | "manual";
+            /**
+             * @description `split` is the second part of a split activity.
+             * @enum {string}
+             */
+            source: "garmin" | "upload" | "manual" | "split";
             /**
              * Format: date-time
              * @description Start in UTC.
@@ -671,6 +717,18 @@ export interface components {
             painTags: string[];
             /** Format: int64 */
             gearId?: number;
+            /** @description The user's edits, oldest first; values above already apply them. */
+            edits: components["schemas"]["ActivityEdit"][];
+            /**
+             * Format: int64
+             * @description The activity this one was merged into; it is left out of the list.
+             */
+            mergedInto?: number;
+            /**
+             * Format: int64
+             * @description For the second part of a split, the activity it was split from.
+             */
+            splitOf?: number;
             /** @description Every leg of the multisport activity this one belongs to, in order; empty otherwise. */
             legs: components["schemas"]["ActivitySummary"][];
         };
@@ -693,6 +751,57 @@ export interface components {
              * @description The user's own shoes or bike.
              */
             gearId?: number;
+        };
+        /** @enum {string} */
+        ActivityEditKind: "sport" | "trim" | "exclude_hr" | "merge" | "split";
+        ActivityEdit: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["ActivityEditKind"];
+            /** Format: date-time */
+            createdAt: string;
+            sport?: components["schemas"]["ActivitySport"];
+            /** @enum {string} */
+            subtype?: "outdoor" | "indoor" | "virtual" | "treadmill";
+            /**
+             * Format: date-time
+             * @description Trim or excluded heart rate range start, inclusive.
+             */
+            from?: string;
+            /**
+             * Format: date-time
+             * @description Range end, inclusive.
+             */
+            to?: string;
+            /**
+             * Format: date-time
+             * @description Where a split's second part starts.
+             */
+            at?: string;
+            /**
+             * Format: int64
+             * @description The activity merged in, or the second part of a split.
+             */
+            activityId?: number;
+        };
+        /**
+         * @description Offsets are seconds from the activity's current start. sport: sport and
+         *     subtype; trim and exclude_hr: fromS and toS (inclusive); split: atS, where
+         *     the second part starts; merge: activityId, the activity to merge in.
+         */
+        ActivityEditRequest: {
+            kind: components["schemas"]["ActivityEditKind"];
+            sport?: components["schemas"]["ActivitySport"];
+            /** @enum {string} */
+            subtype?: "outdoor" | "indoor" | "virtual" | "treadmill";
+            /** Format: double */
+            fromS?: number;
+            /** Format: double */
+            toS?: number;
+            /** Format: double */
+            atS?: number;
+            /** Format: int64 */
+            activityId?: number;
         };
         GearInput: {
             /** @enum {string} */
@@ -1397,6 +1506,57 @@ export interface operations {
         };
         responses: {
             /** @description The activity with its new annotation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    addActivityEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActivityEditRequest"];
+            };
+        };
+        responses: {
+            /** @description The edited activity. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityDetail"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    undoActivityEdit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["ActivityID"];
+                editId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The activity without that edit. */
             200: {
                 headers: {
                     [name: string]: unknown;

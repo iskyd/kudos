@@ -2,11 +2,22 @@ import {
   formatActivityStart,
   formatDistance,
   formatDuration,
+  formatLocalClock,
   formatPace,
   formatSpeed,
   formatWhole,
+  localDay,
   paceSeconds,
 } from '@/lib/format/units'
+
+describe('formatLocalClock and localDay', () => {
+  it('use the local time where the activity happened', () => {
+    // 23:30:05 UTC in Rome (+2 h) is 01:30:05 the next day.
+    expect(formatLocalClock('2026-10-14T23:30:05Z', 7200)).toBe('01:30:05')
+    expect(localDay('2026-10-14T23:30:05Z', 7200)).toBe('2026-10-15')
+    expect(localDay('2026-10-14T23:30:05Z', -3600)).toBe('2026-10-14')
+  })
+})
 
 describe('formatDuration', () => {
   it.each([
