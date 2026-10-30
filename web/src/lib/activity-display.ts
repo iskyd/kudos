@@ -1,4 +1,4 @@
-import type { ActivitySport, ActivityStreams } from '@/api/activities'
+import type { ActivitySport, ActivityStreams, StepExecution, WorkoutStep } from '@/api/activities'
 import {
   formatDuration,
   formatPace,
@@ -66,4 +66,53 @@ export function charts(
     out.push({ label: 'Elevation', values: s.altitudeM, format: (v) => formatWhole(v, 'm') })
   }
   return out
+}
+
+// Targets the execution panel compares; others (zones, percentages, cadence) are shown as recorded.
+const compared = ['speed', 'heart_rate', 'power']
+
+// targetValue renders one value of a step's target type: speed as pace on foot.
+export function targetValue(sport: ActivitySport, type: string, v: number): string {
+  switch (type) {
+    case 'speed':
+      return speedText(sport, v)
+    case 'heart_rate':
+      return formatWhole(v, 'bpm')
+    case 'power':
+      return formatWhole(v, 'W')
+    default:
+      return '—'
+  }
+}
+
+// targetRange renders a step's target as a range, fastest pace first on foot.
+export function targetRange(sport: ActivitySport, step: WorkoutStep): string {
+  const { targetType: type, targetLow: lo, targetHigh: hi } = step
+  if (type === undefined || lo === undefined || hi === undefined || !compared.includes(type)) {
+    return '—'
+  }
+  let [a, b] = [Math.min(lo, hi), Math.max(lo, hi)]
+  if (type === 'speed' && pacePer(sport) !== null) [a, b] = [b, a]
+  return `${targetValue(sport, type, a)} – ${targetValue(sport, type, b)}`
+}
+
+// resultText says how a run went against its target; on foot, a speed above the target is faster.
+export function resultText(
+  sport: ActivitySport,
+  type: string | undefined,
+  r: StepExecution['result'],
+) {
+  const pace = type === 'speed' && pacePer(sport) !== null
+  switch (r) {
+    case 'skipped':
+      return 'Skipped'
+    case 'within':
+      return 'On target'
+    case 'above':
+      return pace ? 'Faster' : 'Above'
+    case 'below':
+      return pace ? 'Slower' : 'Below'
+    default:
+      return '—'
+  }
 }

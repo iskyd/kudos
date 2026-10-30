@@ -75,6 +75,7 @@ export function useCreateActivity() {
 export type ActivityDetail = components['schemas']['ActivityDetail']
 export type ActivityStreams = components['schemas']['ActivityStreams']
 export type Lap = components['schemas']['Lap']
+export type WorkoutStep = components['schemas']['WorkoutStep']
 export type SwimLength = components['schemas']['SwimLength']
 export type StrengthSet = components['schemas']['StrengthSet']
 
@@ -114,6 +115,22 @@ export function useComparison(id: number, other: number, axis: ComparisonAxis) {
     queryFn: async () => {
       const { data, error } = await api.GET('/api/activities/{id}/comparison', {
         params: { path: { id }, query: { with: other, axis, points: chartPoints } },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+  })
+}
+
+export type WorkoutExecution = components['schemas']['WorkoutExecution']
+export type StepExecution = components['schemas']['StepExecution']
+
+export function useExecution(id: number) {
+  return useQuery({
+    queryKey: [...activitiesKey, id, 'execution'],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/activities/{id}/execution', {
+        params: { path: { id } },
       })
       if (error) throw new ApiError(error)
       return data
