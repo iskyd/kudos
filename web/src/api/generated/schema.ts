@@ -629,9 +629,11 @@ export interface paths {
         /**
          * Pending zone suggestions
          * @description Thresholds recorded files carried that differ from the zone version valid
-         *     on their date, latest first, each with that version (current) when there
-         *     is one. Runs suggest running versions, rides cycling ones (a run's FTP is
-         *     running power and never used), everything else general ones.
+         *     on their date, and higher FTP or threshold pace estimates from rides' and
+         *     runs' best efforts (see getCurves), latest first, each with that version
+         *     (current) when there is one. Runs suggest running versions, rides cycling
+         *     ones (a run's FTP is running power and never used), everything else
+         *     general ones.
          */
         get: operations["listZoneSuggestions"];
         put?: never;
@@ -724,6 +726,33 @@ export interface paths {
          *     first activity, whichever is earlier.
          */
         get: operations["getRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/curves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Power-duration and pace-duration curves with threshold estimates
+         * @description The best mean cycling power (virtual rides included) and running speed
+         *     (virtual runs excluded) over standard durations, among the activities
+         *     whose local day is within from and to (all time when both are absent).
+         *     Each point takes the best value at its duration or any longer one, so
+         *     the curves never rise with duration. The estimates read the curves:
+         *     FTP is 95% of the best power over 20 minutes or longer, threshold pace
+         *     the best pace over 30 minutes or longer, rounded up to a whole second
+         *     per kilometre.
+         */
+        get: operations["getCurves"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1438,7 +1467,7 @@ export interface components {
             sport: components["schemas"]["ZoneSport"];
             /**
              * Format: date
-             * @description The local date of the first file that carried these values.
+             * @description The local date of the first activity that gave these values.
              */
             effectiveFrom: string;
             lthrBpm?: number;
@@ -1446,8 +1475,13 @@ export interface components {
             maxHrBpm?: number;
             restingHrBpm?: number;
             /**
+             * Format: double
+             * @description Running threshold pace, as a speed.
+             */
+            thresholdSpeedMS?: number;
+            /**
              * Format: int64
-             * @description The activity whose file carried them.
+             * @description The activity whose file or best efforts gave them.
              */
             activityId?: number;
             current?: components["schemas"]["ZoneSet"];
@@ -1504,6 +1538,32 @@ export interface components {
              * @description Seconds for fastest efforts, metres for longest, watts for power.
              */
             value: number;
+        };
+        Curves: {
+            /** @description Watts, shortest duration first. */
+            power: components["schemas"]["CurvePoint"][];
+            /** @description Speed in m/s, shortest duration first. */
+            pace: components["schemas"]["CurvePoint"][];
+            /** @description Estimated FTP; absent without 20 minutes of power. */
+            ftpW?: number;
+            /**
+             * Format: double
+             * @description Estimated threshold pace, as a speed; absent without a 30-minute run.
+             */
+            thresholdSpeedMS?: number;
+        };
+        CurvePoint: {
+            durationS: number;
+            /** Format: double */
+            value: number;
+            /**
+             * Format: int64
+             * @description The activity that set the value.
+             */
+            activityId: number;
+            /** Format: date-time */
+            startTime: string;
+            utcOffsetS: number;
         };
         Readiness: {
             /** Format: date */
@@ -2704,6 +2764,32 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Records"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCurves: {
+        parameters: {
+            query?: {
+                /** @description First local day, inclusive. */
+                from?: string;
+                /** @description Last local day, inclusive. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The curves; empty without activities in the period. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Curves"];
                 };
             };
             default: components["responses"]["Problem"];

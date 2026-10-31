@@ -113,6 +113,10 @@ func TestBestPowerEfforts(t *testing.T) {
 	}
 	got = BestEfforts(EffortInput{Sport: "cycling", Segments: [][]Sample{append(paused, resumed...)}})
 	sameEfforts(t, "paused", got, map[EffortName]float64{Power5s: 200})
+
+	// A ride at 0 W (a power meter while coasting) sets no power effort.
+	got = BestEfforts(EffortInput{Sport: "cycling", Segments: [][]Sample{powerSamples(1, repeat(0, 100)...)}})
+	sameEfforts(t, "no power", got, map[EffortName]float64{})
 }
 
 func TestBestEffortsOfOtherSports(t *testing.T) {

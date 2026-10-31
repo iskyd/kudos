@@ -115,18 +115,7 @@ func BestEfforts(in EffortInput) []Effort {
 func fastestDistance(segments [][]Sample, metres float64) (seconds float64, ok bool) {
 	best := math.Inf(1)
 	for _, seg := range segments {
-		var ts, ds []float64
-		for _, s := range seg {
-			if s.Distance == nil {
-				continue
-			}
-			d := *s.Distance
-			if len(ds) > 0 {
-				d = math.Max(d, ds[len(ds)-1]) // a dip is noise, not running back
-			}
-			ts = append(ts, s.Time.Sub(seg[0].Time).Seconds())
-			ds = append(ds, d)
-		}
+		ts, ds := distanceTrack(seg)
 		i := 0
 		for j := range ds {
 			target := ds[j] - metres
@@ -143,7 +132,8 @@ func fastestDistance(segments [][]Sample, metres float64) (seconds float64, ok b
 	return best, !math.IsInf(best, 1)
 }
 
-// bestMeanPower is the highest mean power over seconds within one run.
+// bestMeanPower is the highest mean power over seconds within one run; none
+// when it is 0 W.
 func bestMeanPower(runs [][]float64, seconds int) (watts float64, ok bool) {
 	best := math.Inf(-1)
 	for _, run := range runs {
@@ -161,7 +151,7 @@ func bestMeanPower(runs [][]float64, seconds int) (watts float64, ok bool) {
 			}
 		}
 	}
-	return best, !math.IsInf(best, -1)
+	return best, best > 0
 }
 
 // powerSeconds samples power every second, each sample's power holding until

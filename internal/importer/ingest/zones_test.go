@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iskyd/kudos/internal/analytics"
 	"github.com/iskyd/kudos/internal/importer"
 	"github.com/iskyd/kudos/internal/store/db"
 )
@@ -15,11 +16,12 @@ import (
 var corpusFiles = []string{"pool_swim.fit", "strength.fit", "bike.fit", "hike.fit", "zwift.fit", "intervals.fit", "half_marathon.fit"}
 
 // suggestions lists a user's suggestions, pending and dismissed, as
-// "sport day lthr/ftp/max/rest status", oldest first.
+// "sport day lthr/ftp/max/rest status", oldest first, with the threshold pace
+// in seconds per kilometre when one is suggested.
 func (e env) suggestions(t *testing.T, userID int64) []string {
 	t.Helper()
-	rows, err := e.pool.Query(t.Context(), `SELECT sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, status
-		FROM zone_suggestions WHERE user_id = $1 ORDER BY effective_from, sport`, userID)
+	rows, err := e.pool.Query(t.Context(), `SELECT sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, status,
+		round(1000 / threshold_speed_m_s)::int FROM zone_suggestions WHERE user_id = $1 ORDER BY effective_from, sport`, userID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -29,7 +31,8 @@ func (e env) suggestions(t *testing.T, userID int64) []string {
 		var sport, status string
 		var day time.Time
 		var lthr, ftp, maxHR, rest *int16
-		if err := rows.Scan(&sport, &day, &lthr, &ftp, &maxHR, &rest, &status); err != nil {
+		var pace *int32
+		if err := rows.Scan(&sport, &day, &lthr, &ftp, &maxHR, &rest, &status, &pace); err != nil {
 			t.Fatal(err)
 		}
 		v := func(p *int16) string {
@@ -38,7 +41,11 @@ func (e env) suggestions(t *testing.T, userID int64) []string {
 			}
 			return fmt.Sprint(*p)
 		}
-		out = append(out, fmt.Sprintf("%s %s %s/%s/%s/%s %s", sport, day.Format(time.DateOnly), v(lthr), v(ftp), v(maxHR), v(rest), status))
+		line := fmt.Sprintf("%s %s %s/%s/%s/%s %s", sport, day.Format(time.DateOnly), v(lthr), v(ftp), v(maxHR), v(rest), status)
+		if pace != nil {
+			line += fmt.Sprintf(" %d s/km", *pace)
+		}
+		out = append(out, line)
 	}
 	return out
 }
@@ -148,5 +155,105 @@ func TestSuggestZonesEdgeCases(t *testing.T) {
 	broken.Close()
 	if err := suggestZones(ctx, db.New(broken), e.alice, 1, run, 0); err == nil {
 		t.Error("suggested over a closed pool")
+	}
+}
+
+func TestEstimatedThresholdsFromTheCorpus(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	ids := map[string]int64{}
+	for _, f := range corpusFiles {
+		ids[f] = e.upload(t, f).ID
+	}
+	// The Zwift ride's best 30 minutes (135.2 W) beat its best 20 (133.5 W):
+	// FTP 128 W. The intervals' best 30 minutes at 3.66 m/s give 4:34/km and
+	// join the file's running suggestion that day; the half marathon is slower.
+	// The outdoor ride has no power. Recomputing changes nothing.
+	want := slices.Clone(corpusSuggestions)
+	want[4] += " 274 s/km"
+	want = append(want, "cycling 2026-10-20 -/128/-/- pending")
+	for range 2 {
+		for _, f := range corpusFiles {
+			e.compute(t, ids[f])
+		}
+		if got := e.suggestions(t, e.alice); !slices.Equal(got, want) {
+			t.Fatalf("suggestions:\n%v\nwant\n%v", got, want)
+		}
+	}
+	if got := e.suggestions(t, e.bob); len(got) != 0 {
+		t.Errorf("bob's suggestions: %v", got)
+	}
+
+	// A dismissed estimate is not suggested again, nor a lower one.
+	rows, err := e.q.ListZoneSuggestions(ctx, db.ListZoneSuggestionsParams{UserID: e.alice, MaxRows: 1})
+	if err != nil || len(rows) != 1 || rows[0].FtpW == nil {
+		t.Fatalf("latest: %v, %v", rows, err)
+	}
+	if _, err := e.q.DismissZoneSuggestion(ctx, db.DismissZoneSuggestionParams{UserID: e.alice, ID: rows[0].ID}); err != nil {
+		t.Fatal(err)
+	}
+	e.compute(t, ids["zwift.fit"])
+	if got := e.suggestions(t, e.alice); got[len(got)-1] != "cycling 2026-10-20 -/128/-/- dismissed" || len(got) != len(want) {
+		t.Errorf("after dismissing: %v", got)
+	}
+}
+
+func TestEstimatesAgainstVersionsAndFiles(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	zwift := e.upload(t, "zwift.fit")
+	_, err := e.q.CreateZoneSet(ctx, db.CreateZoneSetParams{
+		UserID: e.alice, Sport: "cycling", EffectiveFrom: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC),
+		LthrBpm: new(int16(185)), FtpW: new(int16(120)),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 128 W beats the version's 120 W.
+	e.compute(t, zwift.ID)
+	want := []string{"cycling 2026-10-20 -/128/-/- pending"}
+	if got := e.suggestions(t, e.alice); !slices.Equal(got, want) {
+		t.Fatalf("suggestions: %v, want %v", got, want)
+	}
+	// A later file with the version's LTHR suggests nothing: the estimate only
+	// adds an FTP over the version's values.
+	ride := importer.Activity{
+		Sport: importer.SportCycling, StartTime: time.Date(2026, 10, 22, 6, 0, 0, 0, time.UTC),
+		Thresholds: &importer.Thresholds{ThresholdHR: new(185.0)},
+	}
+	if err := suggestZones(ctx, e.q, e.alice, zwift.ID, ride, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := e.suggestions(t, e.alice); !slices.Equal(got, want) {
+		t.Errorf("after a file with known values: %v", got)
+	}
+
+	// Confirming applies it; a version above the estimate leaves nothing to suggest.
+	rows, err := e.q.ListZoneSuggestions(ctx, db.ListZoneSuggestionsParams{UserID: e.alice, MaxRows: 1})
+	if err != nil || len(rows) != 1 {
+		t.Fatal(rows, err)
+	}
+	_, err = e.q.ConfirmZoneSuggestion(ctx, db.ConfirmZoneSuggestionParams{
+		UserID: e.alice, ID: rows[0].ID, Sport: "cycling", EffectiveFrom: rows[0].EffectiveFrom, LthrBpm: new(int16(185)), FtpW: rows[0].FtpW,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	e.compute(t, zwift.ID)
+	if got := e.suggestions(t, e.alice); len(got) != 0 {
+		t.Errorf("after confirming: %v", got)
+	}
+
+	// Failures surface.
+	broken := pg.NewEmptyDB(t)
+	broken.Close()
+	curve := []analytics.CurvePoint{{Kind: analytics.PowerCurve, DurationS: analytics.FTPDurationS, Value: 300}}
+	if err := suggestEstimates(ctx, db.New(broken), e.alice, zwift.ID, time.Now(), curve); err == nil {
+		t.Error("suggested over a closed pool")
+	}
+	if err := suggestEstimates(ctx, e.q, e.alice, 999_999, time.Now(), curve); err == nil {
+		t.Error("suggested for a missing activity")
 	}
 }

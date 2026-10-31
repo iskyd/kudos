@@ -56,6 +56,16 @@ INSERT INTO zone_suggestions (user_id, sport, effective_from, lthr_bpm, ftp_w, m
 VALUES (@user_id, @sport, @effective_from, @lthr_bpm, @ftp_w, @max_hr_bpm, @resting_hr_bpm, @activity_id)
 ON CONFLICT (user_id, sport, effective_from) DO NOTHING;
 
+-- name: SuggestEstimate :exec
+-- An estimate joins a pending suggestion already on its day; a dismissed one
+-- keeps the day.
+INSERT INTO zone_suggestions (user_id, sport, effective_from, ftp_w, threshold_speed_m_s, activity_id)
+VALUES (@user_id, @sport, @effective_from, @ftp_w, @threshold_speed_m_s, @activity_id)
+ON CONFLICT (user_id, sport, effective_from) DO UPDATE SET
+    ftp_w = coalesce(EXCLUDED.ftp_w, zone_suggestions.ftp_w),
+    threshold_speed_m_s = coalesce(EXCLUDED.threshold_speed_m_s, zone_suggestions.threshold_speed_m_s)
+WHERE zone_suggestions.status = 'pending';
+
 -- name: MoveZoneSuggestion :exec
 -- An older file with the same values moves a suggestion back to its date.
 UPDATE zone_suggestions SET effective_from = @effective_from, activity_id = @activity_id

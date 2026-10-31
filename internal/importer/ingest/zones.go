@@ -14,12 +14,30 @@ import (
 )
 
 // thresholdValues are the thresholds a suggestion compares.
-type thresholdValues struct{ lthr, ftp, maxHR, restingHR *int16 }
+type thresholdValues struct {
+	lthr, ftp, maxHR, restingHR *int16
+	thresholdSpeed              *float32
+}
 
 // coveredBy reports whether known already holds every value v has.
 func (v thresholdValues) coveredBy(known thresholdValues) bool {
-	same := func(a, b *int16) bool { return a == nil || (b != nil && *a == *b) }
-	return same(v.lthr, known.lthr) && same(v.ftp, known.ftp) && same(v.maxHR, known.maxHR) && same(v.restingHR, known.restingHR)
+	return same(v.lthr, known.lthr) && same(v.ftp, known.ftp) && same(v.maxHR, known.maxHR) &&
+		same(v.restingHR, known.restingHR) && same(v.thresholdSpeed, known.thresholdSpeed)
+}
+
+func same[T comparable](a, b *T) bool { return a == nil || (b != nil && *a == *b) }
+
+// over returns v with o's values over it.
+func (v thresholdValues) over(o thresholdValues) thresholdValues {
+	for _, f := range []struct{ to, from **int16 }{{&v.lthr, &o.lthr}, {&v.ftp, &o.ftp}, {&v.maxHR, &o.maxHR}, {&v.restingHR, &o.restingHR}} {
+		if *f.from != nil {
+			*f.to = *f.from
+		}
+	}
+	if o.thresholdSpeed != nil {
+		v.thresholdSpeed = o.thresholdSpeed
+	}
+	return v
 }
 
 func (v thresholdValues) equal(o thresholdValues) bool { return v.coveredBy(o) && o.coveredBy(v) }
@@ -74,22 +92,22 @@ func suggestZones(ctx context.Context, q *db.Queries, userID, activityID int64, 
 }
 
 // knownOn returns the thresholds known for a sport on day and the date they
-// start, from whichever of the version and the suggestion starts later; from is
-// nil when there are none.
+// start: the version's, with the suggestion's over them when it starts later;
+// from is nil when there are none.
 func knownOn(ctx context.Context, q *db.Queries, userID int64, sport string, day time.Time) (thresholdValues, *time.Time, error) {
 	var known thresholdValues
 	var from *time.Time
 	v, err := q.GetZoneSetAt(ctx, db.GetZoneSetAtParams{UserID: userID, Sport: sport, Day: day})
 	switch {
 	case err == nil:
-		known, from = thresholdValues{v.LthrBpm, v.FtpW, v.MaxHrBpm, v.RestingHrBpm}, &v.EffectiveFrom
+		known, from = thresholdValues{v.LthrBpm, v.FtpW, v.MaxHrBpm, v.RestingHrBpm, v.ThresholdSpeedMS}, &v.EffectiveFrom
 	case !errors.Is(err, pgx.ErrNoRows):
 		return known, nil, fmt.Errorf("reading zone version: %w", err)
 	}
 	s, err := q.GetZoneSuggestionAt(ctx, db.GetZoneSuggestionAtParams{UserID: userID, Sport: sport, Day: day})
 	switch {
 	case err == nil && (from == nil || s.EffectiveFrom.After(*from)):
-		known, from = suggestionValues(s), &s.EffectiveFrom
+		known, from = known.over(suggestionValues(s)), &s.EffectiveFrom
 	case err != nil && !errors.Is(err, pgx.ErrNoRows):
 		return known, nil, fmt.Errorf("reading zone suggestion: %w", err)
 	}
@@ -97,5 +115,43 @@ func knownOn(ctx context.Context, q *db.Queries, userID int64, sport string, day
 }
 
 func suggestionValues(s db.ZoneSuggestion) thresholdValues {
-	return thresholdValues{s.LthrBpm, s.FtpW, s.MaxHrBpm, s.RestingHrBpm}
+	return thresholdValues{s.LthrBpm, s.FtpW, s.MaxHrBpm, s.RestingHrBpm, s.ThresholdSpeedMS}
+}
+
+// suggestEstimates suggests a zone version for the activity's local date when
+// its curve implies a higher threshold than known for its sport then: a ride's
+// FTP (virtual rides too), a run's threshold pace (analytics.Estimates). As with files, a suggested value is known, pending or
+// dismissed; an estimate joins a pending suggestion on its day.
+func suggestEstimates(ctx context.Context, q *db.Queries, userID, activityID int64, day time.Time, curve []analytics.CurvePoint) error {
+	var sport analytics.ZoneSport
+	var est thresholdValues
+	switch ftp, speed := analytics.Estimates(curve); {
+	case ftp != nil:
+		sport, est.ftp = analytics.ZoneCycling, i16(ftp)
+	case speed != nil:
+		sport, est.thresholdSpeed = analytics.ZoneRunning, new(float32(*speed))
+	default:
+		return nil
+	}
+	known, _, err := knownOn(ctx, q, userID, string(sport), day)
+	if err != nil {
+		return err
+	}
+	if !higher(est.ftp, known.ftp) && !higher(est.thresholdSpeed, known.thresholdSpeed) {
+		return nil
+	}
+	err = q.SuggestEstimate(ctx, db.SuggestEstimateParams{
+		UserID: userID, Sport: string(sport), EffectiveFrom: day, ActivityID: &activityID,
+		FtpW: est.ftp, ThresholdSpeedMS: est.thresholdSpeed,
+	})
+	if err != nil {
+		return fmt.Errorf("suggesting estimated thresholds: %w", err)
+	}
+	return nil
+}
+
+// higher reports whether an estimate beats what is known; there is none to beat
+// when nothing is known.
+func higher[T int16 | float32](est, known *T) bool {
+	return est != nil && (known == nil || *est > *known)
 }

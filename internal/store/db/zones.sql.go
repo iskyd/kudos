@@ -156,7 +156,7 @@ func (q *Queries) DismissZoneSuggestion(ctx context.Context, arg DismissZoneSugg
 }
 
 const getNextZoneSuggestion = `-- name: GetNextZoneSuggestion :one
-SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at, threshold_speed_m_s FROM zone_suggestions
 WHERE user_id = $1 AND sport = $2 AND effective_from > $3::date
 ORDER BY effective_from
 LIMIT 1
@@ -184,12 +184,13 @@ func (q *Queries) GetNextZoneSuggestion(ctx context.Context, arg GetNextZoneSugg
 		&i.ActivityID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ThresholdSpeedMS,
 	)
 	return i, err
 }
 
 const getPendingZoneSuggestion = `-- name: GetPendingZoneSuggestion :one
-SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions WHERE user_id = $1 AND id = $2 AND status = 'pending'
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at, threshold_speed_m_s FROM zone_suggestions WHERE user_id = $1 AND id = $2 AND status = 'pending'
 `
 
 type GetPendingZoneSuggestionParams struct {
@@ -212,6 +213,7 @@ func (q *Queries) GetPendingZoneSuggestion(ctx context.Context, arg GetPendingZo
 		&i.ActivityID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ThresholdSpeedMS,
 	)
 	return i, err
 }
@@ -250,7 +252,7 @@ func (q *Queries) GetZoneSetAt(ctx context.Context, arg GetZoneSetAtParams) (Zon
 }
 
 const getZoneSuggestionAt = `-- name: GetZoneSuggestionAt :one
-SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at, threshold_speed_m_s FROM zone_suggestions
 WHERE user_id = $1 AND sport = $2 AND effective_from <= $3::date
 ORDER BY effective_from DESC
 LIMIT 1
@@ -278,6 +280,7 @@ func (q *Queries) GetZoneSuggestionAt(ctx context.Context, arg GetZoneSuggestion
 		&i.ActivityID,
 		&i.Status,
 		&i.CreatedAt,
+		&i.ThresholdSpeedMS,
 	)
 	return i, err
 }
@@ -418,7 +421,7 @@ func (q *Queries) ListZoneSetsAt(ctx context.Context, arg ListZoneSetsAtParams) 
 }
 
 const listZoneSuggestions = `-- name: ListZoneSuggestions :many
-SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at FROM zone_suggestions
+SELECT id, user_id, sport, effective_from, lthr_bpm, ftp_w, max_hr_bpm, resting_hr_bpm, activity_id, status, created_at, threshold_speed_m_s FROM zone_suggestions
 WHERE user_id = $1 AND status = 'pending'
     AND ($2::date IS NULL
         OR (effective_from, id) < ($2::date, $3::bigint))
@@ -460,6 +463,7 @@ func (q *Queries) ListZoneSuggestions(ctx context.Context, arg ListZoneSuggestio
 			&i.ActivityID,
 			&i.Status,
 			&i.CreatedAt,
+			&i.ThresholdSpeedMS,
 		); err != nil {
 			return nil, err
 		}
@@ -490,6 +494,38 @@ func (q *Queries) MoveZoneSuggestion(ctx context.Context, arg MoveZoneSuggestion
 		arg.ActivityID,
 		arg.UserID,
 		arg.ID,
+	)
+	return err
+}
+
+const suggestEstimate = `-- name: SuggestEstimate :exec
+INSERT INTO zone_suggestions (user_id, sport, effective_from, ftp_w, threshold_speed_m_s, activity_id)
+VALUES ($1, $2, $3, $4, $5, $6)
+ON CONFLICT (user_id, sport, effective_from) DO UPDATE SET
+    ftp_w = coalesce(EXCLUDED.ftp_w, zone_suggestions.ftp_w),
+    threshold_speed_m_s = coalesce(EXCLUDED.threshold_speed_m_s, zone_suggestions.threshold_speed_m_s)
+WHERE zone_suggestions.status = 'pending'
+`
+
+type SuggestEstimateParams struct {
+	UserID           int64
+	Sport            string
+	EffectiveFrom    time.Time
+	FtpW             *int16
+	ThresholdSpeedMS *float32
+	ActivityID       *int64
+}
+
+// An estimate joins a pending suggestion already on its day; a dismissed one
+// keeps the day.
+func (q *Queries) SuggestEstimate(ctx context.Context, arg SuggestEstimateParams) error {
+	_, err := q.db.Exec(ctx, suggestEstimate,
+		arg.UserID,
+		arg.Sport,
+		arg.EffectiveFrom,
+		arg.FtpW,
+		arg.ThresholdSpeedMS,
+		arg.ActivityID,
 	)
 	return err
 }
