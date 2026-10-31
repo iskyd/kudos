@@ -5,6 +5,7 @@ import {
   formatLocalClock,
   formatPace,
   formatSpeed,
+  formatOneDecimal,
   formatWhole,
   localDay,
   paceSeconds,
@@ -98,5 +99,12 @@ describe('speedFromPace', () => {
     expect(speedFromPace(240)).toBeCloseTo(1000 / 240)
     expect(speedFromPace(100, 100)).toBe(1)
     expect(speedFromPace(0)).toBeNull()
+  })
+})
+
+describe('formatOneDecimal', () => {
+  it('keeps one decimal with the unit', () => {
+    expect(formatOneDecimal(70.46, 'kg')).toBe('70.5 kg')
+    expect(formatOneDecimal(2, 'L')).toBe('2.0 L')
   })
 })

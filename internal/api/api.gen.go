@@ -396,6 +396,27 @@ func (e GearInputKind) Valid() bool {
 	}
 }
 
+// Defines values for HealthLogKind.
+const (
+	Illness HealthLogKind = "illness"
+	Injury  HealthLogKind = "injury"
+	Period  HealthLogKind = "period"
+)
+
+// Valid indicates whether the value is a known member of the HealthLogKind enum.
+func (e HealthLogKind) Valid() bool {
+	switch e {
+	case Illness:
+		return true
+	case Injury:
+		return true
+	case Period:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LapIntensity.
 const (
 	LapIntensityActive   LapIntensity = "active"
@@ -983,6 +1004,40 @@ type GearPage struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// HealthLogEntry defines model for HealthLogEntry.
+type HealthLogEntry struct {
+	// Description Required for injuries and illnesses.
+	Description *string `json:"description,omitempty"`
+
+	// EndDate Absent while ongoing.
+	EndDate   *openapi_types.Date `json:"endDate,omitempty"`
+	Id        int64               `json:"id"`
+	Kind      HealthLogKind       `json:"kind"`
+	StartDate openapi_types.Date  `json:"startDate"`
+}
+
+// HealthLogInput defines model for HealthLogInput.
+type HealthLogInput struct {
+	// Description Required for injuries and illnesses.
+	Description *string `json:"description,omitempty"`
+
+	// EndDate Absent while ongoing.
+	EndDate   *openapi_types.Date `json:"endDate,omitempty"`
+	Kind      HealthLogKind       `json:"kind"`
+	StartDate openapi_types.Date  `json:"startDate"`
+}
+
+// HealthLogKind defines model for HealthLogKind.
+type HealthLogKind string
+
+// HealthLogPage defines model for HealthLogPage.
+type HealthLogPage struct {
+	Items []HealthLogEntry `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
 // Lap defines model for Lap.
 type Lap struct {
 	AscentM          *float32      `json:"ascentM,omitempty"`
@@ -1237,6 +1292,59 @@ type UploadResult struct {
 // Username 3 to 32 characters among a-z, 0-9, ".", "_" and "-". Case-insensitive; stored lowercase.
 type Username = string
 
+// WellnessDay defines model for WellnessDay.
+type WellnessDay struct {
+	BodyFatPct *float64           `json:"bodyFatPct,omitempty"`
+	Day        openapi_types.Date `json:"day"`
+
+	// HydrationL Litres drunk.
+	HydrationL *float64 `json:"hydrationL,omitempty"`
+
+	// Motivation 1 low to 5 high.
+	Motivation *int    `json:"motivation,omitempty"`
+	Note       *string `json:"note,omitempty"`
+
+	// SleepQuality 1 poor to 5 great.
+	SleepQuality *int `json:"sleepQuality,omitempty"`
+
+	// Soreness 1 none to 5 severe.
+	Soreness *int `json:"soreness,omitempty"`
+
+	// Stress 1 low to 5 high.
+	Stress   *int     `json:"stress,omitempty"`
+	WeightKg *float64 `json:"weightKg,omitempty"`
+}
+
+// WellnessDayInput defines model for WellnessDayInput.
+type WellnessDayInput struct {
+	BodyFatPct *float64 `json:"bodyFatPct,omitempty"`
+
+	// HydrationL Litres drunk.
+	HydrationL *float64 `json:"hydrationL,omitempty"`
+
+	// Motivation 1 low to 5 high.
+	Motivation *int    `json:"motivation,omitempty"`
+	Note       *string `json:"note,omitempty"`
+
+	// SleepQuality 1 poor to 5 great.
+	SleepQuality *int `json:"sleepQuality,omitempty"`
+
+	// Soreness 1 none to 5 severe.
+	Soreness *int `json:"soreness,omitempty"`
+
+	// Stress 1 low to 5 high.
+	Stress   *int     `json:"stress,omitempty"`
+	WeightKg *float64 `json:"weightKg,omitempty"`
+}
+
+// WellnessDayPage defines model for WellnessDayPage.
+type WellnessDayPage struct {
+	Items []WellnessDay `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
 // WorkoutExecution defines model for WorkoutExecution.
 type WorkoutExecution struct {
 	// Intervals Stretches of one target power (kind target_power), at most 1000.
@@ -1385,6 +1493,12 @@ type ActivityID = int64
 // Cursor defines model for Cursor.
 type Cursor = string
 
+// Day defines model for Day.
+type Day = openapi_types.Date
+
+// EntryID defines model for EntryID.
+type EntryID = int64
+
 // GearID defines model for GearID.
 type GearID = int64
 
@@ -1496,6 +1610,26 @@ type ListGearParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListHealthLogParams defines parameters for ListHealthLog.
+type ListHealthLogParams struct {
+	Kind *HealthLogKind `form:"kind,omitempty" json:"kind,omitempty"`
+
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListWellnessDaysParams defines parameters for ListWellnessDays.
+type ListWellnessDaysParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // ListZoneSetsParams defines parameters for ListZoneSets.
 type ListZoneSetsParams struct {
 	Sport *ZoneSport `form:"sport,omitempty" json:"sport,omitempty"`
@@ -1552,8 +1686,17 @@ type CreateGearJSONRequestBody = GearInput
 // UpdateGearJSONRequestBody defines body for UpdateGear for application/json ContentType.
 type UpdateGearJSONRequestBody = GearInput
 
+// CreateHealthLogEntryJSONRequestBody defines body for CreateHealthLogEntry for application/json ContentType.
+type CreateHealthLogEntryJSONRequestBody = HealthLogInput
+
+// UpdateHealthLogEntryJSONRequestBody defines body for UpdateHealthLogEntry for application/json ContentType.
+type UpdateHealthLogEntryJSONRequestBody = HealthLogInput
+
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
+
+// PutWellnessDayJSONRequestBody defines body for PutWellnessDay for application/json ContentType.
+type PutWellnessDayJSONRequestBody = WellnessDayInput
 
 // CreateZoneSetJSONRequestBody defines body for CreateZoneSet for application/json ContentType.
 type CreateZoneSetJSONRequestBody = ZoneSetInput
@@ -1656,12 +1799,33 @@ type ServerInterface interface {
 	// UpdateGear Edit, retire or reactivate gear
 	// (PUT /api/gear/{id})
 	UpdateGear(w http.ResponseWriter, r *http.Request, id GearID)
+	// ListHealthLog List injuries, illnesses and periods
+	// (GET /api/health-log)
+	ListHealthLog(w http.ResponseWriter, r *http.Request, params ListHealthLogParams)
+	// CreateHealthLogEntry Log an injury, illness or period
+	// (POST /api/health-log)
+	CreateHealthLogEntry(w http.ResponseWriter, r *http.Request)
+	// DeleteHealthLogEntry Delete a log entry
+	// (DELETE /api/health-log/{entryId})
+	DeleteHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID)
+	// UpdateHealthLogEntry Edit a log entry
+	// (PUT /api/health-log/{entryId})
+	UpdateHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// ListWellnessDays List check-ins and body metrics
+	// (GET /api/wellness)
+	ListWellnessDays(w http.ResponseWriter, r *http.Request, params ListWellnessDaysParams)
+	// DeleteWellnessDay Delete a day's check-in and body metrics
+	// (DELETE /api/wellness/{day})
+	DeleteWellnessDay(w http.ResponseWriter, r *http.Request, day Day)
+	// PutWellnessDay Save a day's check-in and body metrics
+	// (PUT /api/wellness/{day})
+	PutWellnessDay(w http.ResponseWriter, r *http.Request, day Day)
 	// ListZoneSets List zone versions
 	// (GET /api/zones)
 	ListZoneSets(w http.ResponseWriter, r *http.Request, params ListZoneSetsParams)
@@ -1881,6 +2045,30 @@ func (_ Unimplemented) UpdateGear(w http.ResponseWriter, r *http.Request, id Gea
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// ListHealthLog List injuries, illnesses and periods
+// (GET /api/health-log)
+func (_ Unimplemented) ListHealthLog(w http.ResponseWriter, r *http.Request, params ListHealthLogParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateHealthLogEntry Log an injury, illness or period
+// (POST /api/health-log)
+func (_ Unimplemented) CreateHealthLogEntry(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteHealthLogEntry Delete a log entry
+// (DELETE /api/health-log/{entryId})
+func (_ Unimplemented) DeleteHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateHealthLogEntry Edit a log entry
+// (PUT /api/health-log/{entryId})
+func (_ Unimplemented) UpdateHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetMe Current user and CSRF token
 // (GET /api/me)
 func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
@@ -1890,6 +2078,24 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 // UpdateMe Update profile settings
 // (PATCH /api/me)
 func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListWellnessDays List check-ins and body metrics
+// (GET /api/wellness)
+func (_ Unimplemented) ListWellnessDays(w http.ResponseWriter, r *http.Request, params ListWellnessDaysParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteWellnessDay Delete a day's check-in and body metrics
+// (DELETE /api/wellness/{day})
+func (_ Unimplemented) DeleteWellnessDay(w http.ResponseWriter, r *http.Request, day Day) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PutWellnessDay Save a day's check-in and body metrics
+// (PUT /api/wellness/{day})
+func (_ Unimplemented) PutWellnessDay(w http.ResponseWriter, r *http.Request, day Day) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2921,6 +3127,131 @@ func (siw *ServerInterfaceWrapper) UpdateGear(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListHealthLog operation middleware
+func (siw *ServerInterfaceWrapper) ListHealthLog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListHealthLogParams
+
+	// ------------- Optional query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListHealthLog(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateHealthLogEntry operation middleware
+func (siw *ServerInterfaceWrapper) CreateHealthLogEntry(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateHealthLogEntry(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteHealthLogEntry operation middleware
+func (siw *ServerInterfaceWrapper) DeleteHealthLogEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "entryId" -------------
+	var entryId EntryID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "entryId", chi.URLParam(r, "entryId"), &entryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entryId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteHealthLogEntry(w, r, entryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateHealthLogEntry operation middleware
+func (siw *ServerInterfaceWrapper) UpdateHealthLogEntry(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "entryId" -------------
+	var entryId EntryID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "entryId", chi.URLParam(r, "entryId"), &entryId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "entryId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateHealthLogEntry(w, r, entryId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -2940,6 +3271,104 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UpdateMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListWellnessDays operation middleware
+func (siw *ServerInterfaceWrapper) ListWellnessDays(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListWellnessDaysParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListWellnessDays(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteWellnessDay operation middleware
+func (siw *ServerInterfaceWrapper) DeleteWellnessDay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "day" -------------
+	var day Day
+
+	err = runtime.BindStyledParameterWithOptions("simple", "day", chi.URLParam(r, "day"), &day, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "date", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "day", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteWellnessDay(w, r, day)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutWellnessDay operation middleware
+func (siw *ServerInterfaceWrapper) PutWellnessDay(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "day" -------------
+	var day Day
+
+	err = runtime.BindStyledParameterWithOptions("simple", "day", chi.URLParam(r, "day"), &day, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "date", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "day", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutWellnessDay(w, r, day)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -3395,6 +3824,27 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/fitness", wrapper.GetFitness)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/wellness", wrapper.ListWellnessDays)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/wellness/{day}", wrapper.DeleteWellnessDay)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/wellness/{day}", wrapper.PutWellnessDay)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/health-log", wrapper.ListHealthLog)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/health-log", wrapper.CreateHealthLogEntry)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/health-log/{entryId}", wrapper.DeleteHealthLogEntry)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/health-log/{entryId}", wrapper.UpdateHealthLogEntry)
 	})
 
 	return r
@@ -4663,6 +5113,157 @@ func (response UpdateGeardefaultApplicationProblemPlusJSONResponse) VisitUpdateG
 	return err
 }
 
+type ListHealthLogRequestObject struct {
+	Params ListHealthLogParams
+}
+
+type ListHealthLogResponseObject interface {
+	VisitListHealthLogResponse(w http.ResponseWriter) error
+}
+
+type ListHealthLog200JSONResponse HealthLogPage
+
+func (response ListHealthLog200JSONResponse) VisitListHealthLogResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListHealthLogdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListHealthLogdefaultApplicationProblemPlusJSONResponse) VisitListHealthLogResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateHealthLogEntryRequestObject struct {
+	Body *CreateHealthLogEntryJSONRequestBody
+}
+
+type CreateHealthLogEntryResponseObject interface {
+	VisitCreateHealthLogEntryResponse(w http.ResponseWriter) error
+}
+
+type CreateHealthLogEntry201JSONResponse HealthLogEntry
+
+func (response CreateHealthLogEntry201JSONResponse) VisitCreateHealthLogEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateHealthLogEntrydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateHealthLogEntrydefaultApplicationProblemPlusJSONResponse) VisitCreateHealthLogEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteHealthLogEntryRequestObject struct {
+	EntryId EntryID `json:"entryId"`
+}
+
+type DeleteHealthLogEntryResponseObject interface {
+	VisitDeleteHealthLogEntryResponse(w http.ResponseWriter) error
+}
+
+type DeleteHealthLogEntry204Response struct {
+}
+
+func (response DeleteHealthLogEntry204Response) VisitDeleteHealthLogEntryResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteHealthLogEntrydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteHealthLogEntrydefaultApplicationProblemPlusJSONResponse) VisitDeleteHealthLogEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateHealthLogEntryRequestObject struct {
+	EntryId EntryID `json:"entryId"`
+	Body    *UpdateHealthLogEntryJSONRequestBody
+}
+
+type UpdateHealthLogEntryResponseObject interface {
+	VisitUpdateHealthLogEntryResponse(w http.ResponseWriter) error
+}
+
+type UpdateHealthLogEntry200JSONResponse HealthLogEntry
+
+func (response UpdateHealthLogEntry200JSONResponse) VisitUpdateHealthLogEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateHealthLogEntrydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response UpdateHealthLogEntrydefaultApplicationProblemPlusJSONResponse) VisitUpdateHealthLogEntryResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -4729,6 +5330,118 @@ type UpdateMedefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response UpdateMedefaultApplicationProblemPlusJSONResponse) VisitUpdateMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWellnessDaysRequestObject struct {
+	Params ListWellnessDaysParams
+}
+
+type ListWellnessDaysResponseObject interface {
+	VisitListWellnessDaysResponse(w http.ResponseWriter) error
+}
+
+type ListWellnessDays200JSONResponse WellnessDayPage
+
+func (response ListWellnessDays200JSONResponse) VisitListWellnessDaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListWellnessDaysdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListWellnessDaysdefaultApplicationProblemPlusJSONResponse) VisitListWellnessDaysResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteWellnessDayRequestObject struct {
+	Day Day `json:"day"`
+}
+
+type DeleteWellnessDayResponseObject interface {
+	VisitDeleteWellnessDayResponse(w http.ResponseWriter) error
+}
+
+type DeleteWellnessDay204Response struct {
+}
+
+func (response DeleteWellnessDay204Response) VisitDeleteWellnessDayResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteWellnessDaydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteWellnessDaydefaultApplicationProblemPlusJSONResponse) VisitDeleteWellnessDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutWellnessDayRequestObject struct {
+	Day  Day `json:"day"`
+	Body *PutWellnessDayJSONRequestBody
+}
+
+type PutWellnessDayResponseObject interface {
+	VisitPutWellnessDayResponse(w http.ResponseWriter) error
+}
+
+type PutWellnessDay200JSONResponse WellnessDay
+
+func (response PutWellnessDay200JSONResponse) VisitPutWellnessDayResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutWellnessDaydefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PutWellnessDaydefaultApplicationProblemPlusJSONResponse) VisitPutWellnessDayResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -5095,12 +5808,33 @@ type StrictServerInterface interface {
 	// UpdateGear Edit, retire or reactivate gear
 	// (PUT /api/gear/{id})
 	UpdateGear(ctx context.Context, request UpdateGearRequestObject) (UpdateGearResponseObject, error)
+	// ListHealthLog List injuries, illnesses and periods
+	// (GET /api/health-log)
+	ListHealthLog(ctx context.Context, request ListHealthLogRequestObject) (ListHealthLogResponseObject, error)
+	// CreateHealthLogEntry Log an injury, illness or period
+	// (POST /api/health-log)
+	CreateHealthLogEntry(ctx context.Context, request CreateHealthLogEntryRequestObject) (CreateHealthLogEntryResponseObject, error)
+	// DeleteHealthLogEntry Delete a log entry
+	// (DELETE /api/health-log/{entryId})
+	DeleteHealthLogEntry(ctx context.Context, request DeleteHealthLogEntryRequestObject) (DeleteHealthLogEntryResponseObject, error)
+	// UpdateHealthLogEntry Edit a log entry
+	// (PUT /api/health-log/{entryId})
+	UpdateHealthLogEntry(ctx context.Context, request UpdateHealthLogEntryRequestObject) (UpdateHealthLogEntryResponseObject, error)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// ListWellnessDays List check-ins and body metrics
+	// (GET /api/wellness)
+	ListWellnessDays(ctx context.Context, request ListWellnessDaysRequestObject) (ListWellnessDaysResponseObject, error)
+	// DeleteWellnessDay Delete a day's check-in and body metrics
+	// (DELETE /api/wellness/{day})
+	DeleteWellnessDay(ctx context.Context, request DeleteWellnessDayRequestObject) (DeleteWellnessDayResponseObject, error)
+	// PutWellnessDay Save a day's check-in and body metrics
+	// (PUT /api/wellness/{day})
+	PutWellnessDay(ctx context.Context, request PutWellnessDayRequestObject) (PutWellnessDayResponseObject, error)
 	// ListZoneSets List zone versions
 	// (GET /api/zones)
 	ListZoneSets(ctx context.Context, request ListZoneSetsRequestObject) (ListZoneSetsResponseObject, error)
@@ -6055,6 +6789,122 @@ func (sh *strictHandler) UpdateGear(w http.ResponseWriter, r *http.Request, id G
 	}
 }
 
+// ListHealthLog operation middleware
+func (sh *strictHandler) ListHealthLog(w http.ResponseWriter, r *http.Request, params ListHealthLogParams) {
+	var request ListHealthLogRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListHealthLog(ctx, request.(ListHealthLogRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListHealthLog")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListHealthLogResponseObject); ok {
+		if err := validResponse.VisitListHealthLogResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateHealthLogEntry operation middleware
+func (sh *strictHandler) CreateHealthLogEntry(w http.ResponseWriter, r *http.Request) {
+	var request CreateHealthLogEntryRequestObject
+
+	var body CreateHealthLogEntryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateHealthLogEntry(ctx, request.(CreateHealthLogEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateHealthLogEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateHealthLogEntryResponseObject); ok {
+		if err := validResponse.VisitCreateHealthLogEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteHealthLogEntry operation middleware
+func (sh *strictHandler) DeleteHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID) {
+	var request DeleteHealthLogEntryRequestObject
+
+	request.EntryId = entryId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteHealthLogEntry(ctx, request.(DeleteHealthLogEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteHealthLogEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteHealthLogEntryResponseObject); ok {
+		if err := validResponse.VisitDeleteHealthLogEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateHealthLogEntry operation middleware
+func (sh *strictHandler) UpdateHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID) {
+	var request UpdateHealthLogEntryRequestObject
+
+	request.EntryId = entryId
+
+	var body UpdateHealthLogEntryJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateHealthLogEntry(ctx, request.(UpdateHealthLogEntryRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateHealthLogEntry")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateHealthLogEntryResponseObject); ok {
+		if err := validResponse.VisitUpdateHealthLogEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetMe operation middleware
 func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
 	var request GetMeRequestObject
@@ -6103,6 +6953,91 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListWellnessDays operation middleware
+func (sh *strictHandler) ListWellnessDays(w http.ResponseWriter, r *http.Request, params ListWellnessDaysParams) {
+	var request ListWellnessDaysRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListWellnessDays(ctx, request.(ListWellnessDaysRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListWellnessDays")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListWellnessDaysResponseObject); ok {
+		if err := validResponse.VisitListWellnessDaysResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteWellnessDay operation middleware
+func (sh *strictHandler) DeleteWellnessDay(w http.ResponseWriter, r *http.Request, day Day) {
+	var request DeleteWellnessDayRequestObject
+
+	request.Day = day
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteWellnessDay(ctx, request.(DeleteWellnessDayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteWellnessDay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteWellnessDayResponseObject); ok {
+		if err := validResponse.VisitDeleteWellnessDayResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutWellnessDay operation middleware
+func (sh *strictHandler) PutWellnessDay(w http.ResponseWriter, r *http.Request, day Day) {
+	var request PutWellnessDayRequestObject
+
+	request.Day = day
+
+	var body PutWellnessDayJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutWellnessDay(ctx, request.(PutWellnessDayRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutWellnessDay")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutWellnessDayResponseObject); ok {
+		if err := validResponse.VisitPutWellnessDayResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

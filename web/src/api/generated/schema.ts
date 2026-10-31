@@ -707,6 +707,86 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/wellness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List check-ins and body metrics
+         * @description Latest day first.
+         */
+        get: operations["listWellnessDays"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/wellness/{day}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Save a day's check-in and body metrics
+         * @description Replaces everything entered for the day; at least one value is required.
+         */
+        put: operations["putWellnessDay"];
+        post?: never;
+        /** Delete a day's check-in and body metrics */
+        delete: operations["deleteWellnessDay"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List injuries, illnesses and periods
+         * @description Latest start first.
+         */
+        get: operations["listHealthLog"];
+        put?: never;
+        /** Log an injury, illness or period */
+        post: operations["createHealthLogEntry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/health-log/{entryId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Edit a log entry */
+        put: operations["updateHealthLogEntry"];
+        post?: never;
+        /** Delete a log entry */
+        delete: operations["deleteHealthLogEntry"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1349,6 +1429,54 @@ export interface components {
              */
             tsb: number;
         };
+        WellnessDayInput: {
+            /** @description 1 none to 5 severe. */
+            soreness?: number;
+            /** @description 1 poor to 5 great. */
+            sleepQuality?: number;
+            /** @description 1 low to 5 high. */
+            stress?: number;
+            /** @description 1 low to 5 high. */
+            motivation?: number;
+            note?: string;
+            /** Format: double */
+            weightKg?: number;
+            /** Format: double */
+            bodyFatPct?: number;
+            /**
+             * Format: double
+             * @description Litres drunk.
+             */
+            hydrationL?: number;
+        };
+        WellnessDay: components["schemas"]["WellnessDayInput"] & {
+            /** Format: date */
+            day: string;
+        };
+        WellnessDayPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["WellnessDay"][];
+        };
+        /** @enum {string} */
+        HealthLogKind: "injury" | "illness" | "period";
+        HealthLogInput: {
+            kind: components["schemas"]["HealthLogKind"];
+            /** @description Required for injuries and illnesses. */
+            description?: string;
+            /** Format: date */
+            startDate: string;
+            /**
+             * Format: date
+             * @description Absent while ongoing.
+             */
+            endDate?: string;
+        };
+        HealthLogEntry: components["schemas"]["HealthLogInput"] & {
+            /** Format: int64 */
+            id: number;
+        };
+        HealthLogPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["HealthLogEntry"][];
+        };
         ActivityStreams: {
             /** @description Seconds from the activity start. */
             timeS: number[];
@@ -1410,6 +1538,9 @@ export interface components {
     parameters: {
         ActivityID: number;
         SuggestionID: number;
+        /** @description Local day. */
+        Day: string;
+        EntryID: number;
         GearID: number;
         /** @description Opaque cursor from a previous page's `nextCursor`. */
         Cursor: string;
@@ -2432,6 +2563,182 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["FitnessDay"][];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listWellnessDays: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of days. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WellnessDayPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putWellnessDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Local day. */
+                day: components["parameters"]["Day"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WellnessDayInput"];
+            };
+        };
+        responses: {
+            /** @description The saved day. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WellnessDay"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteWellnessDay: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Local day. */
+                day: components["parameters"]["Day"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listHealthLog: {
+        parameters: {
+            query?: {
+                kind?: components["schemas"]["HealthLogKind"];
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthLogPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createHealthLogEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthLogInput"];
+            };
+        };
+        responses: {
+            /** @description The new entry. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthLogEntry"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateHealthLogEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryId: components["parameters"]["EntryID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HealthLogInput"];
+            };
+        };
+        responses: {
+            /** @description The entry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthLogEntry"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteHealthLogEntry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                entryId: components["parameters"]["EntryID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };

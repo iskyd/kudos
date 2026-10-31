@@ -179,7 +179,8 @@ describe('ActivityEdits', () => {
       '/activities/2',
     )
     expect(sent.body).toEqual({ kind: 'merge', activityId: 2 })
-    expect(queries[0]).toBe('?sort=date&from=2026-10-10&to=2026-10-10')
+    // The page's compare picker lists activities too, in no fixed order.
+    expect(queries).toContain('?sort=date&from=2026-10-10&to=2026-10-10')
   })
 
   it('undoes an edit', async () => {

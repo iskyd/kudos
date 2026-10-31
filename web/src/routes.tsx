@@ -10,12 +10,14 @@ import { ActivityDetailPage } from '@/pages/activity-detail'
 import { GearPage } from '@/pages/gear'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { SettingsPage } from '@/pages/settings'
+import { WellnessPage } from '@/pages/wellness'
 import { ZonesPage } from '@/pages/zones'
 
 const pages: Partial<Record<string, ReactElement>> = {
   '/activities': <ActivitiesPage />,
   '/gear': <GearPage />,
   '/settings': <SettingsPage />,
+  '/wellness': <WellnessPage />,
 }
 
 export const routes: RouteObject[] = [
