@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"time"
 
 	openapi_types "github.com/oapi-codegen/runtime/types"
 
@@ -27,9 +28,22 @@ func (s *Server) GetFitness(ctx context.Context, req GetFitnessRequestObject) (G
 	case days > maxFitnessDays:
 		return nil, &Error{Kind: KindInvalidRequest, Detail: fmt.Sprintf("at most %d days", maxFitnessDays)}
 	}
+	days, err := s.fitnessDays(ctx, sessionFrom(ctx).userID, from, to)
+	if err != nil {
+		return nil, err
+	}
+	out := make(GetFitness200JSONResponse, len(days))
+	for i, d := range days {
+		out[i] = FitnessDay{Day: openapi_types.Date{Time: d.Day}, Load: d.Load, Ctl: d.CTL, Atl: d.ATL, Tsb: d.TSB}
+	}
+	return out, nil
+}
+
+// fitnessDays returns the curves from from to to, at most maxFitnessDays apart.
+func (s *Server) fitnessDays(ctx context.Context, userID int64, from, to time.Time) ([]analytics.FitnessDay, error) {
 	start := from.AddDate(0, 0, -fitnessWarmUpDays)
 	rows, err := s.q.ListDailyLoads(ctx, db.ListDailyLoadsParams{
-		UserID: sessionFrom(ctx).userID, FromDay: start, ToDay: to, MaxRows: maxFitnessDays + fitnessWarmUpDays,
+		UserID: userID, FromDay: start, ToDay: to, MaxRows: maxFitnessDays + fitnessWarmUpDays,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("listing daily loads: %w", err)
@@ -40,10 +54,5 @@ func (s *Server) GetFitness(ctx context.Context, req GetFitnessRequestObject) (G
 	}
 	// Starting every curve a fixed warm-up before from keeps a day's values the
 	// same whichever range asks for it.
-	days := analytics.Fitness(loads, start, to)[fitnessWarmUpDays:]
-	out := make(GetFitness200JSONResponse, len(days))
-	for i, d := range days {
-		out[i] = FitnessDay{Day: openapi_types.Date{Time: d.Day}, Load: d.Load, Ctl: d.CTL, Atl: d.ATL, Tsb: d.TSB}
-	}
-	return out, nil
+	return analytics.Fitness(loads, start, to)[fitnessWarmUpDays:], nil
 }

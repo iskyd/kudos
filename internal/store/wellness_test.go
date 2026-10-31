@@ -2,6 +2,7 @@ package store_test
 
 import (
 	"errors"
+	"slices"
 	"testing"
 	"time"
 
@@ -46,6 +47,13 @@ func TestWellnessDaysIsolationAndPaging(t *testing.T) {
 	check(t, err)
 	if len(rest) != 1 || rest[0].Day.Day() != 1 {
 		t.Errorf("second page: %+v", rest)
+	}
+
+	if got, err := q.GetWellnessDay(ctx, db.GetWellnessDayParams{UserID: alice.ID, Day: day(3)}); err != nil || *got.WeightKg != 70.5 {
+		t.Errorf("alice's day: %+v, %v", got, err)
+	}
+	if _, err := q.GetWellnessDay(ctx, db.GetWellnessDayParams{UserID: bob.ID, Day: day(2)}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Errorf("bob got alice's day: %v", err)
 	}
 
 	// Bob reaches none of Alice's days.
@@ -101,6 +109,19 @@ func TestHealthLogIsolationAndPaging(t *testing.T) {
 		t.Errorf("periods: %+v", periods)
 	}
 
+	// Entries covering a day: illness and injury only, end date inclusive.
+	for d, want := range map[int][]int64{10: {cold.ID}, 5: {knee.ID}, 6: nil} {
+		on, err := q.ListHealthLogOn(ctx, db.ListHealthLogOnParams{UserID: alice.ID, Day: day(d), MaxRows: 10})
+		check(t, err)
+		ids := make([]int64, 0, len(on))
+		for _, e := range on {
+			ids = append(ids, e.ID)
+		}
+		if !slices.Equal(ids, want) && len(ids)+len(want) > 0 {
+			t.Errorf("on day %d: %v, want %v", d, ids, want)
+		}
+	}
+
 	// Bob reaches none of Alice's entries.
 	if _, err := q.UpdateHealthLogEntry(ctx, db.UpdateHealthLogEntryParams{UserID: bob.ID, ID: knee.ID, Kind: "injury", Description: new("x"), StartDate: day(1)}); !errors.Is(err, pgx.ErrNoRows) {
 		t.Errorf("bob updated alice's entry: %v", err)
@@ -110,6 +131,9 @@ func TestHealthLogIsolationAndPaging(t *testing.T) {
 	}
 	if bobs, err := q.ListHealthLog(ctx, db.ListHealthLogParams{UserID: bob.ID, MaxRows: 10}); err != nil || len(bobs) != 0 {
 		t.Errorf("bob's log: %+v, %v", bobs, err)
+	}
+	if bobs, err := q.ListHealthLogOn(ctx, db.ListHealthLogOnParams{UserID: bob.ID, Day: day(10), MaxRows: 10}); err != nil || len(bobs) != 0 {
+		t.Errorf("bob's entries on day 10: %+v, %v", bobs, err)
 	}
 
 	healed, err := q.UpdateHealthLogEntry(ctx, db.UpdateHealthLogEntryParams{UserID: alice.ID, ID: cold.ID, Kind: "illness", Description: new("Cold"), StartDate: day(10), EndDate: new(day(14))})

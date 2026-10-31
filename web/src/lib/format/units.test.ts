@@ -6,6 +6,7 @@ import {
   formatPace,
   formatSpeed,
   formatOneDecimal,
+  formatShare,
   formatWhole,
   localDay,
   paceSeconds,
@@ -106,5 +107,12 @@ describe('formatOneDecimal', () => {
   it('keeps one decimal with the unit', () => {
     expect(formatOneDecimal(70.46, 'kg')).toBe('70.5 kg')
     expect(formatOneDecimal(2, 'L')).toBe('2.0 L')
+  })
+})
+
+describe('formatShare', () => {
+  it('renders a whole percentage', () => {
+    expect(formatShare(0.3)).toBe('30%')
+    expect(formatShare(2 / 3)).toBe('67%')
   })
 })

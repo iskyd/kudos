@@ -72,3 +72,8 @@ export function formatWhole(value: number, unit: string): string {
 export function formatOneDecimal(value: number, unit: string): string {
   return `${value.toFixed(1)} ${unit}`
 }
+
+// formatShare renders a 0–1 fraction as a whole percentage: "30%".
+export function formatShare(fraction: number): string {
+  return `${String(Math.round(fraction * 100))}%`
+}

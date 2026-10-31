@@ -900,6 +900,35 @@ paths:
                   $ref: "#/components/schemas/FitnessDay"
         default:
           $ref: "#/components/responses/Problem"
+  /api/readiness:
+    get:
+      operationId: getReadiness
+      summary: Readiness for a day
+      description: |
+        A deterministic 0–100 score with its breakdown: HRV against its 60-day
+        and 7-day baselines, resting HR against its 60-day baseline, sleep,
+        form and the check-in, each scored 0–100 and weighted among those
+        present. An illness (30) or injury (50) covering the day caps it. Until
+        the 60 days before the day hold 14 days with both HRV and resting HR,
+        only the baseline progress is returned.
+      tags: [analytics]
+      parameters:
+        - name: day
+          in: query
+          required: true
+          description: Local day.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The day's readiness.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Readiness"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/wellness:
     get:
       operationId: listWellnessDays
@@ -2097,6 +2126,75 @@ components:
           type: number
           format: double
           description: Form.
+    Readiness:
+      type: object
+      required: [day, status, baselineDays, requiredDays, components]
+      properties:
+        day:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [ready, collecting_baseline]
+        baselineDays:
+          type: integer
+          description: Days with both HRV and resting HR in the 60 days before the day.
+        requiredDays:
+          type: integer
+          description: Baseline days needed before a score is shown.
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: Set when ready.
+        uncappedScore:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: The score before any cap; set when ready.
+        components:
+          type: array
+          description: Empty until ready.
+          items:
+            $ref: "#/components/schemas/ReadinessComponent"
+        cap:
+          $ref: "#/components/schemas/ReadinessCap"
+    ReadinessComponent:
+      type: object
+      required: [name, score, share]
+      properties:
+        name:
+          type: string
+          enum: [hrv, resting_hr, sleep, form, check_in]
+        score:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+        share:
+          type: number
+          format: double
+          description: Weight among the components present, 0–1.
+        value:
+          type: number
+          format: double
+          description: The day's HRV (ms), resting HR (bpm), sleep (s) or form (TSB).
+        baseline:
+          type: number
+          format: double
+          description: The 60-day baseline of HRV (ms) or resting HR (bpm).
+    ReadinessCap:
+      type: object
+      description: An illness or injury covering the day; it may not bind.
+      required: [entryId, kind, max]
+      properties:
+        entryId:
+          type: integer
+          format: int64
+        kind:
+          $ref: "#/components/schemas/HealthLogKind"
+        max:
+          type: integer
     WellnessDayInput:
       type: object
       properties:

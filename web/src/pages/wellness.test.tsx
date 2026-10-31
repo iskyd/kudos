@@ -39,6 +39,17 @@ function returns(days: WellnessDay[], log: HealthLogEntry[]) {
 beforeEach(() => {
   loggedInAs(ann)
   localStorage.clear()
+  server.use(
+    http.get('/api/readiness', () =>
+      HttpResponse.json({
+        day: today,
+        status: 'collecting_baseline',
+        baselineDays: 3,
+        requiredDays: 14,
+        components: [],
+      }),
+    ),
+  )
 })
 
 describe('WellnessPage', () => {
@@ -61,6 +72,7 @@ describe('WellnessPage', () => {
     renderApp('/wellness')
     expect(await screen.findByText('No check-ins yet.')).toBeInTheDocument()
     expect(await screen.findByText(/Nothing logged/)).toBeInTheDocument()
+    expect(await screen.findByText(/Collecting baseline: 3 of 14 days/)).toBeInTheDocument()
   })
 
   it('reports load errors', async () => {
