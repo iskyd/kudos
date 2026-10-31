@@ -343,6 +343,17 @@ func samples(segs [][]db.ActivityStream) [][]analytics.Sample {
 				Speed: f64(r.SpeedMS), Distance: r.DistanceM, Temperature: f64(r.TemperatureC),
 				Altitude: f64(r.AltitudeM),
 			}
+			if len(r.Extras) > 0 {
+				var x struct {
+					VO     *float64 `json:"vertical_oscillation_m"`
+					Stance *float64 `json:"stance_time_s"`
+					Step   *float64 `json:"step_length_m"`
+				}
+				// The importer writes extras as a JSON object; anything else carries no running dynamics.
+				if json.Unmarshal(r.Extras, &x) == nil {
+					out[i][j].VerticalOscillation, out[i][j].StanceTime, out[i][j].StepLength = x.VO, x.Stance, x.Step
+				}
+			}
 		}
 	}
 	return out

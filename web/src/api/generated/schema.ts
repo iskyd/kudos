@@ -750,9 +750,34 @@ export interface paths {
          *     the curves never rise with duration. The estimates read the curves:
          *     FTP is 95% of the best power over 20 minutes or longer, threshold pace
          *     the best pace over 30 minutes or longer, rounded up to a whole second
-         *     per kilometre.
+         *     per kilometre, and VO2max the best Daniels VDOT among the pace points of
+         *     5 minutes or longer, from which races are predicted. CSS comes from the
+         *     period's fastest 200 m and 400 m swims.
          */
         get: operations["getCurves"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/trends": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Per-activity running or swim analytics
+         * @description One value set per activity, newest first: outdoor runs (running and
+         *     trail running; virtual runs left out) with efficiency, aerobic
+         *     decoupling, cadence and running dynamics, or pool swims with their
+         *     mean SWOLF and pool length. Days are local calendar days.
+         */
+        get: operations["listActivityTrends"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1523,7 +1548,7 @@ export interface components {
         };
         Record: {
             /** @enum {string} */
-            effort: "fastest_1k" | "fastest_5k" | "fastest_10k" | "fastest_half_marathon" | "fastest_marathon" | "longest_run" | "longest_ride" | "longest_swim" | "longest_hike" | "power_5s" | "power_1m" | "power_5m" | "power_20m" | "power_60m";
+            effort: "fastest_1k" | "fastest_5k" | "fastest_10k" | "fastest_half_marathon" | "fastest_marathon" | "fastest_swim_200m" | "fastest_swim_400m" | "longest_run" | "longest_ride" | "longest_swim" | "longest_hike" | "power_5s" | "power_1m" | "power_5m" | "power_20m" | "power_60m";
             /** @description Each time the record was set, oldest first; the last is current. */
             history: components["schemas"]["RecordEntry"][];
         };
@@ -1551,6 +1576,71 @@ export interface components {
              * @description Estimated threshold pace, as a speed; absent without a 30-minute run.
              */
             thresholdSpeedMS?: number;
+            /**
+             * Format: double
+             * @description Estimated VO2max (ml/kg/min); absent without a 5-minute run.
+             */
+            vo2max?: number;
+            /** @description Predicted 5K, 10K, half marathon and marathon times at that VO2max; empty without one. */
+            racePredictions: components["schemas"]["RacePrediction"][];
+            /**
+             * Format: double
+             * @description Estimated critical swim speed; absent without both a 200 m and a slower 400 m.
+             */
+            cssMS?: number;
+        };
+        RacePrediction: {
+            /** Format: double */
+            distanceM: number;
+            /** Format: double */
+            timeS: number;
+        };
+        ActivityTrendPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["ActivityTrend"][];
+        };
+        /** @description An activity's analytics; values the activity lacks are absent. */
+        ActivityTrend: {
+            /** Format: int64 */
+            activityId: number;
+            /** Format: date-time */
+            startTime: string;
+            utcOffsetS: number;
+            sport: components["schemas"]["ActivitySport"];
+            /** Format: double */
+            avgSpeedMS?: number;
+            /** Format: double */
+            avgHrBpm?: number;
+            /**
+             * Format: double
+             * @description Efficiency factor, speed over heart rate, in metres per heartbeat.
+             */
+            efficiencyMPerBeat?: number;
+            /**
+             * Format: double
+             * @description Aerobic decoupling, how much efficiency fell from the first half to the second, in percent.
+             */
+            decouplingPct?: number;
+            /**
+             * Format: double
+             * @description Steps per minute.
+             */
+            cadenceSpm?: number;
+            /** Format: double */
+            verticalOscillationM?: number;
+            /**
+             * Format: double
+             * @description Ground contact time.
+             */
+            stanceTimeS?: number;
+            /** Format: double */
+            stepLengthM?: number;
+            /**
+             * Format: double
+             * @description Mean SWOLF of the active lengths.
+             */
+            swolf?: number;
+            /** Format: double */
+            poolLengthM?: number;
         };
         CurvePoint: {
             durationS: number;
@@ -2790,6 +2880,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Curves"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listActivityTrends: {
+        parameters: {
+            query: {
+                kind: "running" | "swimming";
+                /** @description First local day, inclusive. */
+                from?: string;
+                /** @description Last local day, inclusive. */
+                to?: string;
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of activities' values. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityTrendPage"];
                 };
             };
             default: components["responses"]["Problem"];

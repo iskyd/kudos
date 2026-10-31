@@ -935,7 +935,9 @@ paths:
         the curves never rise with duration. The estimates read the curves:
         FTP is 95% of the best power over 20 minutes or longer, threshold pace
         the best pace over 30 minutes or longer, rounded up to a whole second
-        per kilometre.
+        per kilometre, and VO2max the best Daniels VDOT among the pace points of
+        5 minutes or longer, from which races are predicted. CSS comes from the
+        period's fastest 200 m and 400 m swims.
       tags: [analytics]
       parameters:
         - name: from
@@ -957,6 +959,46 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Curves"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/trends:
+    get:
+      operationId: listActivityTrends
+      summary: Per-activity running or swim analytics
+      description: |
+        One value set per activity, newest first: outdoor runs (running and
+        trail running; virtual runs left out) with efficiency, aerobic
+        decoupling, cadence and running dynamics, or pool swims with their
+        mean SWOLF and pool length. Days are local calendar days.
+      tags: [analytics]
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [running, swimming]
+        - name: from
+          in: query
+          description: First local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          description: Last local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of activities' values.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActivityTrendPage"
         default:
           $ref: "#/components/responses/Problem"
   /api/readiness:
@@ -2213,6 +2255,8 @@ components:
             - fastest_10k
             - fastest_half_marathon
             - fastest_marathon
+            - fastest_swim_200m
+            - fastest_swim_400m
             - longest_run
             - longest_ride
             - longest_swim
@@ -2245,7 +2289,7 @@ components:
           description: Seconds for fastest efforts, metres for longest, watts for power.
     Curves:
       type: object
-      required: [power, pace]
+      required: [power, pace, racePredictions]
       properties:
         power:
           type: array
@@ -2264,6 +2308,89 @@ components:
           type: number
           format: double
           description: Estimated threshold pace, as a speed; absent without a 30-minute run.
+        vo2max:
+          type: number
+          format: double
+          description: Estimated VO2max (ml/kg/min); absent without a 5-minute run.
+        racePredictions:
+          type: array
+          description: Predicted 5K, 10K, half marathon and marathon times at that VO2max; empty without one.
+          items:
+            $ref: "#/components/schemas/RacePrediction"
+        cssMS:
+          type: number
+          format: double
+          description: Estimated critical swim speed; absent without both a 200 m and a slower 400 m.
+    RacePrediction:
+      type: object
+      required: [distanceM, timeS]
+      properties:
+        distanceM:
+          type: number
+          format: double
+        timeS:
+          type: number
+          format: double
+    ActivityTrendPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/ActivityTrend"
+    ActivityTrend:
+      type: object
+      description: An activity's analytics; values the activity lacks are absent.
+      required: [activityId, startTime, utcOffsetS, sport]
+      properties:
+        activityId:
+          type: integer
+          format: int64
+        startTime:
+          type: string
+          format: date-time
+        utcOffsetS:
+          type: integer
+        sport:
+          $ref: "#/components/schemas/ActivitySport"
+        avgSpeedMS:
+          type: number
+          format: double
+        avgHrBpm:
+          type: number
+          format: double
+        efficiencyMPerBeat:
+          type: number
+          format: double
+          description: Efficiency factor, speed over heart rate, in metres per heartbeat.
+        decouplingPct:
+          type: number
+          format: double
+          description: Aerobic decoupling, how much efficiency fell from the first half to the second, in percent.
+        cadenceSpm:
+          type: number
+          format: double
+          description: Steps per minute.
+        verticalOscillationM:
+          type: number
+          format: double
+        stanceTimeS:
+          type: number
+          format: double
+          description: Ground contact time.
+        stepLengthM:
+          type: number
+          format: double
+        swolf:
+          type: number
+          format: double
+          description: Mean SWOLF of the active lengths.
+        poolLengthM:
+          type: number
+          format: double
     CurvePoint:
       type: object
       required: [durationS, value, activityId, startTime, utcOffsetS]

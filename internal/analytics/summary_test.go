@@ -55,6 +55,20 @@ func TestSummarizeTimeWeights(t *testing.T) {
 	}
 }
 
+func TestSummarizeRunningDynamics(t *testing.T) {
+	t.Parallel()
+	// 1 s, then 3 s: time-weighted; the step length of the last sample weighs nothing.
+	seg := []Sample{
+		{Time: at(0), VerticalOscillation: new(0.08), StanceTime: new(0.25), StepLength: new(1.0)},
+		{Time: at(1), VerticalOscillation: new(0.10), StanceTime: new(0.21)},
+		{Time: at(4), StepLength: new(1.4)},
+	}
+	s, _ := Summarize([][]Sample{seg})
+	near(t, "vertical oscillation", s.AvgVerticalOscillation, (0.08+0.30)/4)
+	near(t, "stance time", s.AvgStanceTime, (0.25+0.63)/4)
+	near(t, "step length", s.AvgStepLength, 1.0)
+}
+
 func TestSummarizeSegments(t *testing.T) {
 	t.Parallel()
 	// Two activities merged: distance restarts at 0 in the second, and the hour between them is not timer time.

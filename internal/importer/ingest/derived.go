@@ -10,13 +10,14 @@ import (
 	"github.com/riverqueue/river"
 
 	"github.com/iskyd/kudos/internal/analytics"
+	"github.com/iskyd/kudos/internal/importer"
 	"github.com/iskyd/kudos/internal/jobs"
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
 // derivedVersion versions the derived values' computation: raising it makes the
 // recompute jobs redo every activity's.
-const derivedVersion = 4
+const derivedVersion = 5
 
 // recomputeBatch is how many activities or users a recompute job reads at once.
 const recomputeBatch = 100
@@ -68,8 +69,9 @@ func ZoneThresholds(z db.ZoneSet) analytics.Thresholds {
 	}
 }
 
-// ComputeDerived computes and stores an activity's derived values, best efforts
-// and curve points from its edited samples and the zones valid on its date, and
+// ComputeDerived computes and stores an activity's derived values (running and
+// swim analytics included), best efforts and curve points from its edited
+// samples and lengths and the zones valid on its date, and
 // suggests the thresholds its curve implies. Recomputing gives the same values;
 // an activity that no longer exists is skipped.
 func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) error {
@@ -112,7 +114,23 @@ func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) 
 	if dist == nil {
 		dist = sum.DistanceM
 	}
-	in := analytics.EffortInput{Sport: z.Activity.Sport, Virtual: z.Activity.Subtype == "virtual", DistanceM: dist, Segments: segs}
+	virtual := z.Activity.Subtype == "virtual"
+	in := analytics.EffortInput{
+		Sport: z.Activity.Sport, Virtual: virtual, DistanceM: dist, Segments: segs, PoolLengthM: f64(z.Activity.PoolLengthM),
+	}
+	switch z.Activity.Sport {
+	case "running", "trail_running":
+		// Running analytics read outdoor pace, like the pace curve.
+		if !virtual {
+			p.EfficiencyMPerBeat, p.DecouplingPct = analytics.EfficiencyFactor(sum.AvgSpeed, sum.AvgHR), analytics.Decoupling(segs)
+			p.AvgVerticalOscillationM, p.AvgStanceTimeS, p.AvgStepLengthM = sum.AvgVerticalOscillation, sum.AvgStanceTime, sum.AvgStepLength
+		}
+	case "pool_swimming":
+		if in.Lengths, err = s.lengths(ctx, userID, v); err != nil {
+			return err
+		}
+		p.AvgSwolf = analytics.AvgSWOLF(in.Lengths)
+	}
 	efforts, curve := analytics.BestEfforts(in), analytics.Curves(in)
 	ins := db.InsertBestEffortsParams{UserID: userID, ActivityID: activityID}
 	for _, e := range efforts {
@@ -148,6 +166,32 @@ func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) 
 		return fmt.Errorf("storing activity %d: %w", activityID, err)
 	}
 	return nil
+}
+
+// maxLengths bounds the pool lengths read per segment: 25 km in a 25 m pool.
+// shortcut: longer swims keep their first 1000 lengths; page the read when one exists.
+const maxLengths = 1000
+
+// lengths returns the pool lengths within the view's segments, in order.
+func (s *Service) lengths(ctx context.Context, userID int64, v View) ([]importer.Length, error) {
+	q := db.New(s.pool)
+	var out []importer.Length
+	for _, seg := range v.Segments {
+		rows, err := q.ListSwimLengths(ctx, db.ListSwimLengthsParams{UserID: userID, ActivityID: seg.ActivityID, After: -1, MaxRows: maxLengths})
+		if err != nil {
+			return nil, fmt.Errorf("reading lengths: %w", err)
+		}
+		for _, r := range rows {
+			if r.StartTime.Before(seg.From) || !r.StartTime.Before(seg.To) {
+				continue
+			}
+			out = append(out, importer.Length{
+				StartTime: r.StartTime, ElapsedTime: r.ElapsedTimeS, TimerTime: r.TimerTimeS, Active: r.Active,
+				Strokes: f64(r.Strokes),
+			})
+		}
+	}
+	return out, nil
 }
 
 // loadInput takes duration and speed from the activity's effective summary,

@@ -49,25 +49,31 @@ type Activity struct {
 }
 
 type ActivityDerived struct {
-	UserID           int64
-	ActivityID       int64
-	Version          int16
-	Stale            bool
-	ComputedAt       time.Time
-	ZoneSetID        *int64
-	GeneralZoneSetID *int64
-	AvgHrBpm         *float64
-	AvgPowerW        *float64
-	AvgSpeedMS       *float64
-	AvgCadence       *float64
-	HrZoneModel      *string
-	HrZoneS          []float64
-	PaceZoneModel    *string
-	PaceZoneS        []float64
-	PowerZoneModel   *string
-	PowerZoneS       []float64
-	Load             *float64
-	LoadMethod       *string
+	UserID                  int64
+	ActivityID              int64
+	Version                 int16
+	Stale                   bool
+	ComputedAt              time.Time
+	ZoneSetID               *int64
+	GeneralZoneSetID        *int64
+	AvgHrBpm                *float64
+	AvgPowerW               *float64
+	AvgSpeedMS              *float64
+	AvgCadence              *float64
+	HrZoneModel             *string
+	HrZoneS                 []float64
+	PaceZoneModel           *string
+	PaceZoneS               []float64
+	PowerZoneModel          *string
+	PowerZoneS              []float64
+	Load                    *float64
+	LoadMethod              *string
+	EfficiencyMPerBeat      *float64
+	DecouplingPct           *float64
+	AvgVerticalOscillationM *float64
+	AvgStanceTimeS          *float64
+	AvgStepLengthM          *float64
+	AvgSwolf                *float64
 }
 
 type ActivityEdit struct {

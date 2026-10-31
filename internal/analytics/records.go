@@ -3,6 +3,8 @@ package analytics
 import (
 	"math"
 	"time"
+
+	"github.com/iskyd/kudos/internal/importer"
 )
 
 // EffortName names a best effort; activities' best efforts make the records.
@@ -16,6 +18,8 @@ const (
 	Fastest10K          EffortName = "fastest_10k"
 	FastestHalfMarathon EffortName = "fastest_half_marathon"
 	FastestMarathon     EffortName = "fastest_marathon"
+	FastestSwim200      EffortName = "fastest_swim_200m"
+	FastestSwim400      EffortName = "fastest_swim_400m"
 	LongestRun          EffortName = "longest_run"
 	LongestRide         EffortName = "longest_ride"
 	LongestSwim         EffortName = "longest_swim"
@@ -31,6 +35,7 @@ const (
 func Efforts() []EffortName {
 	return []EffortName{
 		Fastest1K, Fastest5K, Fastest10K, FastestHalfMarathon, FastestMarathon,
+		FastestSwim200, FastestSwim400,
 		LongestRun, LongestRide, LongestSwim, LongestHike,
 		Power5s, Power1m, Power5m, Power20m, Power60m,
 	}
@@ -39,7 +44,7 @@ func Efforts() []EffortName {
 // LowerIsBetter reports whether a smaller value beats a larger one.
 func (e EffortName) LowerIsBetter() bool {
 	switch e {
-	case Fastest1K, Fastest5K, Fastest10K, FastestHalfMarathon, FastestMarathon:
+	case Fastest1K, Fastest5K, Fastest10K, FastestHalfMarathon, FastestMarathon, FastestSwim200, FastestSwim400:
 		return true
 	default:
 		return false
@@ -52,6 +57,9 @@ type EffortInput struct {
 	Virtual   bool
 	DistanceM *float64 // the effective distance, nil when unknown
 	Segments  [][]Sample
+	// Pool swims: the pool length (m) and the lengths swum.
+	PoolLengthM *float64
+	Lengths     []importer.Length
 }
 
 // Effort is an activity's best value for one effort.
@@ -61,7 +69,8 @@ type Effort struct {
 }
 
 // BestEfforts returns an activity's best efforts: for runs the fastest time
-// over each standard distance and the distance, for rides, swims and hikes the
+// over each standard distance and the distance, for swims the fastest 200 and
+// 400 m (from lengths in a pool) and the distance, for rides and hikes the
 // distance, and for rides the best mean power over each standard duration.
 // Virtual activities get no distance efforts (invariant 18), only power.
 func BestEfforts(in EffortInput) []Effort {
@@ -91,6 +100,22 @@ func BestEfforts(in EffortInput) []Effort {
 			if s, ok := fastestDistance(in.Segments, d.metres); ok {
 				out = append(out, Effort{d.name, s})
 			}
+		}
+	}
+	for _, d := range []struct {
+		name   EffortName
+		metres float64
+	}{{FastestSwim200, 200}, {FastestSwim400, 400}} {
+		var s float64
+		var ok bool
+		switch {
+		case in.Sport == "pool_swimming" && in.PoolLengthM != nil:
+			s, ok = fastestLengths(in.Lengths, *in.PoolLengthM, d.metres)
+		case in.Sport == "open_water_swimming" && !in.Virtual:
+			s, ok = fastestDistance(in.Segments, d.metres)
+		}
+		if ok {
+			out = append(out, Effort{d.name, s})
 		}
 	}
 	if in.Sport == "cycling" {

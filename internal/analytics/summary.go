@@ -14,6 +14,8 @@ const MaxGap = 10 * time.Second
 type Sample struct {
 	Time                                                       time.Time
 	HR, Power, Cadence, Speed, Distance, Temperature, Altitude *float64
+	// Running dynamics, in metres and seconds.
+	VerticalOscillation, StanceTime, StepLength *float64
 }
 
 // Summary holds an activity's summary values computed from its samples.
@@ -23,6 +25,7 @@ type Summary struct {
 	// Nil when no sample recorded the channel.
 	DistanceM, AvgSpeed, MaxSpeed, AvgHR, MaxHR, AvgPower, MaxPower *float64
 	AvgCadence, MaxCadence, AvgTemperature                          *float64
+	AvgVerticalOscillation, AvgStanceTime, AvgStepLength            *float64
 }
 
 // Summarize computes summary values from segments of samples, each segment in
@@ -60,6 +63,9 @@ func Summarize(segments [][]Sample) (s Summary, ok bool) {
 			ch("cadence").add(smp.Cadence, w)
 			ch("speed").add(smp.Speed, w)
 			ch("temperature").add(smp.Temperature, w)
+			ch("vo").add(smp.VerticalOscillation, w)
+			ch("stance").add(smp.StanceTime, w)
+			ch("step").add(smp.StepLength, w)
 			if smp.Distance != nil {
 				if segFirst == nil {
 					segFirst = smp.Distance
@@ -84,6 +90,7 @@ func Summarize(segments [][]Sample) (s Summary, ok bool) {
 	s.AvgPower, s.MaxPower = ch("power").avg(), ch("power").maximum()
 	s.AvgCadence, s.MaxCadence = ch("cadence").avg(), ch("cadence").maximum()
 	s.AvgTemperature = ch("temperature").avg()
+	s.AvgVerticalOscillation, s.AvgStanceTime, s.AvgStepLength = ch("vo").avg(), ch("stance").avg(), ch("step").avg()
 	s.AvgSpeed, s.MaxSpeed = ch("speed").avg(), ch("speed").maximum()
 	if hasDistance && s.TimerS > 0 {
 		s.AvgSpeed = new(distance / s.TimerS)

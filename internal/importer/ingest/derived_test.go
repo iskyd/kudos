@@ -447,3 +447,68 @@ func TestCurvePointsAreStoredWithDerivedValues(t *testing.T) {
 		t.Errorf("after the sport change: %v", got)
 	}
 }
+
+func TestRunningAndSwimAnalyticsAreStored(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	run, swim, ride := e.upload(t, "half_marathon.fit"), e.upload(t, "pool_swim.fit"), e.upload(t, "zwift.fit")
+	nearly := func(name string, got *float64, want float64) {
+		t.Helper()
+		if got == nil || math.Abs(*got-want) > 1e-3 {
+			t.Errorf("%s = %v, want %v", name, got, want)
+		}
+	}
+	// The half marathon: 1.228 m per beat, heart rate drifting 9.3% against
+	// pace, and its running dynamics (time-weighted, in metres and seconds).
+	d := e.compute(t, run.ID)
+	nearly("EF", d.EfficiencyMPerBeat, 1.2282)
+	nearly("decoupling", d.DecouplingPct, 9.3104)
+	nearly("vertical oscillation", d.AvgVerticalOscillationM, 0.1132)
+	nearly("stance time", d.AvgStanceTimeS, 0.2209)
+	nearly("step length", d.AvgStepLengthM, 1.2071)
+	if d.AvgSwolf != nil {
+		t.Errorf("run SWOLF: %v", *d.AvgSwolf)
+	}
+	// The pool swim: SWOLF from its active lengths and a 200 m from 50 m
+	// lengths in a row, but no 400 m without a rest.
+	d = e.compute(t, swim.ID)
+	nearly("SWOLF", d.AvgSwolf, 109.0562)
+	if d.EfficiencyMPerBeat != nil || d.DecouplingPct != nil {
+		t.Errorf("swim running analytics: %+v", d)
+	}
+	swimEfforts := func() map[string]float64 {
+		t.Helper()
+		rows, err := e.q.ListBestEffortsInPeriod(t.Context(), db.ListBestEffortsInPeriodParams{
+			UserID: e.alice, Efforts: []string{string(analytics.FastestSwim200), string(analytics.FastestSwim400)},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]float64{}
+		for _, r := range rows {
+			out[r.Effort] = r.Value
+		}
+		return out
+	}
+	if got := swimEfforts(); len(got) != 1 || got[string(analytics.FastestSwim200)] != 313.5 {
+		t.Errorf("swim efforts: %v", got)
+	}
+	if d := e.compute(t, ride.ID); d.EfficiencyMPerBeat != nil || d.AvgSwolf != nil || d.AvgStanceTimeS != nil {
+		t.Errorf("ride: %+v", d)
+	}
+
+	// They follow edits: trimmed to its first 4 minutes the swim keeps a SWOLF
+	// but no 200 m; a run changed to a virtual run has no running analytics.
+	from, to := swim.StartTime, swim.StartTime.Add(4*time.Minute)
+	e.add(t, swim.ID, Edit{Kind: EditTrim, From: &from, To: &to})
+	if d := e.compute(t, swim.ID); d.AvgSwolf == nil || *d.AvgSwolf == 109.0562 {
+		t.Errorf("trimmed SWOLF: %v", d.AvgSwolf)
+	}
+	if got := swimEfforts(); len(got) != 0 {
+		t.Errorf("trimmed swim efforts: %v", got)
+	}
+	e.add(t, run.ID, Edit{Kind: EditSport, Sport: "running", Subtype: "virtual"})
+	if d := e.compute(t, run.ID); d.EfficiencyMPerBeat != nil || d.DecouplingPct != nil || d.AvgStepLengthM != nil {
+		t.Errorf("virtual run: %+v", d)
+	}
+}
