@@ -707,6 +707,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/readiness": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Readiness for a day
+         * @description A deterministic 0–100 score with its breakdown: HRV against its 60-day
+         *     and 7-day baselines, resting HR against its 60-day baseline, sleep,
+         *     form and the check-in, each scored 0–100 and weighted among those
+         *     present. An illness (30) or injury (50) covering the day caps it. Until
+         *     the 60 days before the day hold 14 days with both HRV and resting HR,
+         *     only the baseline progress is returned.
+         */
+        get: operations["getReadiness"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/wellness": {
         parameters: {
             query?: never;
@@ -1428,6 +1453,51 @@ export interface components {
              * @description Form.
              */
             tsb: number;
+        };
+        Readiness: {
+            /** Format: date */
+            day: string;
+            /** @enum {string} */
+            status: "ready" | "collecting_baseline";
+            /** @description Days with both HRV and resting HR in the 60 days before the day. */
+            baselineDays: number;
+            /** @description Baseline days needed before a score is shown. */
+            requiredDays: number;
+            /** @description Set when ready. */
+            score?: number;
+            /** @description The score before any cap; set when ready. */
+            uncappedScore?: number;
+            /** @description Empty until ready. */
+            components: components["schemas"]["ReadinessComponent"][];
+            cap?: components["schemas"]["ReadinessCap"];
+        };
+        ReadinessComponent: {
+            /** @enum {string} */
+            name: "hrv" | "resting_hr" | "sleep" | "form" | "check_in";
+            /** Format: double */
+            score: number;
+            /**
+             * Format: double
+             * @description Weight among the components present, 0–1.
+             */
+            share: number;
+            /**
+             * Format: double
+             * @description The day's HRV (ms), resting HR (bpm), sleep (s) or form (TSB).
+             */
+            value?: number;
+            /**
+             * Format: double
+             * @description The 60-day baseline of HRV (ms) or resting HR (bpm).
+             */
+            baseline?: number;
+        };
+        /** @description An illness or injury covering the day; it may not bind. */
+        ReadinessCap: {
+            /** Format: int64 */
+            entryId: number;
+            kind: components["schemas"]["HealthLogKind"];
+            max: number;
         };
         WellnessDayInput: {
             /** @description 1 none to 5 severe. */
@@ -2562,6 +2632,30 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FitnessDay"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getReadiness: {
+        parameters: {
+            query: {
+                /** @description Local day. */
+                day: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The day's readiness. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Readiness"];
                 };
             };
             default: components["responses"]["Problem"];

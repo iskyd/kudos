@@ -1,4 +1,4 @@
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCurrentUser } from '@/api/auth'
 import { api } from '@/api/client'
 import type { components } from '@/api/generated/schema'
@@ -8,9 +8,12 @@ export type WellnessDay = components['schemas']['WellnessDay']
 export type WellnessDayInput = components['schemas']['WellnessDayInput']
 export type HealthLogEntry = components['schemas']['HealthLogEntry']
 export type HealthLogInput = components['schemas']['HealthLogInput']
+export type Readiness = components['schemas']['Readiness']
 
 const wellnessKey = ['wellness'] as const
 const healthLogKey = ['health-log'] as const
+// Check-ins and the health log feed readiness, so their changes refetch it.
+const readinessKey = ['readiness'] as const
 
 export function useWellnessDays() {
   return useInfiniteQuery({
@@ -40,7 +43,11 @@ export function useSaveWellnessDay() {
       if (error) throw new ApiError(error)
       return data
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: wellnessKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: wellnessKey }),
+        queryClient.invalidateQueries({ queryKey: readinessKey }),
+      ]),
   })
 }
 
@@ -55,7 +62,11 @@ export function useDeleteWellnessDay() {
       })
       if (error) throw new ApiError(error)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: wellnessKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: wellnessKey }),
+        queryClient.invalidateQueries({ queryKey: readinessKey }),
+      ]),
   })
 }
 
@@ -91,7 +102,11 @@ export function useSaveHealthLogEntry() {
       if (error) throw new ApiError(error)
       return data
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: healthLogKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: healthLogKey }),
+        queryClient.invalidateQueries({ queryKey: readinessKey }),
+      ]),
   })
 }
 
@@ -106,6 +121,21 @@ export function useDeleteHealthLogEntry() {
       })
       if (error) throw new ApiError(error)
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: healthLogKey }),
+    onSuccess: () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: healthLogKey }),
+        queryClient.invalidateQueries({ queryKey: readinessKey }),
+      ]),
+  })
+}
+
+export function useReadiness(day: string) {
+  return useQuery({
+    queryKey: [...readinessKey, day],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/readiness', { params: { query: { day } } })
+      if (error) throw new ApiError(error)
+      return data
+    },
   })
 }

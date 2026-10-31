@@ -12,6 +12,7 @@ import {
   useSaveWellnessDay,
   useWellnessDays,
 } from '@/api/wellness'
+import { ReadinessCard } from '@/components/readiness-card'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -74,6 +75,7 @@ export function WellnessPage() {
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-2xl font-semibold">Wellness</h1>
+      <ReadinessCard day={toISODay(new Date())} />
       <CheckIns />
       <HealthLog />
     </div>

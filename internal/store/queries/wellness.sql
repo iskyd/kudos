@@ -44,3 +44,14 @@ WHERE user_id = @user_id
         OR (start_date, id) < (sqlc.narg(after_start)::date, sqlc.narg(after_id)::bigint))
 ORDER BY start_date DESC, id DESC
 LIMIT @max_rows;
+
+-- name: GetWellnessDay :one
+SELECT * FROM wellness_days WHERE user_id = @user_id AND day = @day;
+
+-- name: ListHealthLogOn :many
+-- Illness and injury entries covering the day, latest start first.
+SELECT * FROM health_log
+WHERE user_id = @user_id AND kind IN ('illness', 'injury')
+    AND start_date <= @day::date AND (end_date IS NULL OR end_date >= @day::date)
+ORDER BY start_date DESC, id DESC
+LIMIT @max_rows;

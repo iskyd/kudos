@@ -79,6 +79,34 @@ func (q *Queries) DeleteWellnessDay(ctx context.Context, arg DeleteWellnessDayPa
 	return result.RowsAffected(), nil
 }
 
+const getWellnessDay = `-- name: GetWellnessDay :one
+SELECT user_id, day, soreness, sleep_quality, stress, motivation, note, weight_kg, body_fat_pct, hydration_l, updated_at FROM wellness_days WHERE user_id = $1 AND day = $2
+`
+
+type GetWellnessDayParams struct {
+	UserID int64
+	Day    time.Time
+}
+
+func (q *Queries) GetWellnessDay(ctx context.Context, arg GetWellnessDayParams) (WellnessDay, error) {
+	row := q.db.QueryRow(ctx, getWellnessDay, arg.UserID, arg.Day)
+	var i WellnessDay
+	err := row.Scan(
+		&i.UserID,
+		&i.Day,
+		&i.Soreness,
+		&i.SleepQuality,
+		&i.Stress,
+		&i.Motivation,
+		&i.Note,
+		&i.WeightKg,
+		&i.BodyFatPct,
+		&i.HydrationL,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const listHealthLog = `-- name: ListHealthLog :many
 SELECT id, user_id, kind, description, start_date, end_date, created_at FROM health_log
 WHERE user_id = $1
@@ -107,6 +135,49 @@ func (q *Queries) ListHealthLog(ctx context.Context, arg ListHealthLogParams) ([
 		arg.AfterID,
 		arg.MaxRows,
 	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []HealthLog
+	for rows.Next() {
+		var i HealthLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Kind,
+			&i.Description,
+			&i.StartDate,
+			&i.EndDate,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listHealthLogOn = `-- name: ListHealthLogOn :many
+SELECT id, user_id, kind, description, start_date, end_date, created_at FROM health_log
+WHERE user_id = $1 AND kind IN ('illness', 'injury')
+    AND start_date <= $2::date AND (end_date IS NULL OR end_date >= $2::date)
+ORDER BY start_date DESC, id DESC
+LIMIT $3
+`
+
+type ListHealthLogOnParams struct {
+	UserID  int64
+	Day     time.Time
+	MaxRows int32
+}
+
+// Illness and injury entries covering the day, latest start first.
+func (q *Queries) ListHealthLogOn(ctx context.Context, arg ListHealthLogOnParams) ([]HealthLog, error) {
+	rows, err := q.db.Query(ctx, listHealthLogOn, arg.UserID, arg.Day, arg.MaxRows)
 	if err != nil {
 		return nil, err
 	}

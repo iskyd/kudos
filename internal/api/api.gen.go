@@ -450,6 +450,51 @@ func (e LapIntensity) Valid() bool {
 	}
 }
 
+// Defines values for ReadinessStatus.
+const (
+	CollectingBaseline ReadinessStatus = "collecting_baseline"
+	Ready              ReadinessStatus = "ready"
+)
+
+// Valid indicates whether the value is a known member of the ReadinessStatus enum.
+func (e ReadinessStatus) Valid() bool {
+	switch e {
+	case CollectingBaseline:
+		return true
+	case Ready:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ReadinessComponentName.
+const (
+	CheckIn   ReadinessComponentName = "check_in"
+	Form      ReadinessComponentName = "form"
+	Hrv       ReadinessComponentName = "hrv"
+	RestingHr ReadinessComponentName = "resting_hr"
+	Sleep     ReadinessComponentName = "sleep"
+)
+
+// Valid indicates whether the value is a known member of the ReadinessComponentName enum.
+func (e ReadinessComponentName) Valid() bool {
+	switch e {
+	case CheckIn:
+		return true
+	case Form:
+		return true
+	case Hrv:
+		return true
+	case RestingHr:
+		return true
+	case Sleep:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Sport.
 const (
 	SportCycling           Sport = "cycling"
@@ -1145,6 +1190,56 @@ type Problem struct {
 	Type string `json:"type"`
 }
 
+// Readiness defines model for Readiness.
+type Readiness struct {
+	// BaselineDays Days with both HRV and resting HR in the 60 days before the day.
+	BaselineDays int `json:"baselineDays"`
+
+	// Cap An illness or injury covering the day; it may not bind.
+	Cap *ReadinessCap `json:"cap,omitempty"`
+
+	// Components Empty until ready.
+	Components []ReadinessComponent `json:"components"`
+	Day        openapi_types.Date   `json:"day"`
+
+	// RequiredDays Baseline days needed before a score is shown.
+	RequiredDays int `json:"requiredDays"`
+
+	// Score Set when ready.
+	Score  *int            `json:"score,omitempty"`
+	Status ReadinessStatus `json:"status"`
+
+	// UncappedScore The score before any cap; set when ready.
+	UncappedScore *int `json:"uncappedScore,omitempty"`
+}
+
+// ReadinessStatus defines model for Readiness.Status.
+type ReadinessStatus string
+
+// ReadinessCap An illness or injury covering the day; it may not bind.
+type ReadinessCap struct {
+	EntryId int64         `json:"entryId"`
+	Kind    HealthLogKind `json:"kind"`
+	Max     int           `json:"max"`
+}
+
+// ReadinessComponent defines model for ReadinessComponent.
+type ReadinessComponent struct {
+	// Baseline The 60-day baseline of HRV (ms) or resting HR (bpm).
+	Baseline *float64               `json:"baseline,omitempty"`
+	Name     ReadinessComponentName `json:"name"`
+	Score    float64                `json:"score"`
+
+	// Share Weight among the components present, 0–1.
+	Share float64 `json:"share"`
+
+	// Value The day's HRV (ms), resting HR (bpm), sleep (s) or form (TSB).
+	Value *float64 `json:"value,omitempty"`
+}
+
+// ReadinessComponentName defines model for ReadinessComponent.Name.
+type ReadinessComponentName string
+
 // RecordedWorkout defines model for RecordedWorkout.
 type RecordedWorkout struct {
 	Name  *string       `json:"name,omitempty"`
@@ -1621,6 +1716,12 @@ type ListHealthLogParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// GetReadinessParams defines parameters for GetReadiness.
+type GetReadinessParams struct {
+	// Day Local day.
+	Day openapi_types.Date `form:"day" json:"day"`
+}
+
 // ListWellnessDaysParams defines parameters for ListWellnessDays.
 type ListWellnessDaysParams struct {
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
@@ -1817,6 +1918,9 @@ type ServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// GetReadiness Readiness for a day
+	// (GET /api/readiness)
+	GetReadiness(w http.ResponseWriter, r *http.Request, params GetReadinessParams)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(w http.ResponseWriter, r *http.Request, params ListWellnessDaysParams)
@@ -2078,6 +2182,12 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 // UpdateMe Update profile settings
 // (PATCH /api/me)
 func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetReadiness Readiness for a day
+// (GET /api/readiness)
+func (_ Unimplemented) GetReadiness(w http.ResponseWriter, r *http.Request, params GetReadinessParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3280,6 +3390,39 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// GetReadiness operation middleware
+func (siw *ServerInterfaceWrapper) GetReadiness(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetReadinessParams
+
+	// ------------- Required query parameter "day" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "day", r.URL.Query(), &params.Day, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "day"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "day", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetReadiness(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWellnessDays operation middleware
 func (siw *ServerInterfaceWrapper) ListWellnessDays(w http.ResponseWriter, r *http.Request) {
 
@@ -3824,6 +3967,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/fitness", wrapper.GetFitness)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/readiness", wrapper.GetReadiness)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/wellness", wrapper.ListWellnessDays)
@@ -5341,6 +5487,45 @@ func (response UpdateMedefaultApplicationProblemPlusJSONResponse) VisitUpdateMeR
 	return err
 }
 
+type GetReadinessRequestObject struct {
+	Params GetReadinessParams
+}
+
+type GetReadinessResponseObject interface {
+	VisitGetReadinessResponse(w http.ResponseWriter) error
+}
+
+type GetReadiness200JSONResponse Readiness
+
+func (response GetReadiness200JSONResponse) VisitGetReadinessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetReadinessdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetReadinessdefaultApplicationProblemPlusJSONResponse) VisitGetReadinessResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListWellnessDaysRequestObject struct {
 	Params ListWellnessDaysParams
 }
@@ -5826,6 +6011,9 @@ type StrictServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// GetReadiness Readiness for a day
+	// (GET /api/readiness)
+	GetReadiness(ctx context.Context, request GetReadinessRequestObject) (GetReadinessResponseObject, error)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(ctx context.Context, request ListWellnessDaysRequestObject) (ListWellnessDaysResponseObject, error)
@@ -6953,6 +7141,32 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetReadiness operation middleware
+func (sh *strictHandler) GetReadiness(w http.ResponseWriter, r *http.Request, params GetReadinessParams) {
+	var request GetReadinessRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetReadiness(ctx, request.(GetReadinessRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetReadiness")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetReadinessResponseObject); ok {
+		if err := validResponse.VisitGetReadinessResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
