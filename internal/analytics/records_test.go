@@ -140,7 +140,7 @@ func TestBestEffortsOfOtherSports(t *testing.T) {
 func TestEffortOrderAndDirection(t *testing.T) {
 	t.Parallel()
 	all := Efforts()
-	if len(all) != 14 || all[0] != Fastest1K || all[13] != Power60m {
+	if len(all) != 16 || all[0] != Fastest1K || all[15] != Power60m {
 		t.Errorf("efforts: %v", all)
 	}
 	for _, e := range all {

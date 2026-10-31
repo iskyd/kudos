@@ -502,6 +502,8 @@ const (
 	Fastest5k           RecordEffort = "fastest_5k"
 	FastestHalfMarathon RecordEffort = "fastest_half_marathon"
 	FastestMarathon     RecordEffort = "fastest_marathon"
+	FastestSwim200m     RecordEffort = "fastest_swim_200m"
+	FastestSwim400m     RecordEffort = "fastest_swim_400m"
 	LongestHike         RecordEffort = "longest_hike"
 	LongestRide         RecordEffort = "longest_ride"
 	LongestRun          RecordEffort = "longest_run"
@@ -525,6 +527,10 @@ func (e RecordEffort) Valid() bool {
 	case FastestHalfMarathon:
 		return true
 	case FastestMarathon:
+		return true
+	case FastestSwim200m:
+		return true
+	case FastestSwim400m:
 		return true
 	case LongestHike:
 		return true
@@ -702,6 +708,24 @@ func (e ListActivitiesParamsSort) Valid() bool {
 	case ListActivitiesParamsSortDistance:
 		return true
 	case ListActivitiesParamsSortDuration:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ListActivityTrendsParamsKind.
+const (
+	ListActivityTrendsParamsKindRunning  ListActivityTrendsParamsKind = "running"
+	ListActivityTrendsParamsKindSwimming ListActivityTrendsParamsKind = "swimming"
+)
+
+// Valid indicates whether the value is a known member of the ListActivityTrendsParamsKind enum.
+func (e ListActivityTrendsParamsKind) Valid() bool {
+	switch e {
+	case ListActivityTrendsParamsKindRunning:
+		return true
+	case ListActivityTrendsParamsKindSwimming:
 		return true
 	default:
 		return false
@@ -930,6 +954,44 @@ type ActivitySummarySource string
 // ActivitySummarySubtype defines model for ActivitySummary.Subtype.
 type ActivitySummarySubtype string
 
+// ActivityTrend An activity's analytics; values the activity lacks are absent.
+type ActivityTrend struct {
+	ActivityId int64    `json:"activityId"`
+	AvgHrBpm   *float64 `json:"avgHrBpm,omitempty"`
+	AvgSpeedMS *float64 `json:"avgSpeedMS,omitempty"`
+
+	// CadenceSpm Steps per minute.
+	CadenceSpm *float64 `json:"cadenceSpm,omitempty"`
+
+	// DecouplingPct Aerobic decoupling, how much efficiency fell from the first half to the second, in percent.
+	DecouplingPct *float64 `json:"decouplingPct,omitempty"`
+
+	// EfficiencyMPerBeat Efficiency factor, speed over heart rate, in metres per heartbeat.
+	EfficiencyMPerBeat *float64 `json:"efficiencyMPerBeat,omitempty"`
+	PoolLengthM        *float64 `json:"poolLengthM,omitempty"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport ActivitySport `json:"sport"`
+
+	// StanceTimeS Ground contact time.
+	StanceTimeS *float64  `json:"stanceTimeS,omitempty"`
+	StartTime   time.Time `json:"startTime"`
+	StepLengthM *float64  `json:"stepLengthM,omitempty"`
+
+	// Swolf Mean SWOLF of the active lengths.
+	Swolf                *float64 `json:"swolf,omitempty"`
+	UtcOffsetS           int      `json:"utcOffsetS"`
+	VerticalOscillationM *float64 `json:"verticalOscillationM,omitempty"`
+}
+
+// ActivityTrendPage defines model for ActivityTrendPage.
+type ActivityTrendPage struct {
+	Items []ActivityTrend `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
 // ActivityZones defines model for ActivityZones.
 type ActivityZones struct {
 	// Day The activity's local date.
@@ -991,6 +1053,9 @@ type CurvePoint struct {
 
 // Curves defines model for Curves.
 type Curves struct {
+	// CssMS Estimated critical swim speed; absent without both a 200 m and a slower 400 m.
+	CssMS *float64 `json:"cssMS,omitempty"`
+
 	// FtpW Estimated FTP; absent without 20 minutes of power.
 	FtpW *int `json:"ftpW,omitempty"`
 
@@ -1000,8 +1065,14 @@ type Curves struct {
 	// Power Watts, shortest duration first.
 	Power []CurvePoint `json:"power"`
 
+	// RacePredictions Predicted 5K, 10K, half marathon and marathon times at that VO2max; empty without one.
+	RacePredictions []RacePrediction `json:"racePredictions"`
+
 	// ThresholdSpeedMS Estimated threshold pace, as a speed; absent without a 30-minute run.
 	ThresholdSpeedMS *float64 `json:"thresholdSpeedMS,omitempty"`
+
+	// Vo2max Estimated VO2max (ml/kg/min); absent without a 5-minute run.
+	Vo2max *float64 `json:"vo2max,omitempty"`
 }
 
 // FitnessDay defines model for FitnessDay.
@@ -1267,6 +1338,12 @@ type Problem struct {
 
 	// Type Stable URI identifying the error kind, e.g. urn:kudos:problem:not-found.
 	Type string `json:"type"`
+}
+
+// RacePrediction defines model for RacePrediction.
+type RacePrediction struct {
+	DistanceM float64 `json:"distanceM"`
+	TimeS     float64 `json:"timeS"`
 }
 
 // Readiness defines model for Readiness.
@@ -1842,6 +1919,26 @@ type GetReadinessParams struct {
 	Day openapi_types.Date `form:"day" json:"day"`
 }
 
+// ListActivityTrendsParams defines parameters for ListActivityTrends.
+type ListActivityTrendsParams struct {
+	Kind ListActivityTrendsParamsKind `form:"kind" json:"kind"`
+
+	// From First local day, inclusive.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Last local day, inclusive.
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
+
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListActivityTrendsParamsKind defines parameters for ListActivityTrends.
+type ListActivityTrendsParamsKind string
+
 // ListWellnessDaysParams defines parameters for ListWellnessDays.
 type ListWellnessDaysParams struct {
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
@@ -2047,6 +2144,9 @@ type ServerInterface interface {
 	// GetRecords Personal records with their history
 	// (GET /api/records)
 	GetRecords(w http.ResponseWriter, r *http.Request)
+	// ListActivityTrends Per-activity running or swim analytics
+	// (GET /api/trends)
+	ListActivityTrends(w http.ResponseWriter, r *http.Request, params ListActivityTrendsParams)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(w http.ResponseWriter, r *http.Request, params ListWellnessDaysParams)
@@ -2326,6 +2426,12 @@ func (_ Unimplemented) GetReadiness(w http.ResponseWriter, r *http.Request, para
 // GetRecords Personal records with their history
 // (GET /api/records)
 func (_ Unimplemented) GetRecords(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListActivityTrends Per-activity running or swim analytics
+// (GET /api/trends)
+func (_ Unimplemented) ListActivityTrends(w http.ResponseWriter, r *http.Request, params ListActivityTrendsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3621,6 +3727,91 @@ func (siw *ServerInterfaceWrapper) GetRecords(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListActivityTrends operation middleware
+func (siw *ServerInterfaceWrapper) ListActivityTrends(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListActivityTrendsParams
+
+	// ------------- Required query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListActivityTrends(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWellnessDays operation middleware
 func (siw *ServerInterfaceWrapper) ListWellnessDays(w http.ResponseWriter, r *http.Request) {
 
@@ -4171,6 +4362,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/curves", wrapper.GetCurves)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/trends", wrapper.ListActivityTrends)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/readiness", wrapper.GetReadiness)
@@ -5807,6 +6001,45 @@ func (response GetRecordsdefaultApplicationProblemPlusJSONResponse) VisitGetReco
 	return err
 }
 
+type ListActivityTrendsRequestObject struct {
+	Params ListActivityTrendsParams
+}
+
+type ListActivityTrendsResponseObject interface {
+	VisitListActivityTrendsResponse(w http.ResponseWriter) error
+}
+
+type ListActivityTrends200JSONResponse ActivityTrendPage
+
+func (response ListActivityTrends200JSONResponse) VisitListActivityTrendsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListActivityTrendsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListActivityTrendsdefaultApplicationProblemPlusJSONResponse) VisitListActivityTrendsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListWellnessDaysRequestObject struct {
 	Params ListWellnessDaysParams
 }
@@ -6301,6 +6534,9 @@ type StrictServerInterface interface {
 	// GetRecords Personal records with their history
 	// (GET /api/records)
 	GetRecords(ctx context.Context, request GetRecordsRequestObject) (GetRecordsResponseObject, error)
+	// ListActivityTrends Per-activity running or swim analytics
+	// (GET /api/trends)
+	ListActivityTrends(ctx context.Context, request ListActivityTrendsRequestObject) (ListActivityTrendsResponseObject, error)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(ctx context.Context, request ListWellnessDaysRequestObject) (ListWellnessDaysResponseObject, error)
@@ -7504,6 +7740,32 @@ func (sh *strictHandler) GetRecords(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetRecordsResponseObject); ok {
 		if err := validResponse.VisitGetRecordsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListActivityTrends operation middleware
+func (sh *strictHandler) ListActivityTrends(w http.ResponseWriter, r *http.Request, params ListActivityTrendsParams) {
+	var request ListActivityTrendsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListActivityTrends(ctx, request.(ListActivityTrendsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListActivityTrends")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListActivityTrendsResponseObject); ok {
+		if err := validResponse.VisitListActivityTrendsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

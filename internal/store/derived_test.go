@@ -126,3 +126,75 @@ func TestActivityDerivedIsolationAndInvalidation(t *testing.T) {
 		t.Errorf("users paged: %v then %v", users, more)
 	}
 }
+
+func TestActivityTrendsAndIsolation(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	n := 0
+	activity := func(userID int64, sport string, day int, d db.UpsertActivityDerivedParams) int64 {
+		n++
+		id, err := q.UpsertActivity(ctx, db.UpsertActivityParams{
+			UserID: userID, Source: "manual", SourceActivityID: string(rune('a' + n)), Sport: sport, Subtype: "outdoor",
+			StartTime: time.Date(2026, 10, day, 7, 0, 0, 0, time.UTC), PoolLengthM: ptr(float32(25)),
+		})
+		check(t, err)
+		d.UserID, d.ActivityID, d.Version = userID, id, 1
+		check(t, q.UpsertActivityDerived(ctx, d))
+		return id
+	}
+	road := activity(alice.ID, "running", 1, db.UpsertActivityDerivedParams{EfficiencyMPerBeat: ptr(1.2), DecouplingPct: ptr(5.0), AvgStepLengthM: ptr(1.1)})
+	trail := activity(alice.ID, "trail_running", 3, db.UpsertActivityDerivedParams{EfficiencyMPerBeat: ptr(1.3)})
+	swim := activity(alice.ID, "pool_swimming", 2, db.UpsertActivityDerivedParams{AvgSwolf: ptr(100.0)})
+	activity(alice.ID, "cycling", 4, db.UpsertActivityDerivedParams{})
+	virtual := activity(alice.ID, "running", 5, db.UpsertActivityDerivedParams{})
+	check(t, q.SetActivityOverrides(ctx, db.SetActivityOverridesParams{UserID: alice.ID, ID: virtual, Overrides: []byte(`{"sport":"running","subtype":"virtual"}`)}))
+	merged := activity(alice.ID, "running", 6, db.UpsertActivityDerivedParams{})
+	check(t, q.SetActivityMergedInto(ctx, db.SetActivityMergedIntoParams{UserID: alice.ID, ID: merged, MergedInto: &road}))
+	bobs := activity(bob.ID, "running", 1, db.UpsertActivityDerivedParams{EfficiencyMPerBeat: ptr(1.0)})
+
+	list := func(userID int64, kind string, from *time.Time, before *db.ListActivityTrendsRow, limit int32) []int64 {
+		t.Helper()
+		p := db.ListActivityTrendsParams{
+			UserID: userID, Kind: kind, FromDay: from, BeforeTime: time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC), BeforeID: 1 << 62, MaxRows: limit,
+		}
+		if before != nil {
+			p.BeforeTime, p.BeforeID = before.StartTime, before.ID
+		}
+		rows, err := q.ListActivityTrends(ctx, p)
+		check(t, err)
+		var ids []int64
+		for _, r := range rows {
+			ids = append(ids, r.ID)
+		}
+		return ids
+	}
+	// Outdoor runs, newest first: not the ride, the virtual run or the merged-away one.
+	if got := list(alice.ID, "running", nil, nil, 10); !slices.Equal(got, []int64{trail, road}) {
+		t.Errorf("runs: %v, want %v", got, []int64{trail, road})
+	}
+	rows, err := q.ListActivityTrends(ctx, db.ListActivityTrendsParams{
+		UserID: alice.ID, Kind: "running", BeforeTime: time.Date(3000, 1, 1, 0, 0, 0, 0, time.UTC), BeforeID: 1 << 62, MaxRows: 1,
+	})
+	check(t, err)
+	if len(rows) != 1 || *rows[0].EfficiencyMPerBeat != 1.3 || rows[0].Sport != "trail_running" {
+		t.Fatalf("first page: %+v", rows)
+	}
+	if got := list(alice.ID, "running", nil, &rows[0], 10); !slices.Equal(got, []int64{road}) {
+		t.Errorf("second page: %v", got)
+	}
+	if got := list(alice.ID, "running", ptr(time.Date(2026, 10, 2, 0, 0, 0, 0, time.UTC)), nil, 10); !slices.Equal(got, []int64{trail}) {
+		t.Errorf("from 2 October: %v", got)
+	}
+	if got := list(alice.ID, "swimming", nil, nil, 10); !slices.Equal(got, []int64{swim}) {
+		t.Errorf("swims: %v", got)
+	}
+	if got := list(alice.ID, "cycling", nil, nil, 10); len(got) != 0 {
+		t.Errorf("unknown kind: %v", got)
+	}
+	if got := list(bob.ID, "running", nil, nil, 10); !slices.Equal(got, []int64{bobs}) {
+		t.Errorf("bob's runs: %v", got)
+	}
+}

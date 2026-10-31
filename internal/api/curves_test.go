@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/iskyd/kudos/internal/analytics"
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
@@ -67,10 +68,39 @@ func TestCurves(t *testing.T) {
 		t.Errorf("estimates: %v %v", all.FtpW, all.ThresholdSpeedMS)
 	}
 
-	// From 2 October only the second counts: too short for estimates.
+	// VO2max is the VDOT of 30 minutes at 4 m/s, the only pace point of 5
+	// minutes or more, with the races it predicts.
+	if all.Vo2max == nil || *all.Vo2max != analytics.VDOT(7200, 1800) || len(all.RacePredictions) != 4 {
+		t.Fatalf("VO2max: %v %+v", all.Vo2max, all.RacePredictions)
+	}
+	if r := all.RacePredictions[1]; r.DistanceM != 10000 || r.TimeS != analytics.PredictRace(*all.Vo2max, 10000) {
+		t.Errorf("10K: %+v", r)
+	}
+	// CSS from the fastest 200 m (first) and 400 m (second): 200 m in 190 s.
+	efforts := func(id int64, name analytics.EffortName, seconds float64) {
+		t.Helper()
+		if err := q.InsertBestEfforts(t.Context(), db.InsertBestEffortsParams{
+			UserID: me.Id, ActivityID: id, Efforts: []string{string(name)}, EffortValues: []float64{seconds},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	efforts(first, analytics.FastestSwim200, 170)
+	efforts(second, analytics.FastestSwim400, 360)
+	efforts(second, analytics.FastestSwim200, 175)
+	if got := get("").CssMS; got == nil || *got != 200.0/190 {
+		t.Errorf("CSS: %v", got)
+	}
+
+	// From 2 October only the second counts: too short for estimates, and
+	// its own 200 m and 400 m give the CSS.
 	later := get("?from=2026-10-02&to=2026-10-31")
-	if len(later.Power) != 2 || later.Power[0].Value != 400 || len(later.Pace) != 1 || later.FtpW != nil || later.ThresholdSpeedMS != nil {
+	if len(later.Power) != 2 || later.Power[0].Value != 400 || len(later.Pace) != 1 || later.FtpW != nil || later.ThresholdSpeedMS != nil ||
+		later.Vo2max != nil || len(later.RacePredictions) != 0 || later.CssMS == nil || *later.CssMS != 200.0/185 {
 		t.Errorf("from 2 October: %+v", later)
+	}
+	if got := get("?to=2026-10-01").CssMS; got != nil {
+		t.Errorf("CSS without a 400 m: %v", *got)
 	}
 	if early := get("?to=2026-10-01"); len(early.Power) != 3 || early.Power[0].ActivityId != first {
 		t.Errorf("to 1 October: %+v", early)
@@ -79,7 +109,7 @@ func TestCurves(t *testing.T) {
 
 	bob := &apiClient{t: t, h: c.h}
 	bob.session(bob.do(http.MethodPost, "/api/auth/register", register("bob"), nil), http.StatusCreated)
-	if got := decodeJSON[Curves](t, bob.do(http.MethodGet, "/api/curves", nil, nil), http.StatusOK); len(got.Power)+len(got.Pace) != 0 {
+	if got := decodeJSON[Curves](t, bob.do(http.MethodGet, "/api/curves", nil, nil), http.StatusOK); len(got.Power)+len(got.Pace) != 0 || got.CssMS != nil {
 		t.Errorf("bob: %+v", got)
 	}
 	wantProblem(t, (&apiClient{t: t, h: c.h}).do(http.MethodGet, "/api/curves", nil, nil), KindUnauthorized)

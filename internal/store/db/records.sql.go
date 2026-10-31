@@ -175,6 +175,60 @@ func (q *Queries) ListBestCurvePoints(ctx context.Context, arg ListBestCurvePoin
 	return items, nil
 }
 
+const listBestEffortsInPeriod = `-- name: ListBestEffortsInPeriod :many
+SELECT e.effort, min(e.value)::double precision AS value
+FROM best_efforts e
+JOIN activities a ON a.id = e.activity_id AND a.user_id = e.user_id
+CROSS JOIN LATERAL (SELECT ((coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)
+    + make_interval(secs => a.utc_offset_s)) AT TIME ZONE 'UTC')::date AS day) l
+WHERE e.user_id = $1 AND a.merged_into IS NULL AND e.effort = ANY($2::text[])
+    AND ($3::date IS NULL OR l.day >= $3::date)
+    AND ($4::date IS NULL OR l.day <= $4::date)
+GROUP BY e.effort
+ORDER BY e.effort
+LIMIT 100
+`
+
+type ListBestEffortsInPeriodParams struct {
+	UserID  int64
+	Efforts []string
+	FromDay *time.Time
+	ToDay   *time.Time
+}
+
+type ListBestEffortsInPeriodRow struct {
+	Effort string
+	Value  float64
+}
+
+// The fastest value of each of the given fastest efforts among the activities
+// whose local start day is within from and to (either open), merged-away
+// activities left out.
+func (q *Queries) ListBestEffortsInPeriod(ctx context.Context, arg ListBestEffortsInPeriodParams) ([]ListBestEffortsInPeriodRow, error) {
+	rows, err := q.db.Query(ctx, listBestEffortsInPeriod,
+		arg.UserID,
+		arg.Efforts,
+		arg.FromDay,
+		arg.ToDay,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBestEffortsInPeriodRow
+	for rows.Next() {
+		var i ListBestEffortsInPeriodRow
+		if err := rows.Scan(&i.Effort, &i.Value); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listRecordHistory = `-- name: ListRecordHistory :many
 SELECT effort, activity_id, start_time, utc_offset_s, value FROM (
     SELECT e.effort, e.activity_id, e.value, x.start_time, a.utc_offset_s, x.score,

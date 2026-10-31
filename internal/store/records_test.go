@@ -157,3 +157,58 @@ func TestBestCurvePointsAndIsolation(t *testing.T) {
 		t.Errorf("after clearing the first: %v", got)
 	}
 }
+
+func TestBestEffortsInPeriodAndIsolation(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	n := 0
+	swim := func(userID int64, day int, values map[string]float64) int64 {
+		n++
+		id, err := q.UpsertActivity(ctx, db.UpsertActivityParams{
+			UserID: userID, Source: "manual", SourceActivityID: fmt.Sprint(n), Sport: "pool_swimming", Subtype: "outdoor",
+			StartTime: time.Date(2026, 10, day, 7, 0, 0, 0, time.UTC),
+		})
+		check(t, err)
+		p := db.InsertBestEffortsParams{UserID: userID, ActivityID: id}
+		for k, v := range values {
+			p.Efforts, p.EffortValues = append(p.Efforts, k), append(p.EffortValues, v)
+		}
+		check(t, q.InsertBestEfforts(ctx, p))
+		return id
+	}
+	first := swim(alice.ID, 1, map[string]float64{"fastest_swim_200m": 170, "fastest_swim_400m": 380})
+	swim(alice.ID, 5, map[string]float64{"fastest_swim_200m": 180, "fastest_swim_400m": 360, "longest_swim": 2000})
+	merged := swim(alice.ID, 6, map[string]float64{"fastest_swim_200m": 100})
+	check(t, q.SetActivityMergedInto(ctx, db.SetActivityMergedIntoParams{UserID: alice.ID, ID: merged, MergedInto: &first}))
+	swim(bob.ID, 1, map[string]float64{"fastest_swim_200m": 90})
+
+	best := func(userID int64, from, to *time.Time) []string {
+		t.Helper()
+		rows, err := q.ListBestEffortsInPeriod(ctx, db.ListBestEffortsInPeriodParams{
+			UserID: userID, FromDay: from, ToDay: to, Efforts: []string{"fastest_swim_200m", "fastest_swim_400m"},
+		})
+		check(t, err)
+		var out []string
+		for _, r := range rows {
+			out = append(out, fmt.Sprintf("%s %v", r.Effort, r.Value))
+		}
+		return out
+	}
+	day := func(d int) *time.Time { return new(time.Date(2026, 10, d, 0, 0, 0, 0, time.UTC)) }
+	// The fastest of each across activities; merged-away activities and other efforts left out.
+	if got, want := best(alice.ID, nil, nil), []string{"fastest_swim_200m 170", "fastest_swim_400m 360"}; !slices.Equal(got, want) {
+		t.Errorf("all time: %v, want %v", got, want)
+	}
+	if got, want := best(alice.ID, day(2), nil), []string{"fastest_swim_200m 180", "fastest_swim_400m 360"}; !slices.Equal(got, want) {
+		t.Errorf("from 2 October: %v, want %v", got, want)
+	}
+	if got, want := best(alice.ID, nil, day(4)), []string{"fastest_swim_200m 170", "fastest_swim_400m 380"}; !slices.Equal(got, want) {
+		t.Errorf("to 4 October: %v, want %v", got, want)
+	}
+	if got, want := best(bob.ID, nil, nil), []string{"fastest_swim_200m 90"}; !slices.Equal(got, want) {
+		t.Errorf("bob: %v", got)
+	}
+}

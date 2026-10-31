@@ -67,3 +67,19 @@ WHERE c.user_id = @user_id AND a.merged_into IS NULL
     AND (sqlc.narg(to_day)::date IS NULL OR l.day <= sqlc.narg(to_day)::date)
 ORDER BY c.kind, c.duration_s, c.value DESC, x.start_time, c.activity_id
 LIMIT @max_rows;
+
+-- name: ListBestEffortsInPeriod :many
+-- The fastest value of each of the given fastest efforts among the activities
+-- whose local start day is within from and to (either open), merged-away
+-- activities left out.
+SELECT e.effort, min(e.value)::double precision AS value
+FROM best_efforts e
+JOIN activities a ON a.id = e.activity_id AND a.user_id = e.user_id
+CROSS JOIN LATERAL (SELECT ((coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)
+    + make_interval(secs => a.utc_offset_s)) AT TIME ZONE 'UTC')::date AS day) l
+WHERE e.user_id = @user_id AND a.merged_into IS NULL AND e.effort = ANY(@efforts::text[])
+    AND (sqlc.narg(from_day)::date IS NULL OR l.day >= sqlc.narg(from_day)::date)
+    AND (sqlc.narg(to_day)::date IS NULL OR l.day <= sqlc.narg(to_day)::date)
+GROUP BY e.effort
+ORDER BY e.effort
+LIMIT 100;
