@@ -16,7 +16,7 @@ import (
 
 // derivedVersion versions the derived values' computation: raising it makes the
 // recompute jobs redo every activity's.
-const derivedVersion = 3
+const derivedVersion = 4
 
 // recomputeBatch is how many activities or users a recompute job reads at once.
 const recomputeBatch = 100
@@ -68,9 +68,10 @@ func ZoneThresholds(z db.ZoneSet) analytics.Thresholds {
 	}
 }
 
-// ComputeDerived computes and stores an activity's derived values and best
-// efforts from its edited samples and the zones valid on its date. Recomputing
-// gives the same values; an activity that no longer exists is skipped.
+// ComputeDerived computes and stores an activity's derived values, best efforts
+// and curve points from its edited samples and the zones valid on its date, and
+// suggests the thresholds its curve implies. Recomputing gives the same values;
+// an activity that no longer exists is skipped.
 func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) error {
 	q := db.New(s.pool)
 	a, err := q.GetActivity(ctx, db.GetActivityParams{UserID: userID, ID: activityID})
@@ -111,13 +112,18 @@ func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) 
 	if dist == nil {
 		dist = sum.DistanceM
 	}
-	efforts := analytics.BestEfforts(analytics.EffortInput{
-		Sport: z.Activity.Sport, Virtual: z.Activity.Subtype == "virtual", DistanceM: dist, Segments: segs,
-	})
+	in := analytics.EffortInput{Sport: z.Activity.Sport, Virtual: z.Activity.Subtype == "virtual", DistanceM: dist, Segments: segs}
+	efforts, curve := analytics.BestEfforts(in), analytics.Curves(in)
 	ins := db.InsertBestEffortsParams{UserID: userID, ActivityID: activityID}
 	for _, e := range efforts {
 		ins.Efforts = append(ins.Efforts, string(e.Name))
 		ins.EffortValues = append(ins.EffortValues, e.Value)
+	}
+	points := db.InsertCurvePointsParams{UserID: userID, ActivityID: activityID}
+	for _, c := range curve {
+		points.Kinds = append(points.Kinds, string(c.Kind))
+		points.Durations = append(points.Durations, int32(c.DurationS)) //nolint:gosec // G115: durations are at most hours
+		points.CurveValues = append(points.CurveValues, c.Value)
 	}
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		q := db.New(tx)
@@ -130,7 +136,13 @@ func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) 
 		if err := q.InsertBestEfforts(ctx, ins); err != nil {
 			return fmt.Errorf("storing best efforts: %w", err)
 		}
-		return nil
+		if err := q.DeleteCurvePoints(ctx, db.DeleteCurvePointsParams{UserID: userID, ActivityID: activityID}); err != nil {
+			return fmt.Errorf("clearing curve points: %w", err)
+		}
+		if err := q.InsertCurvePoints(ctx, points); err != nil {
+			return fmt.Errorf("storing curve points: %w", err)
+		}
+		return suggestEstimates(ctx, q, userID, activityID, z.Day, curve)
 	})
 	if err != nil {
 		return fmt.Errorf("storing activity %d: %w", activityID, err)

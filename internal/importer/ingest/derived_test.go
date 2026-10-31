@@ -413,3 +413,37 @@ func TestBestEffortsAreStoredWithDerivedValues(t *testing.T) {
 		t.Errorf("after the sport change: %v", got)
 	}
 }
+
+func TestCurvePointsAreStoredWithDerivedValues(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	run, zwift := e.upload(t, "half_marathon.fit"), e.upload(t, "zwift.fit")
+	curves := func(userID int64) map[string]int64 {
+		t.Helper()
+		rows, err := e.q.ListBestCurvePoints(t.Context(), db.ListBestCurvePointsParams{UserID: userID, MaxRows: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string]int64{}
+		for _, r := range rows {
+			out[r.Kind] = r.ActivityID
+		}
+		return out
+	}
+	for range 2 { // recomputing replaces the rows
+		e.compute(t, run.ID)
+		e.compute(t, zwift.ID)
+	}
+	if got := curves(e.alice); len(got) != 2 || got["pace"] != run.ID || got["power"] != zwift.ID {
+		t.Errorf("curves: %v", got)
+	}
+	if got := curves(e.bob); len(got) != 0 {
+		t.Errorf("bob's curves: %v", got)
+	}
+	// Curves follow edits: a run changed to a ride loses its pace curve.
+	e.add(t, run.ID, Edit{Kind: EditSport, Sport: "cycling", Subtype: "outdoor"})
+	e.compute(t, run.ID)
+	if got := curves(e.alice); len(got) != 1 || got["pace"] != 0 {
+		t.Errorf("after the sport change: %v", got)
+	}
+}

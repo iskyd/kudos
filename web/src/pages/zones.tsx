@@ -193,7 +193,8 @@ function AddVersion() {
 }
 
 // Suggestions lists thresholds recorded files carried that differ from the
-// version valid on their date; only the user's confirmation creates a version.
+// version valid on their date and higher ones estimated from best efforts; only
+// the user's confirmation creates a version.
 function Suggestions() {
   const suggestions = useZoneSuggestions()
   const answer = useAnswerSuggestion()
@@ -201,7 +202,7 @@ function Suggestions() {
   if (suggestions.isPending || (suggestions.isSuccess && items.length === 0)) return null
   return (
     <section aria-label="Suggestions" className="flex flex-col gap-4">
-      <h2 className="text-lg font-semibold">Suggestions from your files</h2>
+      <h2 className="text-lg font-semibold">Suggested thresholds</h2>
       {suggestions.isError && (
         <p role="alert" className="text-sm text-destructive">
           {problemMessage(suggestions.error)}
@@ -219,7 +220,7 @@ function Suggestions() {
             <p className="text-sm">{suggestionText(s)}</p>
             {s.activityId !== undefined && (
               <Link to={`/activities/${String(s.activityId)}`} className="text-sm underline">
-                Recorded in this activity
+                From this activity
               </Link>
             )}
             <div className="flex gap-2">
@@ -268,17 +269,19 @@ function Suggestions() {
 
 // suggestionText lists the suggested values with what the current version has.
 function suggestionText(s: ZoneSuggestion): string {
-  const parts: [string, number | undefined, number | undefined, string][] = [
-    ['LTHR', s.lthrBpm, s.current?.lthrBpm, 'bpm'],
-    ['FTP', s.ftpW, s.current?.ftpW, 'W'],
-    ['max HR', s.maxHrBpm, s.current?.maxHrBpm, 'bpm'],
-    ['resting HR', s.restingHrBpm, s.current?.restingHrBpm, 'bpm'],
+  const bpm = (v: number) => `${String(v)} bpm`
+  const parts: [string, number | undefined, number | undefined, (v: number) => string][] = [
+    ['LTHR', s.lthrBpm, s.current?.lthrBpm, bpm],
+    ['threshold pace', s.thresholdSpeedMS, s.current?.thresholdSpeedMS, (v) => formatPace(v)],
+    ['FTP', s.ftpW, s.current?.ftpW, (v) => `${String(v)} W`],
+    ['max HR', s.maxHrBpm, s.current?.maxHrBpm, bpm],
+    ['resting HR', s.restingHrBpm, s.current?.restingHrBpm, bpm],
   ]
   return parts
-    .filter(([, v]) => v !== undefined)
-    .map(([label, v, was, unit]) => {
-      const now = `${label} ${String(v)} ${unit}`
-      return was === undefined || was === v ? now : `${now} (was ${String(was)})`
+    .flatMap(([label, v, was, format]) => {
+      if (v === undefined) return []
+      const now = `${label} ${format(v)}`
+      return [was === undefined || was === v ? now : `${now} (was ${format(was)})`]
     })
     .join(', ')
 }

@@ -212,9 +212,9 @@ describe('ZonesPage', () => {
       await screen.findByRole('article', { name: 'Running from 15 October 2026' }),
     )
     expect(
-      card.getByText('LTHR 171 bpm (was 176), max HR 187 bpm, resting HR 58 bpm'),
+      card.getByText('LTHR 171 bpm (was 176 bpm), max HR 187 bpm, resting HR 58 bpm'),
     ).toBeInTheDocument()
-    expect(card.getByRole('link', { name: 'Recorded in this activity' })).toHaveAttribute(
+    expect(card.getByRole('link', { name: 'From this activity' })).toHaveAttribute(
       'href',
       '/activities/4',
     )
@@ -223,6 +223,35 @@ describe('ZonesPage', () => {
     await vi.waitFor(() => {
       expect(answered).toEqual(['confirm 9 csrf-ann', 'dismiss 9 csrf-ann'])
     })
+  })
+
+  it('shows thresholds estimated from best efforts', async () => {
+    serve([running])
+    const estimates: ZoneSuggestion[] = [
+      {
+        id: 10,
+        sport: 'running',
+        effectiveFrom: '2026-10-20',
+        thresholdSpeedMS: 1000 / 235,
+        activityId: 5,
+        current: running,
+      },
+      { id: 11, sport: 'cycling', effectiveFrom: '2026-10-21', ftpW: 128, activityId: 6 },
+    ]
+    server.use(http.get('/api/zones/suggestions', () => HttpResponse.json({ items: estimates })))
+    renderApp('/settings/zones')
+    const section = within(await screen.findByRole('region', { name: 'Suggestions' }))
+    expect(section.getByRole('heading', { name: 'Suggested thresholds' })).toBeInTheDocument()
+    expect(
+      within(section.getByRole('article', { name: 'Running from 20 October 2026' })).getByText(
+        'threshold pace 3:55 /km (was 4:00 /km)',
+      ),
+    ).toBeInTheDocument()
+    expect(
+      within(section.getByRole('article', { name: 'Cycling from 21 October 2026' })).getByText(
+        'FTP 128 W',
+      ),
+    ).toBeInTheDocument()
   })
 
   it('shows suggestion errors', async () => {

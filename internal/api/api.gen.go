@@ -979,6 +979,31 @@ type CreatedActivity struct {
 	Id int64 `json:"id"`
 }
 
+// CurvePoint defines model for CurvePoint.
+type CurvePoint struct {
+	// ActivityId The activity that set the value.
+	ActivityId int64     `json:"activityId"`
+	DurationS  int       `json:"durationS"`
+	StartTime  time.Time `json:"startTime"`
+	UtcOffsetS int       `json:"utcOffsetS"`
+	Value      float64   `json:"value"`
+}
+
+// Curves defines model for Curves.
+type Curves struct {
+	// FtpW Estimated FTP; absent without 20 minutes of power.
+	FtpW *int `json:"ftpW,omitempty"`
+
+	// Pace Speed in m/s, shortest duration first.
+	Pace []CurvePoint `json:"pace"`
+
+	// Power Watts, shortest duration first.
+	Power []CurvePoint `json:"power"`
+
+	// ThresholdSpeedMS Estimated threshold pace, as a speed; absent without a 30-minute run.
+	ThresholdSpeedMS *float64 `json:"thresholdSpeedMS,omitempty"`
+}
+
 // FitnessDay defines model for FitnessDay.
 type FitnessDay struct {
 	// Atl Fatigue.
@@ -1629,11 +1654,11 @@ type ZoneSport string
 
 // ZoneSuggestion defines model for ZoneSuggestion.
 type ZoneSuggestion struct {
-	// ActivityId The activity whose file carried them.
+	// ActivityId The activity whose file or best efforts gave them.
 	ActivityId *int64   `json:"activityId,omitempty"`
 	Current    *ZoneSet `json:"current,omitempty"`
 
-	// EffectiveFrom The local date of the first file that carried these values.
+	// EffectiveFrom The local date of the first activity that gave these values.
 	EffectiveFrom openapi_types.Date `json:"effectiveFrom"`
 	FtpW          *int               `json:"ftpW,omitempty"`
 	Id            int64              `json:"id"`
@@ -1643,6 +1668,9 @@ type ZoneSuggestion struct {
 
 	// Sport Sports that share thresholds; general holds max and resting HR for any sport.
 	Sport ZoneSport `json:"sport"`
+
+	// ThresholdSpeedMS Running threshold pace, as a speed.
+	ThresholdSpeedMS *float64 `json:"thresholdSpeedMS,omitempty"`
 }
 
 // ZoneSuggestionPage defines model for ZoneSuggestionPage.
@@ -1759,6 +1787,15 @@ type GetActivityStreamsParams struct {
 
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+}
+
+// GetCurvesParams defines parameters for GetCurves.
+type GetCurvesParams struct {
+	// From First local day, inclusive.
+	From *openapi_types.Date `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Last local day, inclusive.
+	To *openapi_types.Date `form:"to,omitempty" json:"to,omitempty"`
 }
 
 // GetFitnessParams defines parameters for GetFitness.
@@ -1941,6 +1978,9 @@ type ServerInterface interface {
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(w http.ResponseWriter, r *http.Request)
+	// GetCurves Power-duration and pace-duration curves with threshold estimates
+	// (GET /api/curves)
+	GetCurves(w http.ResponseWriter, r *http.Request, params GetCurvesParams)
 	// GetFitness Fitness, fatigue and form by day
 	// (GET /api/fitness)
 	GetFitness(w http.ResponseWriter, r *http.Request, params GetFitnessParams)
@@ -2148,6 +2188,12 @@ func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
 // GetConfig Frontend settings
 // (GET /api/config)
 func (_ Unimplemented) GetConfig(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetCurves Power-duration and pace-duration curves with threshold estimates
+// (GET /api/curves)
+func (_ Unimplemented) GetCurves(w http.ResponseWriter, r *http.Request, params GetCurvesParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3004,6 +3050,52 @@ func (siw *ServerInterfaceWrapper) GetConfig(w http.ResponseWriter, r *http.Requ
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetConfig(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurves operation middleware
+func (siw *ServerInterfaceWrapper) GetCurves(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCurvesParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurves(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4078,6 +4170,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/api/records", wrapper.GetRecords)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/curves", wrapper.GetCurves)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/readiness", wrapper.GetReadiness)
 	})
 	r.Group(func(r chi.Router) {
@@ -4826,6 +4921,45 @@ type GetConfigdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetConfigdefaultApplicationProblemPlusJSONResponse) VisitGetConfigResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCurvesRequestObject struct {
+	Params GetCurvesParams
+}
+
+type GetCurvesResponseObject interface {
+	VisitGetCurvesResponse(w http.ResponseWriter) error
+}
+
+type GetCurves200JSONResponse Curves
+
+func (response GetCurves200JSONResponse) VisitGetCurvesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCurvesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCurvesdefaultApplicationProblemPlusJSONResponse) VisitGetCurvesResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -6098,6 +6232,9 @@ type StrictServerInterface interface {
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
+	// GetCurves Power-duration and pace-duration curves with threshold estimates
+	// (GET /api/curves)
+	GetCurves(ctx context.Context, request GetCurvesRequestObject) (GetCurvesResponseObject, error)
 	// GetFitness Fitness, fatigue and form by day
 	// (GET /api/fitness)
 	GetFitness(ctx context.Context, request GetFitnessRequestObject) (GetFitnessResponseObject, error)
@@ -6732,6 +6869,32 @@ func (sh *strictHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetConfigResponseObject); ok {
 		if err := validResponse.VisitGetConfigResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCurves operation middleware
+func (sh *strictHandler) GetCurves(w http.ResponseWriter, r *http.Request, params GetCurvesParams) {
+	var request GetCurvesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCurves(ctx, request.(GetCurvesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCurves")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCurvesResponseObject); ok {
+		if err := validResponse.VisitGetCurvesResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

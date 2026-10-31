@@ -240,7 +240,7 @@ func (s *Server) ListZoneSuggestions(ctx context.Context, req ListZoneSuggestion
 		out := ZoneSuggestion{
 			Id: r.ID, Sport: ZoneSport(r.Sport), EffectiveFrom: openapi_types.Date{Time: r.EffectiveFrom},
 			LthrBpm: intPtr(r.LthrBpm), FtpW: intPtr(r.FtpW), MaxHrBpm: intPtr(r.MaxHrBpm), RestingHrBpm: intPtr(r.RestingHrBpm),
-			ActivityId: r.ActivityID,
+			ThresholdSpeedMS: f64(r.ThresholdSpeedMS), ActivityId: r.ActivityID,
 		}
 		current, err := s.zoneSetAt(ctx, r.Sport, r.EffectiveFrom)
 		if err != nil {
@@ -281,6 +281,9 @@ func (s *Server) ConfirmZoneSuggestion(ctx context.Context, req ConfirmZoneSugge
 		if v.from != nil {
 			*v.to = intPtr(v.from)
 		}
+	}
+	if sug.ThresholdSpeedMS != nil {
+		in.ThresholdSpeedMS = f64(sug.ThresholdSpeedMS)
 	}
 	p, err := zoneSetParams(&in)
 	if err != nil {

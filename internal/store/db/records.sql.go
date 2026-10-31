@@ -24,6 +24,20 @@ func (q *Queries) DeleteBestEfforts(ctx context.Context, arg DeleteBestEffortsPa
 	return err
 }
 
+const deleteCurvePoints = `-- name: DeleteCurvePoints :exec
+DELETE FROM curve_points WHERE user_id = $1 AND activity_id = $2
+`
+
+type DeleteCurvePointsParams struct {
+	UserID     int64
+	ActivityID int64
+}
+
+func (q *Queries) DeleteCurvePoints(ctx context.Context, arg DeleteCurvePointsParams) error {
+	_, err := q.db.Exec(ctx, deleteCurvePoints, arg.UserID, arg.ActivityID)
+	return err
+}
+
 const getRecordsSince = `-- name: GetRecordsSince :one
 SELECT since FROM (SELECT LEAST(
     (SELECT window_start FROM garmin_backfills b WHERE b.user_id = $1),
@@ -65,6 +79,100 @@ func (q *Queries) InsertBestEfforts(ctx context.Context, arg InsertBestEffortsPa
 		arg.EffortValues,
 	)
 	return err
+}
+
+const insertCurvePoints = `-- name: InsertCurvePoints :exec
+INSERT INTO curve_points (user_id, activity_id, kind, duration_s, value)
+SELECT $1, $2, unnest($3::text[]), unnest($4::integer[]), unnest($5::double precision[])
+WHERE EXISTS (SELECT 1 FROM activities WHERE user_id = $1 AND id = $2)
+`
+
+type InsertCurvePointsParams struct {
+	UserID      int64
+	ActivityID  int64
+	Kinds       []string
+	Durations   []int32
+	CurveValues []float64
+}
+
+// The WHERE stores nothing for an activity of another user.
+func (q *Queries) InsertCurvePoints(ctx context.Context, arg InsertCurvePointsParams) error {
+	_, err := q.db.Exec(ctx, insertCurvePoints,
+		arg.UserID,
+		arg.ActivityID,
+		arg.Kinds,
+		arg.Durations,
+		arg.CurveValues,
+	)
+	return err
+}
+
+const listBestCurvePoints = `-- name: ListBestCurvePoints :many
+SELECT DISTINCT ON (c.kind, c.duration_s) c.kind, c.duration_s, c.value, c.activity_id, x.start_time, a.utc_offset_s
+FROM curve_points c
+JOIN activities a ON a.id = c.activity_id AND a.user_id = c.user_id
+CROSS JOIN LATERAL (SELECT
+    coalesce((a.overrides->>'start_time')::timestamptz, a.start_time)::timestamptz AS start_time
+) x
+CROSS JOIN LATERAL (SELECT
+    ((x.start_time + make_interval(secs => a.utc_offset_s)) AT TIME ZONE 'UTC')::date AS day
+) l
+WHERE c.user_id = $1 AND a.merged_into IS NULL
+    AND ($2::date IS NULL OR l.day >= $2::date)
+    AND ($3::date IS NULL OR l.day <= $3::date)
+ORDER BY c.kind, c.duration_s, c.value DESC, x.start_time, c.activity_id
+LIMIT $4
+`
+
+type ListBestCurvePointsParams struct {
+	UserID  int64
+	FromDay *time.Time
+	ToDay   *time.Time
+	MaxRows int32
+}
+
+type ListBestCurvePointsRow struct {
+	Kind       string
+	DurationS  int32
+	Value      float64
+	ActivityID int64
+	StartTime  time.Time
+	UtcOffsetS int32
+}
+
+// The best point of each curve and duration among the activities whose local
+// start day is within from and to (either open), the earliest activity winning
+// a tie, merged-away activities left out.
+func (q *Queries) ListBestCurvePoints(ctx context.Context, arg ListBestCurvePointsParams) ([]ListBestCurvePointsRow, error) {
+	rows, err := q.db.Query(ctx, listBestCurvePoints,
+		arg.UserID,
+		arg.FromDay,
+		arg.ToDay,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListBestCurvePointsRow
+	for rows.Next() {
+		var i ListBestCurvePointsRow
+		if err := rows.Scan(
+			&i.Kind,
+			&i.DurationS,
+			&i.Value,
+			&i.ActivityID,
+			&i.StartTime,
+			&i.UtcOffsetS,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listRecordHistory = `-- name: ListRecordHistory :many
