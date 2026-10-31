@@ -16,7 +16,7 @@ import (
 
 // derivedVersion versions the derived values' computation: raising it makes the
 // recompute jobs redo every activity's.
-const derivedVersion = 2
+const derivedVersion = 3
 
 // recomputeBatch is how many activities or users a recompute job reads at once.
 const recomputeBatch = 100
@@ -68,9 +68,9 @@ func ZoneThresholds(z db.ZoneSet) analytics.Thresholds {
 	}
 }
 
-// ComputeDerived computes and stores an activity's derived values from its
-// edited samples and the zones valid on its date. Recomputing gives the same
-// values; an activity that no longer exists is skipped.
+// ComputeDerived computes and stores an activity's derived values and best
+// efforts from its edited samples and the zones valid on its date. Recomputing
+// gives the same values; an activity that no longer exists is skipped.
 func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) error {
 	q := db.New(s.pool)
 	a, err := q.GetActivity(ctx, db.GetActivityParams{UserID: userID, ID: activityID})
@@ -107,8 +107,33 @@ func (s *Service) ComputeDerived(ctx context.Context, userID, activityID int64) 
 	if load, method, ok := analytics.Load(loadInput(z.Activity, z, segs, sum)); ok {
 		p.Load, p.LoadMethod = &load, text(string(method))
 	}
-	if err := q.UpsertActivityDerived(ctx, p); err != nil {
-		return fmt.Errorf("storing derived values: %w", err)
+	dist := z.Activity.DistanceM
+	if dist == nil {
+		dist = sum.DistanceM
+	}
+	efforts := analytics.BestEfforts(analytics.EffortInput{
+		Sport: z.Activity.Sport, Virtual: z.Activity.Subtype == "virtual", DistanceM: dist, Segments: segs,
+	})
+	ins := db.InsertBestEffortsParams{UserID: userID, ActivityID: activityID}
+	for _, e := range efforts {
+		ins.Efforts = append(ins.Efforts, string(e.Name))
+		ins.EffortValues = append(ins.EffortValues, e.Value)
+	}
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		q := db.New(tx)
+		if err := q.UpsertActivityDerived(ctx, p); err != nil {
+			return fmt.Errorf("storing derived values: %w", err)
+		}
+		if err := q.DeleteBestEfforts(ctx, db.DeleteBestEffortsParams{UserID: userID, ActivityID: activityID}); err != nil {
+			return fmt.Errorf("clearing best efforts: %w", err)
+		}
+		if err := q.InsertBestEfforts(ctx, ins); err != nil {
+			return fmt.Errorf("storing best efforts: %w", err)
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("storing activity %d: %w", activityID, err)
 	}
 	return nil
 }

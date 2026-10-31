@@ -93,32 +93,16 @@ const npWindow = 30
 func NormalizedPower(segments [][]Sample) (np float64, ok bool) {
 	var sum4 float64
 	n := 0
-	for _, seg := range segments {
-		var buf [npWindow]float64
+	for _, run := range powerSeconds(segments) {
 		var wsum float64
-		k, filled, j := 0, 0, 0
-		for t := 0; len(seg) > 1; t++ {
-			at := seg[0].Time.Add(time.Duration(t) * time.Second)
-			for j+1 < len(seg) && !seg[j+1].Time.After(at) {
-				j++
+		for k, w := range run {
+			wsum += w
+			if k >= npWindow {
+				wsum -= run[k-npWindow]
 			}
-			if j+1 == len(seg) {
-				break
-			}
-			p := seg[j].Power
-			if p == nil || seg[j+1].Time.Sub(seg[j].Time) > MaxGap {
-				filled, wsum = 0, 0
-				continue
-			}
-			if filled == npWindow {
-				wsum -= buf[k]
-			}
-			buf[k] = *p
-			wsum += *p
-			k = (k + 1) % npWindow
-			filled = min(filled+1, npWindow)
-			if filled == npWindow {
-				sum4 += math.Pow(wsum/npWindow, 4)
+			if k >= npWindow-1 {
+				m := wsum / npWindow
+				sum4 += m * m * m * m
 				n++
 			}
 		}

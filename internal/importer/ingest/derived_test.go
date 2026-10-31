@@ -362,3 +362,54 @@ func TestDerivedOnBrokenData(t *testing.T) {
 		t.Error("changed zones over a closed pool")
 	}
 }
+
+func TestBestEffortsAreStoredWithDerivedValues(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	ctx := t.Context()
+	run := e.upload(t, "half_marathon.fit")
+	zwift := e.upload(t, "zwift.fit")
+	ride := e.upload(t, "bike.fit")
+	records := func(userID int64) map[string][]int64 {
+		t.Helper()
+		rows, err := e.q.ListRecordHistory(ctx, db.ListRecordHistoryParams{UserID: userID, MaxRows: 100})
+		if err != nil {
+			t.Fatal(err)
+		}
+		out := map[string][]int64{}
+		for _, r := range rows {
+			out[r.Effort] = append(out[r.Effort], r.ActivityID)
+			if r.Effort == string(analytics.LongestRun) && r.Value != *e.effective(t, run.ID).DistanceM {
+				t.Errorf("longest run %v m", r.Value)
+			}
+		}
+		return out
+	}
+	for range 2 { // recomputing replaces the rows
+		for _, id := range []int64{run.ID, zwift.ID, ride.ID} {
+			e.compute(t, id)
+		}
+	}
+	got := records(e.alice)
+	for _, effort := range []analytics.EffortName{
+		analytics.Fastest1K, analytics.Fastest5K, analytics.Fastest10K, analytics.FastestHalfMarathon, analytics.LongestRun,
+	} {
+		if !slices.Equal(got[string(effort)], []int64{run.ID}) {
+			t.Errorf("%s: %v", effort, got[string(effort)])
+		}
+	}
+	// The virtual ride sets power records but never a distance one.
+	if !slices.Equal(got[string(analytics.LongestRide)], []int64{ride.ID}) || !slices.Contains(got[string(analytics.Power5s)], zwift.ID) {
+		t.Errorf("rides: %v", got)
+	}
+	if bobs := records(e.bob); len(bobs) != 0 {
+		t.Errorf("bob's records: %v", bobs)
+	}
+
+	// Efforts follow edits: a run changed to a ride sets no running records.
+	e.add(t, run.ID, Edit{Kind: EditSport, Sport: "cycling", Subtype: "outdoor"})
+	e.compute(t, run.ID)
+	if got := records(e.alice); got[string(analytics.Fastest1K)] != nil || got[string(analytics.LongestRun)] != nil {
+		t.Errorf("after the sport change: %v", got)
+	}
+}

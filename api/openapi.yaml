@@ -900,6 +900,27 @@ paths:
                   $ref: "#/components/schemas/FitnessDay"
         default:
           $ref: "#/components/responses/Problem"
+  /api/records:
+    get:
+      operationId: getRecords
+      summary: Personal records with their history
+      description: |
+        Fastest 1K, 5K, 10K, half marathon and marathon within any run; longest
+        run, ride, swim and hike; best cycling power over 5 s, 1, 5, 20 and 60
+        minutes. Virtual activities set no distance records. Each record lists
+        the activities that set it, oldest first: the last is the current one.
+        Records cover activities since the Garmin backfill window's start or the
+        first activity, whichever is earlier.
+      tags: [analytics]
+      responses:
+        "200":
+          description: The records that have been set.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Records"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/readiness:
     get:
       operationId: getReadiness
@@ -2126,6 +2147,60 @@ components:
           type: number
           format: double
           description: Form.
+    Records:
+      type: object
+      required: [records]
+      properties:
+        since:
+          type: string
+          format: date
+          description: The first local day records cover; absent without activities.
+        records:
+          type: array
+          items:
+            $ref: "#/components/schemas/Record"
+    Record:
+      type: object
+      required: [effort, history]
+      properties:
+        effort:
+          type: string
+          enum:
+            - fastest_1k
+            - fastest_5k
+            - fastest_10k
+            - fastest_half_marathon
+            - fastest_marathon
+            - longest_run
+            - longest_ride
+            - longest_swim
+            - longest_hike
+            - power_5s
+            - power_1m
+            - power_5m
+            - power_20m
+            - power_60m
+        history:
+          type: array
+          description: Each time the record was set, oldest first; the last is current.
+          items:
+            $ref: "#/components/schemas/RecordEntry"
+    RecordEntry:
+      type: object
+      required: [activityId, startTime, utcOffsetS, value]
+      properties:
+        activityId:
+          type: integer
+          format: int64
+        startTime:
+          type: string
+          format: date-time
+        utcOffsetS:
+          type: integer
+        value:
+          type: number
+          format: double
+          description: Seconds for fastest efforts, metres for longest, watts for power.
     Readiness:
       type: object
       required: [day, status, baselineDays, requiredDays, components]
