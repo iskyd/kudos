@@ -707,6 +707,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Personal records with their history
+         * @description Fastest 1K, 5K, 10K, half marathon and marathon within any run; longest
+         *     run, ride, swim and hike; best cycling power over 5 s, 1, 5, 20 and 60
+         *     minutes. Virtual activities set no distance records. Each record lists
+         *     the activities that set it, oldest first: the last is the current one.
+         *     Records cover activities since the Garmin backfill window's start or the
+         *     first activity, whichever is earlier.
+         */
+        get: operations["getRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/readiness": {
         parameters: {
             query?: never;
@@ -1453,6 +1478,32 @@ export interface components {
              * @description Form.
              */
             tsb: number;
+        };
+        Records: {
+            /**
+             * Format: date
+             * @description The first local day records cover; absent without activities.
+             */
+            since?: string;
+            records: components["schemas"]["Record"][];
+        };
+        Record: {
+            /** @enum {string} */
+            effort: "fastest_1k" | "fastest_5k" | "fastest_10k" | "fastest_half_marathon" | "fastest_marathon" | "longest_run" | "longest_ride" | "longest_swim" | "longest_hike" | "power_5s" | "power_1m" | "power_5m" | "power_20m" | "power_60m";
+            /** @description Each time the record was set, oldest first; the last is current. */
+            history: components["schemas"]["RecordEntry"][];
+        };
+        RecordEntry: {
+            /** Format: int64 */
+            activityId: number;
+            /** Format: date-time */
+            startTime: string;
+            utcOffsetS: number;
+            /**
+             * Format: double
+             * @description Seconds for fastest efforts, metres for longest, watts for power.
+             */
+            value: number;
         };
         Readiness: {
             /** Format: date */
@@ -2632,6 +2683,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FitnessDay"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The records that have been set. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Records"];
                 };
             };
             default: components["responses"]["Problem"];

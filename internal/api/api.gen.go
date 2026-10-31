@@ -495,6 +495,60 @@ func (e ReadinessComponentName) Valid() bool {
 	}
 }
 
+// Defines values for RecordEffort.
+const (
+	Fastest10k          RecordEffort = "fastest_10k"
+	Fastest1k           RecordEffort = "fastest_1k"
+	Fastest5k           RecordEffort = "fastest_5k"
+	FastestHalfMarathon RecordEffort = "fastest_half_marathon"
+	FastestMarathon     RecordEffort = "fastest_marathon"
+	LongestHike         RecordEffort = "longest_hike"
+	LongestRide         RecordEffort = "longest_ride"
+	LongestRun          RecordEffort = "longest_run"
+	LongestSwim         RecordEffort = "longest_swim"
+	Power1m             RecordEffort = "power_1m"
+	Power20m            RecordEffort = "power_20m"
+	Power5m             RecordEffort = "power_5m"
+	Power5s             RecordEffort = "power_5s"
+	Power60m            RecordEffort = "power_60m"
+)
+
+// Valid indicates whether the value is a known member of the RecordEffort enum.
+func (e RecordEffort) Valid() bool {
+	switch e {
+	case Fastest10k:
+		return true
+	case Fastest1k:
+		return true
+	case Fastest5k:
+		return true
+	case FastestHalfMarathon:
+		return true
+	case FastestMarathon:
+		return true
+	case LongestHike:
+		return true
+	case LongestRide:
+		return true
+	case LongestRun:
+		return true
+	case LongestSwim:
+		return true
+	case Power1m:
+		return true
+	case Power20m:
+		return true
+	case Power5m:
+		return true
+	case Power5s:
+		return true
+	case Power60m:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Sport.
 const (
 	SportCycling           Sport = "cycling"
@@ -1240,10 +1294,39 @@ type ReadinessComponent struct {
 // ReadinessComponentName defines model for ReadinessComponent.Name.
 type ReadinessComponentName string
 
+// Record defines model for Record.
+type Record struct {
+	Effort RecordEffort `json:"effort"`
+
+	// History Each time the record was set, oldest first; the last is current.
+	History []RecordEntry `json:"history"`
+}
+
+// RecordEffort defines model for Record.Effort.
+type RecordEffort string
+
+// RecordEntry defines model for RecordEntry.
+type RecordEntry struct {
+	ActivityId int64     `json:"activityId"`
+	StartTime  time.Time `json:"startTime"`
+	UtcOffsetS int       `json:"utcOffsetS"`
+
+	// Value Seconds for fastest efforts, metres for longest, watts for power.
+	Value float64 `json:"value"`
+}
+
 // RecordedWorkout defines model for RecordedWorkout.
 type RecordedWorkout struct {
 	Name  *string       `json:"name,omitempty"`
 	Steps []WorkoutStep `json:"steps"`
+}
+
+// Records defines model for Records.
+type Records struct {
+	Records []Record `json:"records"`
+
+	// Since The first local day records cover; absent without activities.
+	Since *openapi_types.Date `json:"since,omitempty"`
 }
 
 // RegisterRequest defines model for RegisterRequest.
@@ -1921,6 +2004,9 @@ type ServerInterface interface {
 	// GetReadiness Readiness for a day
 	// (GET /api/readiness)
 	GetReadiness(w http.ResponseWriter, r *http.Request, params GetReadinessParams)
+	// GetRecords Personal records with their history
+	// (GET /api/records)
+	GetRecords(w http.ResponseWriter, r *http.Request)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(w http.ResponseWriter, r *http.Request, params ListWellnessDaysParams)
@@ -2188,6 +2274,12 @@ func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
 // GetReadiness Readiness for a day
 // (GET /api/readiness)
 func (_ Unimplemented) GetReadiness(w http.ResponseWriter, r *http.Request, params GetReadinessParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetRecords Personal records with their history
+// (GET /api/records)
+func (_ Unimplemented) GetRecords(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3423,6 +3515,20 @@ func (siw *ServerInterfaceWrapper) GetReadiness(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// GetRecords operation middleware
+func (siw *ServerInterfaceWrapper) GetRecords(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetRecords(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWellnessDays operation middleware
 func (siw *ServerInterfaceWrapper) ListWellnessDays(w http.ResponseWriter, r *http.Request) {
 
@@ -3967,6 +4073,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/fitness", wrapper.GetFitness)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/records", wrapper.GetRecords)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/readiness", wrapper.GetReadiness)
@@ -5526,6 +5635,44 @@ func (response GetReadinessdefaultApplicationProblemPlusJSONResponse) VisitGetRe
 	return err
 }
 
+type GetRecordsRequestObject struct {
+}
+
+type GetRecordsResponseObject interface {
+	VisitGetRecordsResponse(w http.ResponseWriter) error
+}
+
+type GetRecords200JSONResponse Records
+
+func (response GetRecords200JSONResponse) VisitGetRecordsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetRecordsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetRecordsdefaultApplicationProblemPlusJSONResponse) VisitGetRecordsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListWellnessDaysRequestObject struct {
 	Params ListWellnessDaysParams
 }
@@ -6014,6 +6161,9 @@ type StrictServerInterface interface {
 	// GetReadiness Readiness for a day
 	// (GET /api/readiness)
 	GetReadiness(ctx context.Context, request GetReadinessRequestObject) (GetReadinessResponseObject, error)
+	// GetRecords Personal records with their history
+	// (GET /api/records)
+	GetRecords(ctx context.Context, request GetRecordsRequestObject) (GetRecordsResponseObject, error)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(ctx context.Context, request ListWellnessDaysRequestObject) (ListWellnessDaysResponseObject, error)
@@ -7167,6 +7317,30 @@ func (sh *strictHandler) GetReadiness(w http.ResponseWriter, r *http.Request, pa
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetReadinessResponseObject); ok {
 		if err := validResponse.VisitGetReadinessResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetRecords operation middleware
+func (sh *strictHandler) GetRecords(w http.ResponseWriter, r *http.Request) {
+	var request GetRecordsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetRecords(ctx, request.(GetRecordsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetRecords")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetRecordsResponseObject); ok {
+		if err := validResponse.VisitGetRecordsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
