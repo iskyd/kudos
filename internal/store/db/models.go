@@ -180,6 +180,16 @@ type Gear struct {
 	CreatedAt            time.Time
 }
 
+type HealthLog struct {
+	ID          int64
+	UserID      int64
+	Kind        string
+	Description *string
+	StartDate   time.Time
+	EndDate     *time.Time
+	CreatedAt   time.Time
+}
+
 type Lap struct {
 	UserID           int64
 	ActivityID       int64
@@ -244,6 +254,20 @@ type SwimLength struct {
 	Stroke       *string
 	Strokes      *int16
 	AvgSpeedMS   *float32
+}
+
+type WellnessDay struct {
+	UserID       int64
+	Day          time.Time
+	Soreness     *int16
+	SleepQuality *int16
+	Stress       *int16
+	Motivation   *int16
+	Note         *string
+	WeightKg     *float32
+	BodyFatPct   *float32
+	HydrationL   *float32
+	UpdatedAt    time.Time
 }
 
 type ZoneSet struct {

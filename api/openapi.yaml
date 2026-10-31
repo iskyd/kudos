@@ -900,6 +900,133 @@ paths:
                   $ref: "#/components/schemas/FitnessDay"
         default:
           $ref: "#/components/responses/Problem"
+  /api/wellness:
+    get:
+      operationId: listWellnessDays
+      summary: List check-ins and body metrics
+      description: Latest day first.
+      tags: [wellness]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of days.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellnessDayPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/wellness/{day}:
+    put:
+      operationId: putWellnessDay
+      summary: Save a day's check-in and body metrics
+      description: Replaces everything entered for the day; at least one value is required.
+      tags: [wellness]
+      parameters:
+        - $ref: "#/components/parameters/Day"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WellnessDayInput"
+      responses:
+        "200":
+          description: The saved day.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WellnessDay"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteWellnessDay
+      summary: Delete a day's check-in and body metrics
+      tags: [wellness]
+      parameters:
+        - $ref: "#/components/parameters/Day"
+      responses:
+        "204":
+          description: Deleted.
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/health-log:
+    get:
+      operationId: listHealthLog
+      summary: List injuries, illnesses and periods
+      description: Latest start first.
+      tags: [wellness]
+      parameters:
+        - name: kind
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/HealthLogKind"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLogPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createHealthLogEntry
+      summary: Log an injury, illness or period
+      tags: [wellness]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HealthLogInput"
+      responses:
+        "201":
+          description: The new entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLogEntry"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/health-log/{entryId}:
+    put:
+      operationId: updateHealthLogEntry
+      summary: Edit a log entry
+      tags: [wellness]
+      parameters:
+        - $ref: "#/components/parameters/EntryID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/HealthLogInput"
+      responses:
+        "200":
+          description: The entry.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthLogEntry"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteHealthLogEntry
+      summary: Delete a log entry
+      tags: [wellness]
+      parameters:
+        - $ref: "#/components/parameters/EntryID"
+      responses:
+        "204":
+          description: Deleted.
+        default:
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     sessionCookie:
@@ -921,6 +1048,21 @@ components:
         format: int64
     SuggestionID:
       name: suggestionId
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    Day:
+      name: day
+      in: path
+      required: true
+      description: Local day.
+      schema:
+        type: string
+        format: date
+    EntryID:
+      name: entryId
       in: path
       required: true
       schema:
@@ -1955,6 +2097,106 @@ components:
           type: number
           format: double
           description: Form.
+    WellnessDayInput:
+      type: object
+      properties:
+        soreness:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 1 none to 5 severe.
+        sleepQuality:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 1 poor to 5 great.
+        stress:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 1 low to 5 high.
+        motivation:
+          type: integer
+          minimum: 1
+          maximum: 5
+          description: 1 low to 5 high.
+        note:
+          type: string
+          maxLength: 2000
+        weightKg:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          maximum: 500
+        bodyFatPct:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+        hydrationL:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 20
+          description: Litres drunk.
+    WellnessDay:
+      allOf:
+        - $ref: "#/components/schemas/WellnessDayInput"
+        - type: object
+          required: [day]
+          properties:
+            day:
+              type: string
+              format: date
+    WellnessDayPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/WellnessDay"
+    HealthLogKind:
+      type: string
+      enum: [injury, illness, period]
+    HealthLogInput:
+      type: object
+      required: [kind, startDate]
+      properties:
+        kind:
+          $ref: "#/components/schemas/HealthLogKind"
+        description:
+          type: string
+          maxLength: 2000
+          description: Required for injuries and illnesses.
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: string
+          format: date
+          description: Absent while ongoing.
+    HealthLogEntry:
+      allOf:
+        - $ref: "#/components/schemas/HealthLogInput"
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              format: int64
+    HealthLogPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/HealthLogEntry"
     ActivityStreams:
       type: object
       required: [timeS]

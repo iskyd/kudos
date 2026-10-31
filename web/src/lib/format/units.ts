@@ -67,3 +67,8 @@ export function formatSpeed(metresPerSecond: number): string {
 export function formatWhole(value: number, unit: string): string {
   return `${String(Math.round(value))} ${unit}`
 }
+
+// formatOneDecimal renders a value with one decimal and its unit: "70.5 kg".
+export function formatOneDecimal(value: number, unit: string): string {
+  return `${value.toFixed(1)} ${unit}`
+}
