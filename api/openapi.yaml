@@ -902,6 +902,58 @@ paths:
                   $ref: "#/components/schemas/FitnessDay"
         default:
           $ref: "#/components/responses/Problem"
+  /api/volume:
+    get:
+      operationId: getVolume
+      summary: Volume by week, month or year, with time in zones
+      description: |
+        Activities, distance, time, ascent and training load per week (from
+        Monday), month or year of the local days from from to to, periods
+        without activities left out; comparing the same months or years gives
+        year-over-year. Time in zones sums the same activities' seconds per
+        metric and zone model. Values are effective ones (edits applied);
+        virtual activities count. At most 3660 days per request.
+      tags: [analytics]
+      parameters:
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [week, month, year]
+        - name: from
+          in: query
+          required: true
+          description: First local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: sport
+          in: query
+          schema:
+            $ref: "#/components/schemas/ActivitySport"
+        - name: gear
+          in: query
+          description: Only activities with this gear.
+          schema:
+            type: integer
+            format: int64
+      responses:
+        "200":
+          description: The periods with activities, oldest first, and the range's time in zones.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Volume"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/records:
     get:
       operationId: getRecords
@@ -2231,6 +2283,57 @@ components:
           type: number
           format: double
           description: Form.
+    Volume:
+      type: object
+      required: [periods, timeInZones]
+      properties:
+        periods:
+          type: array
+          items:
+            $ref: "#/components/schemas/VolumePeriod"
+        timeInZones:
+          type: array
+          items:
+            $ref: "#/components/schemas/ZoneTime"
+    VolumePeriod:
+      type: object
+      required: [start, activities, distanceM, durationS, ascentM, load]
+      properties:
+        start:
+          type: string
+          format: date
+          description: The period's first day (a Monday for weeks); it can be before from.
+        activities:
+          type: integer
+        distanceM:
+          type: number
+          format: double
+        durationS:
+          type: number
+          format: double
+          description: Timer time, else elapsed time.
+        ascentM:
+          type: number
+          format: double
+        load:
+          type: number
+          format: double
+    ZoneTime:
+      type: object
+      required: [metric, model, seconds]
+      properties:
+        metric:
+          type: string
+          enum: [hr, pace, power]
+        model:
+          type: string
+          description: The zone model, as in Zones.
+        seconds:
+          type: array
+          description: Seconds in each zone, the first zone first.
+          items:
+            type: number
+            format: double
     Records:
       type: object
       required: [records]

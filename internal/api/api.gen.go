@@ -693,6 +693,27 @@ func (e ZoneSport) Valid() bool {
 	}
 }
 
+// Defines values for ZoneTimeMetric.
+const (
+	Hr    ZoneTimeMetric = "hr"
+	Pace  ZoneTimeMetric = "pace"
+	Power ZoneTimeMetric = "power"
+)
+
+// Valid indicates whether the value is a known member of the ZoneTimeMetric enum.
+func (e ZoneTimeMetric) Valid() bool {
+	switch e {
+	case Hr:
+		return true
+	case Pace:
+		return true
+	case Power:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListActivitiesParamsSort.
 const (
 	ListActivitiesParamsSortDate     ListActivitiesParamsSort = "date"
@@ -726,6 +747,27 @@ func (e ListActivityTrendsParamsKind) Valid() bool {
 	case ListActivityTrendsParamsKindRunning:
 		return true
 	case ListActivityTrendsParamsKindSwimming:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GetVolumeParamsPeriod.
+const (
+	Month GetVolumeParamsPeriod = "month"
+	Week  GetVolumeParamsPeriod = "week"
+	Year  GetVolumeParamsPeriod = "year"
+)
+
+// Valid indicates whether the value is a known member of the GetVolumeParamsPeriod enum.
+func (e GetVolumeParamsPeriod) Valid() bool {
+	switch e {
+	case Month:
+		return true
+	case Week:
+		return true
+	case Year:
 		return true
 	default:
 		return false
@@ -1572,6 +1614,26 @@ type UploadResult struct {
 // Username 3 to 32 characters among a-z, 0-9, ".", "_" and "-". Case-insensitive; stored lowercase.
 type Username = string
 
+// Volume defines model for Volume.
+type Volume struct {
+	Periods     []VolumePeriod `json:"periods"`
+	TimeInZones []ZoneTime     `json:"timeInZones"`
+}
+
+// VolumePeriod defines model for VolumePeriod.
+type VolumePeriod struct {
+	Activities int     `json:"activities"`
+	AscentM    float64 `json:"ascentM"`
+	DistanceM  float64 `json:"distanceM"`
+
+	// DurationS Timer time, else elapsed time.
+	DurationS float64 `json:"durationS"`
+	Load      float64 `json:"load"`
+
+	// Start The period's first day (a Monday for weeks); it can be before from.
+	Start openapi_types.Date `json:"start"`
+}
+
 // WellnessDay defines model for WellnessDay.
 type WellnessDay struct {
 	BodyFatPct *float64           `json:"bodyFatPct,omitempty"`
@@ -1758,6 +1820,20 @@ type ZoneSuggestionPage struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// ZoneTime defines model for ZoneTime.
+type ZoneTime struct {
+	Metric ZoneTimeMetric `json:"metric"`
+
+	// Model The zone model, as in Zones.
+	Model string `json:"model"`
+
+	// Seconds Seconds in each zone, the first zone first.
+	Seconds []float64 `json:"seconds"`
+}
+
+// ZoneTimeMetric defines model for ZoneTime.Metric.
+type ZoneTimeMetric string
+
 // Zones Zones per metric with the model each comes from: friel_run_hr,
 // friel_bike_hr or heart_rate_reserve (bpm); friel_run_pace or css (m/s,
 // slow to fast); coggan_power (W). A metric without a model is absent.
@@ -1938,6 +2014,24 @@ type ListActivityTrendsParams struct {
 
 // ListActivityTrendsParamsKind defines parameters for ListActivityTrends.
 type ListActivityTrendsParamsKind string
+
+// GetVolumeParams defines parameters for GetVolume.
+type GetVolumeParams struct {
+	Period GetVolumeParamsPeriod `form:"period" json:"period"`
+
+	// From First local day, inclusive.
+	From openapi_types.Date `form:"from" json:"from"`
+
+	// To Last local day, inclusive.
+	To    openapi_types.Date `form:"to" json:"to"`
+	Sport *ActivitySport     `form:"sport,omitempty" json:"sport,omitempty"`
+
+	// Gear Only activities with this gear.
+	Gear *int64 `form:"gear,omitempty" json:"gear,omitempty"`
+}
+
+// GetVolumeParamsPeriod defines parameters for GetVolume.
+type GetVolumeParamsPeriod string
 
 // ListWellnessDaysParams defines parameters for ListWellnessDays.
 type ListWellnessDaysParams struct {
@@ -2147,6 +2241,9 @@ type ServerInterface interface {
 	// ListActivityTrends Per-activity running or swim analytics
 	// (GET /api/trends)
 	ListActivityTrends(w http.ResponseWriter, r *http.Request, params ListActivityTrendsParams)
+	// GetVolume Volume by week, month or year, with time in zones
+	// (GET /api/volume)
+	GetVolume(w http.ResponseWriter, r *http.Request, params GetVolumeParams)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(w http.ResponseWriter, r *http.Request, params ListWellnessDaysParams)
@@ -2432,6 +2529,12 @@ func (_ Unimplemented) GetRecords(w http.ResponseWriter, r *http.Request) {
 // ListActivityTrends Per-activity running or swim analytics
 // (GET /api/trends)
 func (_ Unimplemented) ListActivityTrends(w http.ResponseWriter, r *http.Request, params ListActivityTrendsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetVolume Volume by week, month or year, with time in zones
+// (GET /api/volume)
+func (_ Unimplemented) GetVolume(w http.ResponseWriter, r *http.Request, params GetVolumeParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3812,6 +3915,91 @@ func (siw *ServerInterfaceWrapper) ListActivityTrends(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetVolume operation middleware
+func (siw *ServerInterfaceWrapper) GetVolume(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetVolumeParams
+
+	// ------------- Required query parameter "period" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "period", r.URL.Query(), &params.Period, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "period"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "period", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "sport" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "sport", r.URL.Query(), &params.Sport, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "sport"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sport", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "gear" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "gear", r.URL.Query(), &params.Gear, runtime.BindQueryParameterOptions{Type: "integer", Format: "int64"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "gear"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "gear", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetVolume(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListWellnessDays operation middleware
 func (siw *ServerInterfaceWrapper) ListWellnessDays(w http.ResponseWriter, r *http.Request) {
 
@@ -4356,6 +4544,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/fitness", wrapper.GetFitness)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/volume", wrapper.GetVolume)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/records", wrapper.GetRecords)
@@ -6040,6 +6231,45 @@ func (response ListActivityTrendsdefaultApplicationProblemPlusJSONResponse) Visi
 	return err
 }
 
+type GetVolumeRequestObject struct {
+	Params GetVolumeParams
+}
+
+type GetVolumeResponseObject interface {
+	VisitGetVolumeResponse(w http.ResponseWriter) error
+}
+
+type GetVolume200JSONResponse Volume
+
+func (response GetVolume200JSONResponse) VisitGetVolumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetVolumedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetVolumedefaultApplicationProblemPlusJSONResponse) VisitGetVolumeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListWellnessDaysRequestObject struct {
 	Params ListWellnessDaysParams
 }
@@ -6537,6 +6767,9 @@ type StrictServerInterface interface {
 	// ListActivityTrends Per-activity running or swim analytics
 	// (GET /api/trends)
 	ListActivityTrends(ctx context.Context, request ListActivityTrendsRequestObject) (ListActivityTrendsResponseObject, error)
+	// GetVolume Volume by week, month or year, with time in zones
+	// (GET /api/volume)
+	GetVolume(ctx context.Context, request GetVolumeRequestObject) (GetVolumeResponseObject, error)
 	// ListWellnessDays List check-ins and body metrics
 	// (GET /api/wellness)
 	ListWellnessDays(ctx context.Context, request ListWellnessDaysRequestObject) (ListWellnessDaysResponseObject, error)
@@ -7766,6 +7999,32 @@ func (sh *strictHandler) ListActivityTrends(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListActivityTrendsResponseObject); ok {
 		if err := validResponse.VisitListActivityTrendsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetVolume operation middleware
+func (sh *strictHandler) GetVolume(w http.ResponseWriter, r *http.Request, params GetVolumeParams) {
+	var request GetVolumeRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetVolume(ctx, request.(GetVolumeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetVolume")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetVolumeResponseObject); ok {
+		if err := validResponse.VisitGetVolumeResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
