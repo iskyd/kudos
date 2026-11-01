@@ -1,5 +1,6 @@
 import {
   addDays,
+  calendarDays,
   daysUntil,
   formatDateTime,
   formatDay,
@@ -87,5 +88,47 @@ describe('formatPeriod', () => {
     expect(formatPeriod('week', '2026-10-26')).toBe('Week of 26 October 2026')
     expect(formatPeriod('month', '2026-10-01')).toBe('October 2026')
     expect(formatPeriod('year', '2026-01-01')).toBe('2026')
+  })
+})
+
+describe('calendarDays', () => {
+  // Days are local calendar days (tests run in Europe/Berlin): a summer-time
+  // change must not skip or repeat one.
+  it('runs where summer time changes', () => {
+    expect(new Date(2026, 9, 25, 12).getTimezoneOffset()).toBe(-60)
+    expect(new Date(2026, 9, 24, 12).getTimezoneOffset()).toBe(-120)
+  })
+
+  it('pads the month to whole weeks from Monday', () => {
+    // October 2026 starts on a Thursday and ends on a Saturday; summer time ends on the 25th.
+    const days = calendarDays('month', '2026-10-25')
+    expect(days).toHaveLength(35)
+    expect(days[0]).toBe('2026-09-28')
+    expect(days.at(-1)).toBe('2026-11-01')
+    expect(days.slice(26, 29)).toEqual(['2026-10-24', '2026-10-25', '2026-10-26'])
+    expect(new Set(days).size).toBe(35)
+  })
+
+  it('returns the week from Monday', () => {
+    expect(calendarDays('week', '2026-10-25')).toEqual([
+      '2026-10-19',
+      '2026-10-20',
+      '2026-10-21',
+      '2026-10-22',
+      '2026-10-23',
+      '2026-10-24',
+      '2026-10-25',
+    ])
+    // Across the spring change, 29 March 2026.
+    expect(calendarDays('week', '2026-03-30')[0]).toBe('2026-03-30')
+    expect(calendarDays('week', '2026-03-29')).toContain('2026-03-29')
+  })
+
+  it('covers six weeks when the month needs them', () => {
+    // August 2026 starts on a Saturday and ends on a Monday.
+    const days = calendarDays('month', '2026-08-10')
+    expect(days).toHaveLength(42)
+    expect(days[0]).toBe('2026-07-27')
+    expect(days.at(-1)).toBe('2026-09-06')
   })
 })

@@ -1165,6 +1165,13 @@ type ActivityZones struct {
 	Zones Zones `json:"zones"`
 }
 
+// Calendar defines model for Calendar.
+type Calendar struct {
+	Activities []ActivitySummary `json:"activities"`
+	HealthLog  []HealthLogEntry  `json:"healthLog"`
+	Wellness   []WellnessDay     `json:"wellness"`
+}
+
 // ComparedStreams One activity's values at each point of x.
 type ComparedStreams struct {
 	AltitudeM *[]*float64 `json:"altitudeM,omitempty"`
@@ -2130,6 +2137,15 @@ type GetActivityStreamsParams struct {
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 }
 
+// GetCalendarParams defines parameters for GetCalendar.
+type GetCalendarParams struct {
+	// From First local day, inclusive.
+	From openapi_types.Date `form:"from" json:"from"`
+
+	// To Last local day, inclusive.
+	To openapi_types.Date `form:"to" json:"to"`
+}
+
 // GetCurvesParams defines parameters for GetCurves.
 type GetCurvesParams struct {
 	// From First local day, inclusive.
@@ -2366,6 +2382,9 @@ type ServerInterface interface {
 	// Register Create an account and log in
 	// (POST /api/auth/register)
 	Register(w http.ResponseWriter, r *http.Request)
+	// GetCalendar Activities, check-ins and injury or illness periods for a range of days
+	// (GET /api/calendar)
+	GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams)
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(w http.ResponseWriter, r *http.Request)
@@ -2588,6 +2607,12 @@ func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
 // Register Create an account and log in
 // (POST /api/auth/register)
 func (_ Unimplemented) Register(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetCalendar Activities, check-ins and injury or illness periods for a range of days
+// (GET /api/calendar)
+func (_ Unimplemented) GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3472,6 +3497,52 @@ func (siw *ServerInterfaceWrapper) Register(w http.ResponseWriter, r *http.Reque
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Register(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCalendar operation middleware
+func (siw *ServerInterfaceWrapper) GetCalendar(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetCalendarParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCalendar(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -4826,6 +4897,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Delete(options.BaseURL+"/api/goals/{id}", wrapper.DeleteGoal)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/calendar", wrapper.GetCalendar)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/laps", wrapper.ListLaps)
 	})
 	r.Group(func(r chi.Router) {
@@ -5590,6 +5664,45 @@ type RegisterdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response RegisterdefaultApplicationProblemPlusJSONResponse) VisitRegisterResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendarRequestObject struct {
+	Params GetCalendarParams
+}
+
+type GetCalendarResponseObject interface {
+	VisitGetCalendarResponse(w http.ResponseWriter) error
+}
+
+type GetCalendar200JSONResponse Calendar
+
+func (response GetCalendar200JSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetCalendardefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetCalendardefaultApplicationProblemPlusJSONResponse) VisitGetCalendarResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -7125,6 +7238,9 @@ type StrictServerInterface interface {
 	// Register Create an account and log in
 	// (POST /api/auth/register)
 	Register(ctx context.Context, request RegisterRequestObject) (RegisterResponseObject, error)
+	// GetCalendar Activities, check-ins and injury or illness periods for a range of days
+	// (GET /api/calendar)
+	GetCalendar(ctx context.Context, request GetCalendarRequestObject) (GetCalendarResponseObject, error)
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
@@ -7756,6 +7872,32 @@ func (sh *strictHandler) Register(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(RegisterResponseObject); ok {
 		if err := validResponse.VisitRegisterResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetCalendar operation middleware
+func (sh *strictHandler) GetCalendar(w http.ResponseWriter, r *http.Request, params GetCalendarParams) {
+	var request GetCalendarRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetCalendar(ctx, request.(GetCalendarRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetCalendar")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetCalendarResponseObject); ok {
+		if err := validResponse.VisitGetCalendarResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

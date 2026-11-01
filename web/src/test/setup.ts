@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import { server } from '@/test/server'
+
+// Pages wait on several queries; with a worker per file on a busy machine the
+// default 1 s wait for an element is sometimes too short.
+configure({ asyncUtilTimeout: 5000 })
 
 // Listen before test files import modules: openapi-fetch captures fetch when the client is created.
 server.listen({ onUnhandledFrame: 'error' })

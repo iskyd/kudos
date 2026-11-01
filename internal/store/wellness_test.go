@@ -145,3 +145,58 @@ func TestHealthLogIsolationAndPaging(t *testing.T) {
 		t.Errorf("alice deleted %d: %v", n, err)
 	}
 }
+
+func TestCalendarRangesIsolation(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	day := func(d int) time.Time { return time.Date(2026, 10, d, 0, 0, 0, 0, time.UTC) }
+
+	for _, d := range []int{4, 5, 11, 12} {
+		_, err := q.PutWellnessDay(ctx, db.PutWellnessDayParams{UserID: alice.ID, Day: day(d), Soreness: new(int16(2))})
+		check(t, err)
+	}
+	_, err := q.PutWellnessDay(ctx, db.PutWellnessDayParams{UserID: bob.ID, Day: day(6), Soreness: new(int16(3))})
+	check(t, err)
+	days, err := q.ListWellnessDaysBetween(ctx, db.ListWellnessDaysBetweenParams{UserID: alice.ID, FromDay: day(5), ToDay: day(11), MaxRows: 10})
+	check(t, err)
+	if len(days) != 2 || !days[0].Day.Equal(day(5)) || !days[1].Day.Equal(day(11)) {
+		t.Errorf("alice's days 5 to 11: %+v", days)
+	}
+
+	entry := func(user int64, kind string, start int, end *int) int64 {
+		t.Helper()
+		p := db.CreateHealthLogEntryParams{UserID: user, Kind: kind, Description: new("x"), StartDate: day(start)}
+		if end != nil {
+			p.EndDate = new(day(*end))
+		}
+		e, err := q.CreateHealthLogEntry(ctx, p)
+		check(t, err)
+		return e.ID
+	}
+	before := entry(alice.ID, "injury", 1, new(4))      // ends the day before the range
+	endsIn := entry(alice.ID, "injury", 1, new(5))      // ends on its first day
+	ongoing := entry(alice.ID, "illness", 3, nil)       // still open
+	startsIn := entry(alice.ID, "illness", 11, new(20)) // starts on its last day
+	entry(alice.ID, "illness", 12, nil)                 // starts after it
+	entry(alice.ID, "period", 6, new(8))                // not an injury or illness
+	entry(bob.ID, "injury", 6, new(8))
+	log, err := q.ListHealthLogBetween(ctx, db.ListHealthLogBetweenParams{UserID: alice.ID, FromDay: day(5), ToDay: day(11), MaxRows: 10})
+	check(t, err)
+	ids := make([]int64, len(log))
+	for i, e := range log {
+		ids[i] = e.ID
+	}
+	if want := []int64{endsIn, ongoing, startsIn}; !slices.Equal(ids, want) {
+		t.Errorf("entries overlapping 5 to 11: %v, want %v (not %d)", ids, want, before)
+	}
+
+	if bobs, err := q.ListWellnessDaysBetween(ctx, db.ListWellnessDaysBetweenParams{UserID: bob.ID, FromDay: day(1), ToDay: day(31), MaxRows: 10}); err != nil || len(bobs) != 1 {
+		t.Errorf("bob's days: %+v, %v", bobs, err)
+	}
+	if bobs, err := q.ListHealthLogBetween(ctx, db.ListHealthLogBetweenParams{UserID: bob.ID, FromDay: day(1), ToDay: day(31), MaxRows: 10}); err != nil || len(bobs) != 1 {
+		t.Errorf("bob's log: %+v, %v", bobs, err)
+	}
+}

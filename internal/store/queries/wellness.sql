@@ -55,3 +55,19 @@ WHERE user_id = @user_id AND kind IN ('illness', 'injury')
     AND start_date <= @day::date AND (end_date IS NULL OR end_date >= @day::date)
 ORDER BY start_date DESC, id DESC
 LIMIT @max_rows;
+
+-- name: ListWellnessDaysBetween :many
+-- The days from from_day to to_day (inclusive) with anything entered, oldest first.
+SELECT * FROM wellness_days
+WHERE user_id = @user_id AND day BETWEEN @from_day::date AND @to_day::date
+ORDER BY day
+LIMIT @max_rows;
+
+-- name: ListHealthLogBetween :many
+-- Illness and injury entries overlapping from_day to to_day (inclusive; an open
+-- end is ongoing), earliest start first.
+SELECT * FROM health_log
+WHERE user_id = @user_id AND kind IN ('illness', 'injury')
+    AND start_date <= @to_day::date AND (end_date IS NULL OR end_date >= @from_day::date)
+ORDER BY start_date, id
+LIMIT @max_rows;

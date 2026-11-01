@@ -161,6 +161,56 @@ func (q *Queries) ListHealthLog(ctx context.Context, arg ListHealthLogParams) ([
 	return items, nil
 }
 
+const listHealthLogBetween = `-- name: ListHealthLogBetween :many
+SELECT id, user_id, kind, description, start_date, end_date, created_at FROM health_log
+WHERE user_id = $1 AND kind IN ('illness', 'injury')
+    AND start_date <= $2::date AND (end_date IS NULL OR end_date >= $3::date)
+ORDER BY start_date, id
+LIMIT $4
+`
+
+type ListHealthLogBetweenParams struct {
+	UserID  int64
+	ToDay   time.Time
+	FromDay time.Time
+	MaxRows int32
+}
+
+// Illness and injury entries overlapping from_day to to_day (inclusive; an open
+// end is ongoing), earliest start first.
+func (q *Queries) ListHealthLogBetween(ctx context.Context, arg ListHealthLogBetweenParams) ([]HealthLog, error) {
+	rows, err := q.db.Query(ctx, listHealthLogBetween,
+		arg.UserID,
+		arg.ToDay,
+		arg.FromDay,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []HealthLog
+	for rows.Next() {
+		var i HealthLog
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Kind,
+			&i.Description,
+			&i.StartDate,
+			&i.EndDate,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listHealthLogOn = `-- name: ListHealthLogOn :many
 SELECT id, user_id, kind, description, start_date, end_date, created_at FROM health_log
 WHERE user_id = $1 AND kind IN ('illness', 'injury')
@@ -220,6 +270,58 @@ type ListWellnessDaysParams struct {
 // One page of days, latest first; before is the previous page's last day.
 func (q *Queries) ListWellnessDays(ctx context.Context, arg ListWellnessDaysParams) ([]WellnessDay, error) {
 	rows, err := q.db.Query(ctx, listWellnessDays, arg.UserID, arg.Before, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []WellnessDay
+	for rows.Next() {
+		var i WellnessDay
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Day,
+			&i.Soreness,
+			&i.SleepQuality,
+			&i.Stress,
+			&i.Motivation,
+			&i.Note,
+			&i.WeightKg,
+			&i.BodyFatPct,
+			&i.HydrationL,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWellnessDaysBetween = `-- name: ListWellnessDaysBetween :many
+SELECT user_id, day, soreness, sleep_quality, stress, motivation, note, weight_kg, body_fat_pct, hydration_l, updated_at FROM wellness_days
+WHERE user_id = $1 AND day BETWEEN $2::date AND $3::date
+ORDER BY day
+LIMIT $4
+`
+
+type ListWellnessDaysBetweenParams struct {
+	UserID  int64
+	FromDay time.Time
+	ToDay   time.Time
+	MaxRows int32
+}
+
+// The days from from_day to to_day (inclusive) with anything entered, oldest first.
+func (q *Queries) ListWellnessDaysBetween(ctx context.Context, arg ListWellnessDaysBetweenParams) ([]WellnessDay, error) {
+	rows, err := q.db.Query(ctx, listWellnessDaysBetween,
+		arg.UserID,
+		arg.FromDay,
+		arg.ToDay,
+		arg.MaxRows,
+	)
 	if err != nil {
 		return nil, err
 	}

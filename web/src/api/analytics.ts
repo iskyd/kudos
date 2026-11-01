@@ -60,3 +60,18 @@ export function useRecords() {
     },
   })
 }
+
+export type Calendar = components['schemas']['Calendar']
+
+// useCalendar returns the activities, check-ins and injury or illness entries
+// of local days from to to.
+export function useCalendar(from: string, to: string) {
+  return useQuery({
+    queryKey: [...analyticsKey, 'calendar', from, to],
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/calendar', { params: { query: { from, to } } })
+      if (error) throw new ApiError(error)
+      return data
+    },
+  })
+}

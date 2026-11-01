@@ -465,6 +465,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/calendar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Activities, check-ins and injury or illness periods for a range of days
+         * @description Everything the calendar shows for the local days from from to to (at most
+         *     42, six weeks): activities by the local day where they happened (start
+         *     plus the activity's own UTC offset), effective values as in
+         *     /api/activities, oldest first, at most 500; the days with a check-in or
+         *     body metrics entered; and the injury and illness entries overlapping the
+         *     range (an entry without an end date is ongoing).
+         */
+        get: operations["getCalendar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/activities/{id}/laps": {
         parameters: {
             query?: never;
@@ -1343,6 +1368,11 @@ export interface components {
         };
         GoalPage: components["schemas"]["Page"] & {
             items: components["schemas"]["Goal"][];
+        };
+        Calendar: {
+            activities: components["schemas"]["ActivitySummary"][];
+            wellness: components["schemas"]["WellnessDay"][];
+            healthLog: components["schemas"]["HealthLogEntry"][];
         };
         RecordedWorkout: {
             name?: string;
@@ -2702,6 +2732,32 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getCalendar: {
+        parameters: {
+            query: {
+                /** @description First local day, inclusive. */
+                from: string;
+                /** @description Last local day, inclusive. */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The range's calendar entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Calendar"];
+                };
             };
             default: components["responses"]["Problem"];
         };
