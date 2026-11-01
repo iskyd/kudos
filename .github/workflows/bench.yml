@@ -1,0 +1,30 @@
+name: Benchmarks
+
+# The page benchmarks seed ten years of data first, which takes minutes, so
+# they run nightly and on demand rather than on every pull request.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      years:
+        description: Years of seeded history
+        default: "10"
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - uses: extractions/setup-just@v3
+      - name: Dashboard and activity page under 300 ms
+        env:
+          YEARS: ${{ inputs.years || '10' }}
+        run: just bench "$YEARS"

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 
 	"github.com/iskyd/kudos/internal/connectors/garminsync"
@@ -27,7 +28,7 @@ const (
 )
 
 // testCipher uses a fixed key so tests can decrypt what handlers store.
-func testCipher(t *testing.T) *crypto.Cipher {
+func testCipher(t testing.TB) *crypto.Cipher {
 	t.Helper()
 	c, err := crypto.New(bytes.Repeat([]byte{7}, crypto.KeySize))
 	if err != nil {
@@ -39,7 +40,7 @@ func testCipher(t *testing.T) *crypto.Cipher {
 // apiClient drives the router like a browser: it keeps the session cookie and
 // sends the CSRF token on writes.
 type apiClient struct {
-	t      *testing.T
+	t      testing.TB
 	h      http.Handler
 	cookie *http.Cookie
 	csrf   string
@@ -47,7 +48,12 @@ type apiClient struct {
 
 func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *db.Queries) {
 	t.Helper()
-	pool := pg.NewDB(t)
+	return newAPIOn(t, pg.NewDB(t), registration, logs)
+}
+
+// newAPIOn serves the API from an existing database.
+func newAPIOn(t testing.TB, pool *pgxpool.Pool, registration bool, logs *bytes.Buffer) (*apiClient, *db.Queries) {
+	t.Helper()
 	q := db.New(pool)
 	// The backfill worker is registered so jobs can be queued; tests never work them.
 	jobClient, err := jobs.NewClient(pool, discard(), func(w *river.Workers) {

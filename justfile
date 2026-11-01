@@ -74,3 +74,11 @@ dev:
 # Stop the development database (data is kept in a Docker volume).
 dev-down:
     docker compose -f deploy/compose.dev.yml down
+
+# Fill an existing account in the dev database with years of synthetic data (register it first).
+seed user years="10":
+    DATABASE_URL=postgres://kudos:kudos@127.0.0.1:{{DEV_DB_PORT}}/kudos DATA_DIR=.data/files go run ./cmd/seed -user {{user}} -years {{years}}
+
+# Time the dashboard and activity page against seeded data, failing over 300 ms (CI runs it nightly).
+bench years="10":
+    KUDOS_BENCH_YEARS={{years}} go test ./internal/api -run '^$' -bench BenchmarkPages -benchtime 20x -timeout 2h

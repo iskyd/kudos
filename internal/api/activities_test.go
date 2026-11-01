@@ -43,7 +43,7 @@ func loggedIn(t *testing.T, tz string) (*apiClient, *db.Queries, Me) {
 	return c, q, me
 }
 
-func decodeJSON[T any](t *testing.T, rec *httptest.ResponseRecorder, wantCode int) T {
+func decodeJSON[T any](t testing.TB, rec *httptest.ResponseRecorder, wantCode int) T {
 	t.Helper()
 	if rec.Code != wantCode {
 		t.Fatalf("status = %d, want %d: %s", rec.Code, wantCode, rec.Body)
