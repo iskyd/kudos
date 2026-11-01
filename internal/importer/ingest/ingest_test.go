@@ -578,3 +578,25 @@ func TestAnnotate(t *testing.T) {
 		t.Errorf("bob's gear: %v, want ErrGearNotFound", err)
 	}
 }
+
+// Two users uploading the same activity at once write samples into the same new
+// chunk; Postgres may pick either as a deadlock victim, which must not fail the upload.
+func TestConcurrentUploads(t *testing.T) {
+	t.Parallel()
+	data := corpus(t, "fit/half_marathon.fit")
+	for range 5 {
+		e := newEnv(t)
+		errs := make(chan error, 2)
+		for _, user := range []int64{e.alice, e.bob} {
+			go func() {
+				_, err := e.svc.Upload(t.Context(), user, time.UTC, "half_marathon.fit", data)
+				errs <- err
+			}()
+		}
+		for range 2 {
+			if err := <-errs; err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+}

@@ -93,9 +93,24 @@ func (s *Service) Import(ctx context.Context, userID int64, loc *time.Location, 
 	return s.Ingest(ctx, userID, loc, File{Format: format, Data: data, Origin: o}, acts)
 }
 
+// ingestAttempts bounds retries of an ingest chosen as a deadlock victim.
+const ingestAttempts = 3
+
 // Ingest stores an uploaded file's activities, replacing earlier imports of the
 // same activities, and returns their IDs. On any error nothing is stored.
 func (s *Service) Ingest(ctx context.Context, userID int64, loc *time.Location, f File, acts []importer.Activity) ([]int64, error) {
+	for attempt := 1; ; attempt++ {
+		ids, err := s.ingestOnce(ctx, userID, loc, f, acts)
+		// Concurrent ingests can deadlock creating the same sample chunk; Postgres
+		// aborts one of them, which then succeeds when run again.
+		if pgErr := (*pgconn.PgError)(nil); attempt < ingestAttempts && errors.As(err, &pgErr) && pgErr.Code == "40P01" {
+			continue
+		}
+		return ids, err
+	}
+}
+
+func (s *Service) ingestOnce(ctx context.Context, userID int64, loc *time.Location, f File, acts []importer.Activity) ([]int64, error) {
 	sum := sha256.Sum256(f.Data)
 	digest := hex.EncodeToString(sum[:])
 	rel := filepath.Join("originals", fmt.Sprint(userID), digest+"."+f.Format+".gz")

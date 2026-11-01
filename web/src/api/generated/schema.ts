@@ -425,6 +425,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/goals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List volume goals with their progress
+         * @description Newest first. Each goal's value sums its sport's activities (all sports
+         *     when it has none) over the local days of its period, effective values
+         *     as in /api/volume, and projects it to the period's end at the rate so far.
+         */
+        get: operations["listGoals"];
+        put?: never;
+        /** Add a volume goal */
+        post: operations["createGoal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/goals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Delete a goal */
+        delete: operations["deleteGoal"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/activities/{id}/laps": {
         parameters: {
             query?: never;
@@ -1251,6 +1291,59 @@ export interface components {
         GearPage: components["schemas"]["Page"] & {
             items: components["schemas"]["Gear"][];
         };
+        GoalInput: {
+            /** @enum {string} */
+            period: "week" | "month" | "year";
+            /**
+             * Format: date
+             * @description First day of the week (Monday), month or year. On input, any day in
+             *     it: the goal covers the whole period holding that day.
+             */
+            start: string;
+            sport?: components["schemas"]["ActivitySport"];
+            /** @enum {string} */
+            metric: "distance" | "duration" | "ascent";
+            /**
+             * Format: double
+             * @description Metres (distance, ascent) or seconds (duration).
+             */
+            target: number;
+        };
+        Goal: components["schemas"]["GoalInput"] & {
+            /** Format: int64 */
+            id: number;
+            /**
+             * Format: date
+             * @description Last day of the period, inclusive.
+             */
+            end: string;
+            /**
+             * Format: double
+             * @description Summed so far, in the target's unit.
+             */
+            value: number;
+            /**
+             * Format: double
+             * @description The value at the period's end at the rate so far; the value
+             *     itself once the period ended or before it starts.
+             */
+            projected: number;
+            /**
+             * Format: date
+             * @description The day the target is reached at the rate so far; absent when
+             *     that falls after the period or the target is already reached.
+             */
+            projectedFinish?: string;
+            /**
+             * @description Ahead or behind the even pace from zero to the target over the
+             *     period; achieved once reached; missed when the period ended short.
+             * @enum {string}
+             */
+            status: "upcoming" | "ahead" | "behind" | "achieved" | "missed";
+        };
+        GoalPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["Goal"][];
+        };
         RecordedWorkout: {
             name?: string;
             steps: components["schemas"]["WorkoutStep"][];
@@ -1869,6 +1962,7 @@ export interface components {
         Day: string;
         EntryID: number;
         GearID: number;
+        GoalID: number;
         /** @description Opaque cursor from a previous page's `nextCursor`. */
         Cursor: string;
         /** @description Maximum number of items to return. */
@@ -2525,6 +2619,78 @@ export interface operations {
             header?: never;
             path: {
                 id: components["parameters"]["GearID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listGoals: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of goals. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GoalPage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createGoal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GoalInput"];
+            };
+        };
+        responses: {
+            /** @description The new goal with its progress. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Goal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteGoal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["GoalID"];
             };
             cookie?: never;
         };
