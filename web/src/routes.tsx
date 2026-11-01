@@ -9,6 +9,7 @@ import { ActivityComparePage } from '@/pages/activity-compare'
 import { ActivityDetailPage } from '@/pages/activity-detail'
 import { DashboardPage } from '@/pages/dashboard'
 import { GearPage } from '@/pages/gear'
+import { GoalsPage } from '@/pages/goals'
 import { RecordsPage } from '@/pages/records'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { SettingsPage } from '@/pages/settings'
@@ -20,6 +21,7 @@ const pages: Partial<Record<string, ReactElement>> = {
   '/': <DashboardPage />,
   '/activities': <ActivitiesPage />,
   '/gear': <GearPage />,
+  '/goals': <GoalsPage />,
   '/records': <RecordsPage />,
   '/settings': <SettingsPage />,
   '/trends': <TrendsPage />,

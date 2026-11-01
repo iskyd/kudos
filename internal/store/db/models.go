@@ -186,6 +186,17 @@ type Gear struct {
 	CreatedAt            time.Time
 }
 
+type Goal struct {
+	ID        int64
+	UserID    int64
+	Period    string
+	StartDay  time.Time
+	Sport     *string
+	Metric    string
+	Target    float64
+	CreatedAt time.Time
+}
+
 type HealthLog struct {
 	ID          int64
 	UserID      int64

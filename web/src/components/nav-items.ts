@@ -3,6 +3,7 @@ export const navItems = [
   { path: '/activities', label: 'Activities' },
   { path: '/trends', label: 'Trends' },
   { path: '/records', label: 'Records' },
+  { path: '/goals', label: 'Goals' },
   { path: '/gear', label: 'Gear' },
   { path: '/wellness', label: 'Wellness' },
   { path: '/calendar', label: 'Calendar' },

@@ -573,6 +573,58 @@ paths:
           description: Deleted.
         default:
           $ref: "#/components/responses/Problem"
+  /api/goals:
+    get:
+      operationId: listGoals
+      summary: List volume goals with their progress
+      description: |
+        Newest first. Each goal's value sums its sport's activities (all sports
+        when it has none) over the local days of its period, effective values
+        as in /api/volume, and projects it to the period's end at the rate so far.
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of goals.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createGoal
+      summary: Add a volume goal
+      tags: [goals]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GoalInput"
+      responses:
+        "201":
+          description: The new goal with its progress.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/goals/{id}:
+    delete:
+      operationId: deleteGoal
+      summary: Delete a goal
+      tags: [goals]
+      parameters:
+        - $ref: "#/components/parameters/GoalID"
+      responses:
+        "204":
+          description: Deleted.
+        default:
+          $ref: "#/components/responses/Problem"
   /api/activities/{id}/laps:
     get:
       operationId: listLaps
@@ -1257,6 +1309,13 @@ components:
       schema:
         type: integer
         format: int64
+    GoalID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
     Cursor:
       name: cursor
       in: query
@@ -1787,6 +1846,74 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Gear"
+    GoalInput:
+      type: object
+      required: [period, start, metric, target]
+      properties:
+        period:
+          type: string
+          enum: [week, month, year]
+        start:
+          type: string
+          format: date
+          description: |
+            First day of the week (Monday), month or year. On input, any day in
+            it: the goal covers the whole period holding that day.
+        sport:
+          $ref: "#/components/schemas/ActivitySport"
+        metric:
+          type: string
+          enum: [distance, duration, ascent]
+        target:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          description: Metres (distance, ascent) or seconds (duration).
+    Goal:
+      allOf:
+        - $ref: "#/components/schemas/GoalInput"
+        - type: object
+          required: [id, end, value, projected, status]
+          properties:
+            id:
+              type: integer
+              format: int64
+            end:
+              type: string
+              format: date
+              description: Last day of the period, inclusive.
+            value:
+              type: number
+              format: double
+              description: Summed so far, in the target's unit.
+            projected:
+              type: number
+              format: double
+              description: |
+                The value at the period's end at the rate so far; the value
+                itself once the period ended or before it starts.
+            projectedFinish:
+              type: string
+              format: date
+              description: |
+                The day the target is reached at the rate so far; absent when
+                that falls after the period or the target is already reached.
+            status:
+              type: string
+              enum: [upcoming, ahead, behind, achieved, missed]
+              description: |
+                Ahead or behind the even pace from zero to the target over the
+                period; achieved once reached; missed when the period ended short.
+    GoalPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Goal"
     RecordedWorkout:
       type: object
       required: [steps]

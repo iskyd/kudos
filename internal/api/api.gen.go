@@ -396,6 +396,117 @@ func (e GearInputKind) Valid() bool {
 	}
 }
 
+// Defines values for GoalMetric.
+const (
+	GoalMetricAscent   GoalMetric = "ascent"
+	GoalMetricDistance GoalMetric = "distance"
+	GoalMetricDuration GoalMetric = "duration"
+)
+
+// Valid indicates whether the value is a known member of the GoalMetric enum.
+func (e GoalMetric) Valid() bool {
+	switch e {
+	case GoalMetricAscent:
+		return true
+	case GoalMetricDistance:
+		return true
+	case GoalMetricDuration:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GoalPeriod.
+const (
+	GoalPeriodMonth GoalPeriod = "month"
+	GoalPeriodWeek  GoalPeriod = "week"
+	GoalPeriodYear  GoalPeriod = "year"
+)
+
+// Valid indicates whether the value is a known member of the GoalPeriod enum.
+func (e GoalPeriod) Valid() bool {
+	switch e {
+	case GoalPeriodMonth:
+		return true
+	case GoalPeriodWeek:
+		return true
+	case GoalPeriodYear:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GoalStatus.
+const (
+	Achieved GoalStatus = "achieved"
+	Ahead    GoalStatus = "ahead"
+	Behind   GoalStatus = "behind"
+	Missed   GoalStatus = "missed"
+	Upcoming GoalStatus = "upcoming"
+)
+
+// Valid indicates whether the value is a known member of the GoalStatus enum.
+func (e GoalStatus) Valid() bool {
+	switch e {
+	case Achieved:
+		return true
+	case Ahead:
+		return true
+	case Behind:
+		return true
+	case Missed:
+		return true
+	case Upcoming:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GoalInputMetric.
+const (
+	GoalInputMetricAscent   GoalInputMetric = "ascent"
+	GoalInputMetricDistance GoalInputMetric = "distance"
+	GoalInputMetricDuration GoalInputMetric = "duration"
+)
+
+// Valid indicates whether the value is a known member of the GoalInputMetric enum.
+func (e GoalInputMetric) Valid() bool {
+	switch e {
+	case GoalInputMetricAscent:
+		return true
+	case GoalInputMetricDistance:
+		return true
+	case GoalInputMetricDuration:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GoalInputPeriod.
+const (
+	GoalInputPeriodMonth GoalInputPeriod = "month"
+	GoalInputPeriodWeek  GoalInputPeriod = "week"
+	GoalInputPeriodYear  GoalInputPeriod = "year"
+)
+
+// Valid indicates whether the value is a known member of the GoalInputPeriod enum.
+func (e GoalInputPeriod) Valid() bool {
+	switch e {
+	case GoalInputPeriodMonth:
+		return true
+	case GoalInputPeriodWeek:
+		return true
+	case GoalInputPeriodYear:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for HealthLogKind.
 const (
 	Illness HealthLogKind = "illness"
@@ -755,19 +866,19 @@ func (e ListActivityTrendsParamsKind) Valid() bool {
 
 // Defines values for GetVolumeParamsPeriod.
 const (
-	Month GetVolumeParamsPeriod = "month"
-	Week  GetVolumeParamsPeriod = "week"
-	Year  GetVolumeParamsPeriod = "year"
+	GetVolumeParamsPeriodMonth GetVolumeParamsPeriod = "month"
+	GetVolumeParamsPeriodWeek  GetVolumeParamsPeriod = "week"
+	GetVolumeParamsPeriodYear  GetVolumeParamsPeriod = "year"
 )
 
 // Valid indicates whether the value is a known member of the GetVolumeParamsPeriod enum.
 func (e GetVolumeParamsPeriod) Valid() bool {
 	switch e {
-	case Month:
+	case GetVolumeParamsPeriodMonth:
 		return true
-	case Week:
+	case GetVolumeParamsPeriodWeek:
 		return true
-	case Year:
+	case GetVolumeParamsPeriodYear:
 		return true
 	default:
 		return false
@@ -1236,6 +1347,80 @@ type GearInputKind string
 // GearPage defines model for GearPage.
 type GearPage struct {
 	Items []Gear `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
+}
+
+// Goal defines model for Goal.
+type Goal struct {
+	// End Last day of the period, inclusive.
+	End    openapi_types.Date `json:"end"`
+	Id     int64              `json:"id"`
+	Metric GoalMetric         `json:"metric"`
+	Period GoalPeriod         `json:"period"`
+
+	// Projected The value at the period's end at the rate so far; the value
+	// itself once the period ended or before it starts.
+	Projected float64 `json:"projected"`
+
+	// ProjectedFinish The day the target is reached at the rate so far; absent when
+	// that falls after the period or the target is already reached.
+	ProjectedFinish *openapi_types.Date `json:"projectedFinish,omitempty"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport *ActivitySport `json:"sport,omitempty"`
+
+	// Start First day of the week (Monday), month or year. On input, any day in
+	// it: the goal covers the whole period holding that day.
+	Start openapi_types.Date `json:"start"`
+
+	// Status Ahead or behind the even pace from zero to the target over the
+	// period; achieved once reached; missed when the period ended short.
+	Status GoalStatus `json:"status"`
+
+	// Target Metres (distance, ascent) or seconds (duration).
+	Target float64 `json:"target"`
+
+	// Value Summed so far, in the target's unit.
+	Value float64 `json:"value"`
+}
+
+// GoalMetric defines model for Goal.Metric.
+type GoalMetric string
+
+// GoalPeriod defines model for Goal.Period.
+type GoalPeriod string
+
+// GoalStatus Ahead or behind the even pace from zero to the target over the
+// period; achieved once reached; missed when the period ended short.
+type GoalStatus string
+
+// GoalInput defines model for GoalInput.
+type GoalInput struct {
+	Metric GoalInputMetric `json:"metric"`
+	Period GoalInputPeriod `json:"period"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport *ActivitySport `json:"sport,omitempty"`
+
+	// Start First day of the week (Monday), month or year. On input, any day in
+	// it: the goal covers the whole period holding that day.
+	Start openapi_types.Date `json:"start"`
+
+	// Target Metres (distance, ascent) or seconds (duration).
+	Target float64 `json:"target"`
+}
+
+// GoalInputMetric defines model for GoalInput.Metric.
+type GoalInputMetric string
+
+// GoalInputPeriod defines model for GoalInput.Period.
+type GoalInputPeriod string
+
+// GoalPage defines model for GoalPage.
+type GoalPage struct {
+	Items []Goal `json:"items"`
 
 	// NextCursor Cursor for the next page; absent on the last page.
 	NextCursor *string `json:"nextCursor,omitempty"`
@@ -1861,6 +2046,9 @@ type EntryID = int64
 // GearID defines model for GearID.
 type GearID = int64
 
+// GoalID defines model for GoalID.
+type GoalID = int64
+
 // Limit defines model for Limit.
 type Limit = int
 
@@ -1971,6 +2159,15 @@ type ListGarminBackfillFailuresParams struct {
 
 // ListGearParams defines parameters for ListGear.
 type ListGearParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListGoalsParams defines parameters for ListGoals.
+type ListGoalsParams struct {
 	// Cursor Opaque cursor from a previous page's `nextCursor`.
 	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
 
@@ -2098,6 +2295,9 @@ type CreateGearJSONRequestBody = GearInput
 // UpdateGearJSONRequestBody defines body for UpdateGear for application/json ContentType.
 type UpdateGearJSONRequestBody = GearInput
 
+// CreateGoalJSONRequestBody defines body for CreateGoal for application/json ContentType.
+type CreateGoalJSONRequestBody = GoalInput
+
 // CreateHealthLogEntryJSONRequestBody defines body for CreateHealthLogEntry for application/json ContentType.
 type CreateHealthLogEntryJSONRequestBody = HealthLogInput
 
@@ -2214,6 +2414,15 @@ type ServerInterface interface {
 	// UpdateGear Edit, retire or reactivate gear
 	// (PUT /api/gear/{id})
 	UpdateGear(w http.ResponseWriter, r *http.Request, id GearID)
+	// ListGoals List volume goals with their progress
+	// (GET /api/goals)
+	ListGoals(w http.ResponseWriter, r *http.Request, params ListGoalsParams)
+	// CreateGoal Add a volume goal
+	// (POST /api/goals)
+	CreateGoal(w http.ResponseWriter, r *http.Request)
+	// DeleteGoal Delete a goal
+	// (DELETE /api/goals/{id})
+	DeleteGoal(w http.ResponseWriter, r *http.Request, id GoalID)
 	// ListHealthLog List injuries, illnesses and periods
 	// (GET /api/health-log)
 	ListHealthLog(w http.ResponseWriter, r *http.Request, params ListHealthLogParams)
@@ -2475,6 +2684,24 @@ func (_ Unimplemented) DeleteGear(w http.ResponseWriter, r *http.Request, id Gea
 // UpdateGear Edit, retire or reactivate gear
 // (PUT /api/gear/{id})
 func (_ Unimplemented) UpdateGear(w http.ResponseWriter, r *http.Request, id GearID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListGoals List volume goals with their progress
+// (GET /api/goals)
+func (_ Unimplemented) ListGoals(w http.ResponseWriter, r *http.Request, params ListGoalsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateGoal Add a volume goal
+// (POST /api/goals)
+func (_ Unimplemented) CreateGoal(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteGoal Delete a goal
+// (DELETE /api/goals/{id})
+func (_ Unimplemented) DeleteGoal(w http.ResponseWriter, r *http.Request, id GoalID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3630,6 +3857,92 @@ func (siw *ServerInterfaceWrapper) UpdateGear(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// ListGoals operation middleware
+func (siw *ServerInterfaceWrapper) ListGoals(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListGoalsParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListGoals(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateGoal operation middleware
+func (siw *ServerInterfaceWrapper) CreateGoal(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateGoal(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteGoal operation middleware
+func (siw *ServerInterfaceWrapper) DeleteGoal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id GoalID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteGoal(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListHealthLog operation middleware
 func (siw *ServerInterfaceWrapper) ListHealthLog(w http.ResponseWriter, r *http.Request) {
 
@@ -4502,6 +4815,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/gear/{id}", wrapper.UpdateGear)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/goals", wrapper.ListGoals)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/goals", wrapper.CreateGoal)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/goals/{id}", wrapper.DeleteGoal)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/activities/{id}/laps", wrapper.ListLaps)
@@ -5887,6 +6209,117 @@ func (response UpdateGeardefaultApplicationProblemPlusJSONResponse) VisitUpdateG
 	return err
 }
 
+type ListGoalsRequestObject struct {
+	Params ListGoalsParams
+}
+
+type ListGoalsResponseObject interface {
+	VisitListGoalsResponse(w http.ResponseWriter) error
+}
+
+type ListGoals200JSONResponse GoalPage
+
+func (response ListGoals200JSONResponse) VisitListGoalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListGoalsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListGoalsdefaultApplicationProblemPlusJSONResponse) VisitListGoalsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGoalRequestObject struct {
+	Body *CreateGoalJSONRequestBody
+}
+
+type CreateGoalResponseObject interface {
+	VisitCreateGoalResponse(w http.ResponseWriter) error
+}
+
+type CreateGoal201JSONResponse Goal
+
+func (response CreateGoal201JSONResponse) VisitCreateGoalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateGoaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateGoaldefaultApplicationProblemPlusJSONResponse) VisitCreateGoalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteGoalRequestObject struct {
+	Id GoalID `json:"id"`
+}
+
+type DeleteGoalResponseObject interface {
+	VisitDeleteGoalResponse(w http.ResponseWriter) error
+}
+
+type DeleteGoal204Response struct {
+}
+
+func (response DeleteGoal204Response) VisitDeleteGoalResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteGoaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteGoaldefaultApplicationProblemPlusJSONResponse) VisitDeleteGoalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListHealthLogRequestObject struct {
 	Params ListHealthLogParams
 }
@@ -6740,6 +7173,15 @@ type StrictServerInterface interface {
 	// UpdateGear Edit, retire or reactivate gear
 	// (PUT /api/gear/{id})
 	UpdateGear(ctx context.Context, request UpdateGearRequestObject) (UpdateGearResponseObject, error)
+	// ListGoals List volume goals with their progress
+	// (GET /api/goals)
+	ListGoals(ctx context.Context, request ListGoalsRequestObject) (ListGoalsResponseObject, error)
+	// CreateGoal Add a volume goal
+	// (POST /api/goals)
+	CreateGoal(ctx context.Context, request CreateGoalRequestObject) (CreateGoalResponseObject, error)
+	// DeleteGoal Delete a goal
+	// (DELETE /api/goals/{id})
+	DeleteGoal(ctx context.Context, request DeleteGoalRequestObject) (DeleteGoalResponseObject, error)
 	// ListHealthLog List injuries, illnesses and periods
 	// (GET /api/health-log)
 	ListHealthLog(ctx context.Context, request ListHealthLogRequestObject) (ListHealthLogResponseObject, error)
@@ -7752,6 +8194,89 @@ func (sh *strictHandler) UpdateGear(w http.ResponseWriter, r *http.Request, id G
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateGearResponseObject); ok {
 		if err := validResponse.VisitUpdateGearResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListGoals operation middleware
+func (sh *strictHandler) ListGoals(w http.ResponseWriter, r *http.Request, params ListGoalsParams) {
+	var request ListGoalsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListGoals(ctx, request.(ListGoalsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListGoals")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListGoalsResponseObject); ok {
+		if err := validResponse.VisitListGoalsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateGoal operation middleware
+func (sh *strictHandler) CreateGoal(w http.ResponseWriter, r *http.Request) {
+	var request CreateGoalRequestObject
+
+	var body CreateGoalJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateGoal(ctx, request.(CreateGoalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateGoal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateGoalResponseObject); ok {
+		if err := validResponse.VisitCreateGoalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteGoal operation middleware
+func (sh *strictHandler) DeleteGoal(w http.ResponseWriter, r *http.Request, id GoalID) {
+	var request DeleteGoalRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteGoal(ctx, request.(DeleteGoalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteGoal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteGoalResponseObject); ok {
+		if err := validResponse.VisitDeleteGoalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
