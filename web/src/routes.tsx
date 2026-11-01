@@ -7,6 +7,7 @@ import { RequireAuth } from '@/components/require-auth'
 import { ActivitiesPage } from '@/pages/activities'
 import { ActivityComparePage } from '@/pages/activity-compare'
 import { ActivityDetailPage } from '@/pages/activity-detail'
+import { DashboardPage } from '@/pages/dashboard'
 import { GearPage } from '@/pages/gear'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { SettingsPage } from '@/pages/settings'
@@ -14,6 +15,7 @@ import { WellnessPage } from '@/pages/wellness'
 import { ZonesPage } from '@/pages/zones'
 
 const pages: Partial<Record<string, ReactElement>> = {
+  '/': <DashboardPage />,
   '/activities': <ActivitiesPage />,
   '/gear': <GearPage />,
   '/settings': <SettingsPage />,

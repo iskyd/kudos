@@ -1,4 +1,11 @@
-import { daysUntil, formatDateTime, formatDay, toISODay } from '@/lib/format/date'
+import {
+  addDays,
+  daysUntil,
+  formatDateTime,
+  formatDay,
+  mondayOf,
+  toISODay,
+} from '@/lib/format/date'
 
 describe('formatDay', () => {
   it('renders the calendar day without shifting it', () => {
@@ -33,5 +40,26 @@ describe('daysUntil', () => {
 describe('toISODay', () => {
   it('pads month and day', () => {
     expect(toISODay(new Date(2026, 0, 5))).toBe('2026-01-05')
+  })
+})
+
+describe('addDays', () => {
+  it.each([
+    ['2026-10-31', 1, '2026-11-01'],
+    ['2026-03-01', -1, '2026-02-28'],
+    ['2026-10-24', 2, '2026-10-26'], // across the end of summer time
+    ['2026-12-31', 0, '2026-12-31'],
+  ])('%s plus %i is %s', (date, n, want) => {
+    expect(addDays(date, n)).toBe(want)
+  })
+})
+
+describe('mondayOf', () => {
+  it.each([
+    ['2026-10-26', '2026-10-26'], // a Monday
+    ['2026-11-01', '2026-10-26'], // a Sunday
+    ['2026-01-01', '2025-12-29'], // across a year
+  ])('the week of %s starts on %s', (date, want) => {
+    expect(mondayOf(date)).toBe(want)
   })
 })

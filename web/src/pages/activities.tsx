@@ -215,7 +215,7 @@ function ActivityList() {
   )
 }
 
-function ActivityRow({ activity: a }: { activity: ActivitySummary }) {
+export function ActivityRow({ activity: a }: { activity: ActivitySummary }) {
   const duration = a.timerTimeS ?? a.elapsedTimeS
   return (
     <tr className="border-t border-border">

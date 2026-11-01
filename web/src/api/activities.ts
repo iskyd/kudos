@@ -17,6 +17,7 @@ export interface ActivityFilters {
   from?: string // local day, YYYY-MM-DD
   to?: string
   sort: 'date' | 'distance' | 'duration'
+  limit?: number // page size
 }
 
 const activitiesKey = ['activities'] as const
