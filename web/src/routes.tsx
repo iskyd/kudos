@@ -9,8 +9,10 @@ import { ActivityComparePage } from '@/pages/activity-compare'
 import { ActivityDetailPage } from '@/pages/activity-detail'
 import { DashboardPage } from '@/pages/dashboard'
 import { GearPage } from '@/pages/gear'
+import { RecordsPage } from '@/pages/records'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { SettingsPage } from '@/pages/settings'
+import { TrendsPage } from '@/pages/trends'
 import { WellnessPage } from '@/pages/wellness'
 import { ZonesPage } from '@/pages/zones'
 
@@ -18,7 +20,9 @@ const pages: Partial<Record<string, ReactElement>> = {
   '/': <DashboardPage />,
   '/activities': <ActivitiesPage />,
   '/gear': <GearPage />,
+  '/records': <RecordsPage />,
   '/settings': <SettingsPage />,
+  '/trends': <TrendsPage />,
   '/wellness': <WellnessPage />,
 }
 

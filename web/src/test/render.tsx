@@ -32,7 +32,8 @@ export function problem(status: number, kind: string, title: string, detail?: st
 // loggedInAs answers GET /api/me with user, or with 401 when user is null. The
 // app shell's Garmin banner asks for the connection on every page: none by default,
 // gear pickers find no gear and activities ran no structured workout. The
-// dashboard at / finds no data: no activities, load or volume, readiness collecting.
+// dashboard, trends and records pages find no data: no activities, load, volume,
+// curves or records, readiness collecting.
 export function loggedInAs(user: Me | null) {
   server.use(
     http.get('/api/me', () =>
@@ -44,6 +45,8 @@ export function loggedInAs(user: Me | null) {
     http.get('/api/activities', () => HttpResponse.json({ items: [] })),
     http.get('/api/fitness', () => HttpResponse.json([])),
     http.get('/api/volume', () => HttpResponse.json({ periods: [], timeInZones: [] })),
+    http.get('/api/curves', () => HttpResponse.json({ power: [], pace: [], racePredictions: [] })),
+    http.get('/api/records', () => HttpResponse.json({ records: [] })),
     http.get('/api/readiness', ({ request }) =>
       HttpResponse.json({
         day: new URL(request.url).searchParams.get('day') ?? '',
