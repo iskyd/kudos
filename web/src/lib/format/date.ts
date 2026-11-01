@@ -38,6 +38,34 @@ export function mondayOf(isoDate: string): string {
   return addDays(isoDate, -((parseDay(isoDate).getDay() + 6) % 7))
 }
 
+// periodStarts returns the first days of the n weeks (from Monday), months or
+// years up to the one holding isoDate, newest first, as the API's periods start.
+export function periodStarts(
+  period: 'week' | 'month' | 'year',
+  isoDate: string,
+  n: number,
+): string[] {
+  const d = parseDay(isoDate)
+  return Array.from({ length: n }, (_, i) => {
+    switch (period) {
+      case 'week':
+        return addDays(mondayOf(isoDate), -7 * i)
+      case 'month':
+        return toISODay(new Date(d.getFullYear(), d.getMonth() - i, 1))
+      default:
+        return toISODay(new Date(d.getFullYear() - i, 0, 1))
+    }
+  })
+}
+
+// formatPeriod names a period by its first day: "Week of 26 October 2026",
+// "October 2026" or "2026".
+export function formatPeriod(period: 'week' | 'month' | 'year', start: string): string {
+  if (period === 'week') return `Week of ${formatDay(start)}`
+  if (period === 'year') return start.slice(0, 4)
+  return parseDay(start).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+}
+
 // toISODay renders a local date as "YYYY-MM-DD", the form date inputs use.
 export function toISODay(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')

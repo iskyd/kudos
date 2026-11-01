@@ -4,6 +4,8 @@ import {
   formatDateTime,
   formatDay,
   mondayOf,
+  formatPeriod,
+  periodStarts,
   toISODay,
 } from '@/lib/format/date'
 
@@ -61,5 +63,29 @@ describe('mondayOf', () => {
     ['2026-01-01', '2025-12-29'], // across a year
   ])('the week of %s starts on %s', (date, want) => {
     expect(mondayOf(date)).toBe(want)
+  })
+})
+
+describe('periodStarts', () => {
+  it('lists the periods up to the one holding the day, newest first', () => {
+    expect(periodStarts('week', '2026-11-01', 3)).toEqual([
+      '2026-10-26',
+      '2026-10-19',
+      '2026-10-12',
+    ])
+    expect(periodStarts('month', '2026-02-15', 3)).toEqual([
+      '2026-02-01',
+      '2026-01-01',
+      '2025-12-01',
+    ])
+    expect(periodStarts('year', '2026-11-01', 2)).toEqual(['2026-01-01', '2025-01-01'])
+  })
+})
+
+describe('formatPeriod', () => {
+  it('names weeks, months and years', () => {
+    expect(formatPeriod('week', '2026-10-26')).toBe('Week of 26 October 2026')
+    expect(formatPeriod('month', '2026-10-01')).toBe('October 2026')
+    expect(formatPeriod('year', '2026-01-01')).toBe('2026')
   })
 })

@@ -40,7 +40,7 @@ describe('DashboardPage', () => {
   it('shows each card empty without data', async () => {
     renderApp('/')
     expect(
-      await (await card('Fitness and form')).findByText('No training load in the last 90 days.'),
+      await (await card('Fitness and form')).findByText('No training load in this period.'),
     ).toBeInTheDocument()
     expect(
       await (await card('Weekly volume')).findByText('No activities in the last 12 weeks.'),
