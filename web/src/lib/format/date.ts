@@ -26,6 +26,18 @@ export function daysUntil(isoDate: string, now: Date): number {
   return Math.round((parseDay(isoDate).getTime() - today.getTime()) / 86_400_000)
 }
 
+// addDays returns the calendar date n days after isoDate (before when negative).
+export function addDays(isoDate: string, n: number): string {
+  const d = parseDay(isoDate)
+  d.setDate(d.getDate() + n)
+  return toISODay(d)
+}
+
+// mondayOf returns the Monday starting isoDate's week, as the API's weeks do.
+export function mondayOf(isoDate: string): string {
+  return addDays(isoDate, -((parseDay(isoDate).getDay() + 6) % 7))
+}
+
 // toISODay renders a local date as "YYYY-MM-DD", the form date inputs use.
 export function toISODay(date: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
