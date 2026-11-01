@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/store/db"
 )
@@ -31,6 +32,7 @@ type Server struct {
 	ingest              *ingest.Service
 	cursors             *Cursors
 	garmin              GarminDeps
+	cipher              *crypto.Cipher // seals every stored secret: Garmin's and LLM keys
 	registrationEnabled bool
 	mapTileURL          string
 	argon               argonParams
@@ -56,6 +58,7 @@ func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin
 		ingest:              ingester,
 		cursors:             cursors,
 		garmin:              garmin,
+		cipher:              garmin.Cipher,
 		registrationEnabled: registrationEnabled,
 		mapTileURL:          mapTileURL,
 		argon:               p,

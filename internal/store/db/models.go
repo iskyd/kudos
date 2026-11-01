@@ -228,6 +228,16 @@ type Lap struct {
 	WorkoutStepIndex *int32
 }
 
+type LlmProvider struct {
+	UserID        int64
+	Provider      string
+	BaseUrl       string
+	Model         string
+	KeyCiphertext []byte
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 type OriginalFile struct {
 	ID         int64
 	UserID     int64
