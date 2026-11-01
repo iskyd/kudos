@@ -48,6 +48,17 @@ export function SettingsPage() {
         </p>
       </section>
       <GarminSection />
+      <section aria-labelledby="coach-heading" className="flex flex-col gap-2">
+        <h2 id="coach-heading" className="text-lg font-semibold">
+          AI coach
+        </h2>
+        <p className="text-sm text-muted-foreground">
+          The LLM provider the coach uses, and what it receives.{' '}
+          <Link to="/settings/ai-coach" className="underline">
+            Set up the AI coach
+          </Link>
+        </p>
+      </section>
     </div>
   )
 }

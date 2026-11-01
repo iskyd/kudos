@@ -5,6 +5,7 @@ import { navItems } from '@/components/nav-items'
 import { EmptyPage } from '@/components/empty-page'
 import { RequireAuth } from '@/components/require-auth'
 import { ActivitiesPage } from '@/pages/activities'
+import { AICoachPage } from '@/pages/ai-coach'
 import { ActivityComparePage } from '@/pages/activity-compare'
 import { ActivityDetailPage } from '@/pages/activity-detail'
 import { CalendarPage } from '@/pages/calendar'
@@ -46,6 +47,7 @@ export const routes: RouteObject[] = [
           { path: '/activities/:id', element: <ActivityDetailPage /> },
           { path: '/activities/:id/compare/:other', element: <ActivityComparePage /> },
           { path: '/settings/zones', element: <ZonesPage /> },
+          { path: '/settings/ai-coach', element: <AICoachPage /> },
           { path: '*', element: <EmptyPage title="Page not found" /> },
         ],
       },
