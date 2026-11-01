@@ -70,10 +70,11 @@ func BenchmarkPages(b *testing.B) {
 		name  string
 		paths []string
 	}{
-		// The home dashboard's requests (T5.3 adds weekly volume once T5.2 exists).
+		// The home dashboard's requests, with twelve weeks of volume.
 		{"dashboard", []string{
 			"/api/me", "/api/garmin", "/api/readiness?day=" + date,
 			"/api/fitness?from=" + today.AddDate(0, 0, -90).Format(time.DateOnly) + "&to=" + date,
+			"/api/volume?period=week&from=" + today.AddDate(0, 0, -83).Format(time.DateOnly) + "&to=" + date,
 			"/api/activities?limit=5",
 		}},
 		{"activity", []string{

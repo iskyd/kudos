@@ -709,6 +709,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/volume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Volume by week, month or year, with time in zones
+         * @description Activities, distance, time, ascent and training load per week (from
+         *     Monday), month or year of the local days from from to to, periods
+         *     without activities left out; comparing the same months or years gives
+         *     year-over-year. Time in zones sums the same activities' seconds per
+         *     metric and zone model. Values are effective ones (edits applied);
+         *     virtual activities count. At most 3660 days per request.
+         */
+        get: operations["getVolume"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/records": {
         parameters: {
             query?: never;
@@ -1537,6 +1562,37 @@ export interface components {
              * @description Form.
              */
             tsb: number;
+        };
+        Volume: {
+            periods: components["schemas"]["VolumePeriod"][];
+            timeInZones: components["schemas"]["ZoneTime"][];
+        };
+        VolumePeriod: {
+            /**
+             * Format: date
+             * @description The period's first day (a Monday for weeks); it can be before from.
+             */
+            start: string;
+            activities: number;
+            /** Format: double */
+            distanceM: number;
+            /**
+             * Format: double
+             * @description Timer time, else elapsed time.
+             */
+            durationS: number;
+            /** Format: double */
+            ascentM: number;
+            /** Format: double */
+            load: number;
+        };
+        ZoneTime: {
+            /** @enum {string} */
+            metric: "hr" | "pace" | "power";
+            /** @description The zone model, as in Zones. */
+            model: string;
+            /** @description Seconds in each zone, the first zone first. */
+            seconds: number[];
         };
         Records: {
             /**
@@ -2833,6 +2889,36 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FitnessDay"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getVolume: {
+        parameters: {
+            query: {
+                period: "week" | "month" | "year";
+                /** @description First local day, inclusive. */
+                from: string;
+                /** @description Last local day, inclusive. */
+                to: string;
+                sport?: components["schemas"]["ActivitySport"];
+                /** @description Only activities with this gear. */
+                gear?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The periods with activities, oldest first, and the range's time in zones. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Volume"];
                 };
             };
             default: components["responses"]["Problem"];
