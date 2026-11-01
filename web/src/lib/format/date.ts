@@ -58,6 +58,21 @@ export function periodStarts(
   })
 }
 
+// calendarDays returns the days a calendar shows for isoDate: its week (Monday
+// to Sunday), or its month padded to whole weeks.
+export function calendarDays(view: 'week' | 'month', isoDate: string): string[] {
+  let first = mondayOf(isoDate)
+  let last = addDays(first, 6)
+  if (view === 'month') {
+    const d = parseDay(isoDate)
+    first = mondayOf(toISODay(new Date(d.getFullYear(), d.getMonth(), 1)))
+    last = addDays(mondayOf(toISODay(new Date(d.getFullYear(), d.getMonth() + 1, 0))), 6)
+  }
+  const days = [first]
+  while (days.at(-1) !== last) days.push(addDays(days.at(-1) ?? last, 1))
+  return days
+}
+
 // formatPeriod names a period by its first day: "Week of 26 October 2026",
 // "October 2026" or "2026".
 export function formatPeriod(period: 'week' | 'month' | 'year', start: string): string {

@@ -625,6 +625,42 @@ paths:
           description: Deleted.
         default:
           $ref: "#/components/responses/Problem"
+  /api/calendar:
+    get:
+      operationId: getCalendar
+      summary: Activities, check-ins and injury or illness periods for a range of days
+      description: |
+        Everything the calendar shows for the local days from from to to (at most
+        42, six weeks): activities by the local day where they happened (start
+        plus the activity's own UTC offset), effective values as in
+        /api/activities, oldest first, at most 500; the days with a check-in or
+        body metrics entered; and the injury and illness entries overlapping the
+        range (an entry without an end date is ongoing).
+      tags: [calendar]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: First local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last local day, inclusive.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The range's calendar entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Calendar"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/activities/{id}/laps:
     get:
       operationId: listLaps
@@ -1914,6 +1950,22 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Goal"
+    Calendar:
+      type: object
+      required: [activities, wellness, healthLog]
+      properties:
+        activities:
+          type: array
+          items:
+            $ref: "#/components/schemas/ActivitySummary"
+        wellness:
+          type: array
+          items:
+            $ref: "#/components/schemas/WellnessDay"
+        healthLog:
+          type: array
+          items:
+            $ref: "#/components/schemas/HealthLogEntry"
     RecordedWorkout:
       type: object
       required: [steps]

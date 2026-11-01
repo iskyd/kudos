@@ -16,5 +16,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
+    // A zone with summer time, the same on every machine, so local-day tests
+    // cover the changes.
+    env: { TZ: 'Europe/Berlin' },
   },
 })
