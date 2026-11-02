@@ -528,6 +528,33 @@ func (e HealthLogKind) Valid() bool {
 	}
 }
 
+// Defines values for LLMProviderKind.
+const (
+	Anthropic  LLMProviderKind = "anthropic"
+	Gemini     LLMProviderKind = "gemini"
+	Ollama     LLMProviderKind = "ollama"
+	Openai     LLMProviderKind = "openai"
+	Perplexity LLMProviderKind = "perplexity"
+)
+
+// Valid indicates whether the value is a known member of the LLMProviderKind enum.
+func (e LLMProviderKind) Valid() bool {
+	switch e {
+	case Anthropic:
+		return true
+	case Gemini:
+		return true
+	case Ollama:
+		return true
+	case Openai:
+		return true
+	case Perplexity:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LapIntensity.
 const (
 	LapIntensityActive   LapIntensity = "active"
@@ -1467,6 +1494,31 @@ type HealthLogPage struct {
 	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
+// LLMProvider defines model for LLMProvider.
+type LLMProvider struct {
+	BaseUrl    *string `json:"baseUrl,omitempty"`
+	Configured bool    `json:"configured"`
+
+	// KeySet Whether an API key is stored; the key itself is never returned.
+	KeySet   bool             `json:"keySet"`
+	Model    *string          `json:"model,omitempty"`
+	Provider *LLMProviderKind `json:"provider,omitempty"`
+}
+
+// LLMProviderInput defines model for LLMProviderInput.
+type LLMProviderInput struct {
+	// ApiKey Absent keeps the stored key (same provider only); empty removes it.
+	ApiKey *string `json:"apiKey,omitempty"`
+
+	// BaseUrl An http or https URL; absent for the provider's public API.
+	BaseUrl  *string         `json:"baseUrl,omitempty"`
+	Model    string          `json:"model"`
+	Provider LLMProviderKind `json:"provider"`
+}
+
+// LLMProviderKind defines model for LLMProviderKind.
+type LLMProviderKind string
+
 // Lap defines model for Lap.
 type Lap struct {
 	AscentM          *float32      `json:"ascentM,omitempty"`
@@ -2320,6 +2372,9 @@ type CreateHealthLogEntryJSONRequestBody = HealthLogInput
 // UpdateHealthLogEntryJSONRequestBody defines body for UpdateHealthLogEntry for application/json ContentType.
 type UpdateHealthLogEntryJSONRequestBody = HealthLogInput
 
+// SetLLMProviderJSONRequestBody defines body for SetLLMProvider for application/json ContentType.
+type SetLLMProviderJSONRequestBody = LLMProviderInput
+
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
 
@@ -2454,6 +2509,15 @@ type ServerInterface interface {
 	// UpdateHealthLogEntry Edit a log entry
 	// (PUT /api/health-log/{entryId})
 	UpdateHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID)
+	// DeleteLLMProvider Remove the LLM provider
+	// (DELETE /api/llm-provider)
+	DeleteLLMProvider(w http.ResponseWriter, r *http.Request)
+	// GetLLMProvider The AI coach's LLM provider
+	// (GET /api/llm-provider)
+	GetLLMProvider(w http.ResponseWriter, r *http.Request)
+	// SetLLMProvider Set the LLM provider
+	// (PUT /api/llm-provider)
+	SetLLMProvider(w http.ResponseWriter, r *http.Request)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(w http.ResponseWriter, r *http.Request)
@@ -2751,6 +2815,24 @@ func (_ Unimplemented) DeleteHealthLogEntry(w http.ResponseWriter, r *http.Reque
 // UpdateHealthLogEntry Edit a log entry
 // (PUT /api/health-log/{entryId})
 func (_ Unimplemented) UpdateHealthLogEntry(w http.ResponseWriter, r *http.Request, entryId EntryID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteLLMProvider Remove the LLM provider
+// (DELETE /api/llm-provider)
+func (_ Unimplemented) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetLLMProvider The AI coach's LLM provider
+// (GET /api/llm-provider)
+func (_ Unimplemented) GetLLMProvider(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SetLLMProvider Set the LLM provider
+// (PUT /api/llm-provider)
+func (_ Unimplemented) SetLLMProvider(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4139,6 +4221,48 @@ func (siw *ServerInterfaceWrapper) UpdateHealthLogEntry(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// DeleteLLMProvider operation middleware
+func (siw *ServerInterfaceWrapper) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteLLMProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetLLMProvider operation middleware
+func (siw *ServerInterfaceWrapper) GetLLMProvider(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLLMProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetLLMProvider operation middleware
+func (siw *ServerInterfaceWrapper) SetLLMProvider(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetLLMProvider(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetMe operation middleware
 func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
 
@@ -4835,6 +4959,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/activities/uploads", wrapper.UploadActivity)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/llm-provider", wrapper.DeleteLLMProvider)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/llm-provider", wrapper.GetLLMProvider)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/llm-provider", wrapper.SetLLMProvider)
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/garmin", wrapper.DeleteGarminConnection)
@@ -6584,6 +6717,115 @@ func (response UpdateHealthLogEntrydefaultApplicationProblemPlusJSONResponse) Vi
 	return err
 }
 
+type DeleteLLMProviderRequestObject struct {
+}
+
+type DeleteLLMProviderResponseObject interface {
+	VisitDeleteLLMProviderResponse(w http.ResponseWriter) error
+}
+
+type DeleteLLMProvider204Response struct {
+}
+
+func (response DeleteLLMProvider204Response) VisitDeleteLLMProviderResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteLLMProviderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteLLMProviderdefaultApplicationProblemPlusJSONResponse) VisitDeleteLLMProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLLMProviderRequestObject struct {
+}
+
+type GetLLMProviderResponseObject interface {
+	VisitGetLLMProviderResponse(w http.ResponseWriter) error
+}
+
+type GetLLMProvider200JSONResponse LLMProvider
+
+func (response GetLLMProvider200JSONResponse) VisitGetLLMProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLLMProviderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetLLMProviderdefaultApplicationProblemPlusJSONResponse) VisitGetLLMProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetLLMProviderRequestObject struct {
+	Body *SetLLMProviderJSONRequestBody
+}
+
+type SetLLMProviderResponseObject interface {
+	VisitSetLLMProviderResponse(w http.ResponseWriter) error
+}
+
+type SetLLMProvider200JSONResponse LLMProvider
+
+func (response SetLLMProvider200JSONResponse) VisitSetLLMProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SetLLMProviderdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response SetLLMProviderdefaultApplicationProblemPlusJSONResponse) VisitSetLLMProviderResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetMeRequestObject struct {
 }
 
@@ -7310,6 +7552,15 @@ type StrictServerInterface interface {
 	// UpdateHealthLogEntry Edit a log entry
 	// (PUT /api/health-log/{entryId})
 	UpdateHealthLogEntry(ctx context.Context, request UpdateHealthLogEntryRequestObject) (UpdateHealthLogEntryResponseObject, error)
+	// DeleteLLMProvider Remove the LLM provider
+	// (DELETE /api/llm-provider)
+	DeleteLLMProvider(ctx context.Context, request DeleteLLMProviderRequestObject) (DeleteLLMProviderResponseObject, error)
+	// GetLLMProvider The AI coach's LLM provider
+	// (GET /api/llm-provider)
+	GetLLMProvider(ctx context.Context, request GetLLMProviderRequestObject) (GetLLMProviderResponseObject, error)
+	// SetLLMProvider Set the LLM provider
+	// (PUT /api/llm-provider)
+	SetLLMProvider(ctx context.Context, request SetLLMProviderRequestObject) (SetLLMProviderResponseObject, error)
 	// GetMe Current user and CSRF token
 	// (GET /api/me)
 	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
@@ -8535,6 +8786,85 @@ func (sh *strictHandler) UpdateHealthLogEntry(w http.ResponseWriter, r *http.Req
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateHealthLogEntryResponseObject); ok {
 		if err := validResponse.VisitUpdateHealthLogEntryResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteLLMProvider operation middleware
+func (sh *strictHandler) DeleteLLMProvider(w http.ResponseWriter, r *http.Request) {
+	var request DeleteLLMProviderRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteLLMProvider(ctx, request.(DeleteLLMProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteLLMProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteLLMProviderResponseObject); ok {
+		if err := validResponse.VisitDeleteLLMProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetLLMProvider operation middleware
+func (sh *strictHandler) GetLLMProvider(w http.ResponseWriter, r *http.Request) {
+	var request GetLLMProviderRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLLMProvider(ctx, request.(GetLLMProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLLMProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetLLMProviderResponseObject); ok {
+		if err := validResponse.VisitGetLLMProviderResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SetLLMProvider operation middleware
+func (sh *strictHandler) SetLLMProvider(w http.ResponseWriter, r *http.Request) {
+	var request SetLLMProviderRequestObject
+
+	var body SetLLMProviderJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SetLLMProvider(ctx, request.(SetLLMProviderRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SetLLMProvider")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SetLLMProviderResponseObject); ok {
+		if err := validResponse.VisitSetLLMProviderResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

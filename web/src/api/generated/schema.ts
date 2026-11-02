@@ -154,6 +154,37 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/llm-provider": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The AI coach's LLM provider
+         * @description The API key is never returned, only whether one is set.
+         */
+        get: operations["getLLMProvider"];
+        /**
+         * Set the LLM provider
+         * @description Replaces the user's one active provider. The API key is stored encrypted
+         *     and never returned. Leaving apiKey out keeps the stored key while the
+         *     provider stays the same; an empty apiKey removes it. Every provider but
+         *     Ollama needs a key. baseUrl defaults to the provider's public API.
+         */
+        put: operations["setLLMProvider"];
+        post?: never;
+        /**
+         * Remove the LLM provider
+         * @description Deletes the settings and the stored key.
+         */
+        delete: operations["deleteLLMProvider"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/garmin": {
         parameters: {
             query?: never;
@@ -1089,6 +1120,24 @@ export interface components {
         UploadResult: {
             /** @description The stored activities; several for a multisport file. */
             activityIds: number[];
+        };
+        /** @enum {string} */
+        LLMProviderKind: "ollama" | "openai" | "gemini" | "perplexity" | "anthropic";
+        LLMProviderInput: {
+            provider: components["schemas"]["LLMProviderKind"];
+            /** @description An http or https URL; absent for the provider's public API. */
+            baseUrl?: string;
+            model: string;
+            /** @description Absent keeps the stored key (same provider only); empty removes it. */
+            apiKey?: string;
+        };
+        LLMProvider: {
+            configured: boolean;
+            provider?: components["schemas"]["LLMProviderKind"];
+            baseUrl?: string;
+            model?: string;
+            /** @description Whether an API key is stored; the key itself is never returned. */
+            keySet: boolean;
         };
         GarminConnection: {
             connected: boolean;
@@ -2252,6 +2301,71 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["UploadResult"];
                 };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getLLMProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The provider, or `configured` false when there is none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMProvider"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    setLLMProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LLMProviderInput"];
+            };
+        };
+        responses: {
+            /** @description The saved provider. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LLMProvider"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteLLMProvider: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Removed, or there was none. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             default: components["responses"]["Problem"];
         };
