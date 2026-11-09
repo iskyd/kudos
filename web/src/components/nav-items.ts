@@ -9,5 +9,6 @@ export const navItems = [
   { path: '/calendar', label: 'Calendar' },
   { path: '/plans', label: 'Plans' },
   { path: '/coach', label: 'Coach' },
+  { path: '/reports', label: 'Reports' },
   { path: '/settings', label: 'Settings' },
 ] as const

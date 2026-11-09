@@ -49,11 +49,14 @@ func (s *Server) Chat(ctx context.Context, req ChatRequestObject) (ChatResponseO
 		return nil, err
 	}
 	sess := sessionFrom(ctx)
-	client, err := s.llmClient(ctx, sess.userID)
+	client, err := s.LLMClient(ctx, sess.userID)
+	if errors.Is(err, llm.ErrNotConfigured) {
+		return nil, &Error{Kind: KindLLMNotConfigured, Detail: "set up a provider in Settings › AI coach"}
+	}
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.athleteContext(ctx, sess.userID, localToday(sess.timezone))
+	c, err := s.AthleteContext(ctx, sess.userID, localToday(sess.timezone))
 	if err != nil {
 		return nil, err
 	}
@@ -127,11 +130,11 @@ func chatErrorDetail(err error) string {
 	return "The AI coach provider could not be reached."
 }
 
-// llmClient returns a client for the user's provider.
-func (s *Server) llmClient(ctx context.Context, userID int64) (llm.Client, error) {
+// LLMClient returns a client for the user's provider, or llm.ErrNotConfigured.
+func (s *Server) LLMClient(ctx context.Context, userID int64) (llm.Client, error) {
 	p, err := s.q.GetLLMProvider(ctx, userID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, &Error{Kind: KindLLMNotConfigured, Detail: "set up a provider in Settings › AI coach"}
+		return nil, llm.ErrNotConfigured
 	}
 	if err != nil {
 		return nil, fmt.Errorf("reading the LLM provider: %w", err)
@@ -148,8 +151,8 @@ func (s *Server) llmClient(ctx context.Context, userID int64) (llm.Client, error
 	return llm.New(cfg, http.DefaultClient), nil
 }
 
-// athleteContext loads what the context builder summarizes, as of today.
-func (s *Server) athleteContext(ctx context.Context, userID int64, today time.Time) (llm.AthleteContext, error) {
+// AthleteContext loads what the context builder summarizes, as of today.
+func (s *Server) AthleteContext(ctx context.Context, userID int64, today time.Time) (llm.AthleteContext, error) {
 	c := llm.AthleteContext{Today: today}
 	fail := func(what string, err error) (llm.AthleteContext, error) {
 		return llm.AthleteContext{}, fmt.Errorf("loading %s for the coach: %w", what, err)

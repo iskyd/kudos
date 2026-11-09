@@ -323,6 +323,32 @@ paths:
                 type: string
         default:
           $ref: "#/components/responses/Problem"
+  /api/coach-reports:
+    get:
+      operationId: listCoachReports
+      summary: List the coach's daily insights or weekly reports
+      description: |
+        Latest day first. Daily insights are written after the morning sync in
+        the user's timezone, weekly reports on Monday mornings; each records the
+        prompt version that produced it.
+      tags: [llm]
+      parameters:
+        - name: kind
+          in: query
+          required: true
+          schema:
+            $ref: "#/components/schemas/CoachReportKind"
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of outputs.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CoachReportPage"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/garmin:
     get:
       operationId: getGarminConnection
@@ -1686,6 +1712,41 @@ components:
         detail:
           description: What went wrong, for `error`.
           type: string
+    CoachReportKind:
+      type: string
+      enum: [daily_insight, weekly_report]
+    CoachReport:
+      type: object
+      required: [id, kind, day, promptVersion, content, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        kind:
+          $ref: "#/components/schemas/CoachReportKind"
+        day:
+          description: The local day of an insight, or the Monday a report was written for the week before.
+          type: string
+          format: date
+        promptVersion:
+          type: string
+          example: daily-insight.v1
+        content:
+          description: The coach's text, citing [act:ID] and [day:YYYY-MM-DD] references.
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    CoachReportPage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/CoachReport"
     GarminConnection:
       type: object
       required: [connected]

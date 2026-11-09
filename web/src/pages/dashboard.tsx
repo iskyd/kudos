@@ -4,6 +4,7 @@ import { useVolume } from '@/api/analytics'
 import { useGarminConnection } from '@/api/garmin'
 import { Card, Empty, QueryStatus } from '@/components/card'
 import { FitnessCard } from '@/components/fitness-card'
+import { InsightCard } from '@/components/insight-card'
 import { ReadinessCard } from '@/components/readiness-card'
 import { ActivityRow } from '@/pages/activities'
 import { addDays, formatDateTime, formatDay, mondayOf, toISODay } from '@/lib/format/date'
@@ -30,11 +31,7 @@ export function DashboardPage() {
             Your next planned workouts will appear here once training plans are available.
           </p>
         </Card>
-        <Card title="Coach insight">
-          <p className="text-sm text-muted-foreground">
-            The coach&apos;s latest insight will appear here once the AI coach is available.
-          </p>
-        </Card>
+        <InsightCard today={today} />
       </div>
     </div>
   )

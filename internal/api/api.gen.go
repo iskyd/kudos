@@ -322,6 +322,24 @@ func (e ChatMessageRole) Valid() bool {
 	}
 }
 
+// Defines values for CoachReportKind.
+const (
+	DailyInsight CoachReportKind = "daily_insight"
+	WeeklyReport CoachReportKind = "weekly_report"
+)
+
+// Valid indicates whether the value is a known member of the CoachReportKind enum.
+func (e CoachReportKind) Valid() bool {
+	switch e {
+	case DailyInsight:
+		return true
+	case WeeklyReport:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ComparisonAxis.
 const (
 	ComparisonAxisDistance ComparisonAxis = "distance"
@@ -1265,6 +1283,32 @@ type ChatMessageRole string
 type ChatRequest struct {
 	// Messages The conversation so far, oldest first, ending with the user's new message.
 	Messages []ChatMessage `json:"messages"`
+}
+
+// CoachReport defines model for CoachReport.
+type CoachReport struct {
+	// Content The coach's text, citing [act:ID] and [day:YYYY-MM-DD] references.
+	Content   string    `json:"content"`
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Day The local day of an insight, or the Monday a report was written for the week before.
+	Day  openapi_types.Date `json:"day"`
+	Id   int64              `json:"id"`
+	Kind CoachReportKind    `json:"kind"`
+
+	// PromptVersion Example: daily-insight.v1
+	PromptVersion string `json:"promptVersion"`
+}
+
+// CoachReportKind defines model for CoachReportKind.
+type CoachReportKind string
+
+// CoachReportPage defines model for CoachReportPage.
+type CoachReportPage struct {
+	Items []CoachReport `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
 // ComparedStreams One activity's values at each point of x.
@@ -2266,6 +2310,17 @@ type GetCalendarParams struct {
 	To openapi_types.Date `form:"to" json:"to"`
 }
 
+// ListCoachReportsParams defines parameters for ListCoachReports.
+type ListCoachReportsParams struct {
+	Kind CoachReportKind `form:"kind" json:"kind"`
+
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // GetCurvesParams defines parameters for GetCurves.
 type GetCurvesParams struct {
 	// From First local day, inclusive.
@@ -2514,6 +2569,9 @@ type ServerInterface interface {
 	// Chat Ask the AI coach
 	// (POST /api/chat)
 	Chat(w http.ResponseWriter, r *http.Request)
+	// ListCoachReports List the coach's daily insights or weekly reports
+	// (GET /api/coach-reports)
+	ListCoachReports(w http.ResponseWriter, r *http.Request, params ListCoachReportsParams)
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(w http.ResponseWriter, r *http.Request)
@@ -2757,6 +2815,12 @@ func (_ Unimplemented) GetCalendar(w http.ResponseWriter, r *http.Request, param
 // Chat Ask the AI coach
 // (POST /api/chat)
 func (_ Unimplemented) Chat(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListCoachReports List the coach's daily insights or weekly reports
+// (GET /api/coach-reports)
+func (_ Unimplemented) ListCoachReports(w http.ResponseWriter, r *http.Request, params ListCoachReportsParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -3719,6 +3783,65 @@ func (siw *ServerInterfaceWrapper) Chat(w http.ResponseWriter, r *http.Request) 
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.Chat(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListCoachReports operation middleware
+func (siw *ServerInterfaceWrapper) ListCoachReports(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListCoachReportsParams
+
+	// ------------- Required query parameter "kind" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "kind", r.URL.Query(), &params.Kind, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "kind"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCoachReports(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -5067,6 +5190,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/api/chat", wrapper.Chat)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/coach-reports", wrapper.ListCoachReports)
+	})
+	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/garmin", wrapper.DeleteGarminConnection)
 	})
 	r.Group(func(r chi.Router) {
@@ -6001,6 +6127,45 @@ type ChatdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response ChatdefaultApplicationProblemPlusJSONResponse) VisitChatResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCoachReportsRequestObject struct {
+	Params ListCoachReportsParams
+}
+
+type ListCoachReportsResponseObject interface {
+	VisitListCoachReportsResponse(w http.ResponseWriter) error
+}
+
+type ListCoachReports200JSONResponse CoachReportPage
+
+func (response ListCoachReports200JSONResponse) VisitListCoachReportsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListCoachReportsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListCoachReportsdefaultApplicationProblemPlusJSONResponse) VisitListCoachReportsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -7651,6 +7816,9 @@ type StrictServerInterface interface {
 	// Chat Ask the AI coach
 	// (POST /api/chat)
 	Chat(ctx context.Context, request ChatRequestObject) (ChatResponseObject, error)
+	// ListCoachReports List the coach's daily insights or weekly reports
+	// (GET /api/coach-reports)
+	ListCoachReports(ctx context.Context, request ListCoachReportsRequestObject) (ListCoachReportsResponseObject, error)
 	// GetConfig Frontend settings
 	// (GET /api/config)
 	GetConfig(ctx context.Context, request GetConfigRequestObject) (GetConfigResponseObject, error)
@@ -8348,6 +8516,32 @@ func (sh *strictHandler) Chat(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ChatResponseObject); ok {
 		if err := validResponse.VisitChatResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListCoachReports operation middleware
+func (sh *strictHandler) ListCoachReports(w http.ResponseWriter, r *http.Request, params ListCoachReportsParams) {
+	var request ListCoachReportsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListCoachReports(ctx, request.(ListCoachReportsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListCoachReports")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListCoachReportsResponseObject); ok {
+		if err := validResponse.VisitListCoachReportsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

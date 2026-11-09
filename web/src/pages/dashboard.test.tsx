@@ -53,8 +53,89 @@ describe('DashboardPage', () => {
       (await card('Planned workouts')).getByText(/once training plans are available/),
     ).toBeInTheDocument()
     expect(
-      (await card('Coach insight')).getByText(/once the AI coach is available/),
-    ).toBeInTheDocument()
+      await (await card('Coach insight')).findByRole('link', { name: 'Set up the AI coach' }),
+    ).toHaveAttribute('href', '/settings/ai-coach')
+  })
+
+  describe('with the AI coach set up', () => {
+    beforeEach(() => {
+      server.use(
+        http.get('/api/llm-provider', () =>
+          HttpResponse.json({
+            configured: true,
+            provider: 'ollama',
+            baseUrl: 'http://o.example.test',
+            model: 'm',
+            keySet: false,
+          }),
+        ),
+      )
+    })
+
+    const insight = (day: string, content: string) =>
+      http.get('/api/coach-reports', ({ request }) => {
+        const query = new URL(request.url).searchParams
+        expect(query.get('kind')).toBe('daily_insight')
+        expect(query.get('limit')).toBe('1')
+        return HttpResponse.json({
+          items: [
+            {
+              id: 1,
+              kind: 'daily_insight',
+              day,
+              promptVersion: 'daily-insight.v1',
+              content,
+              createdAt: `${day}T06:30:00Z`,
+            },
+          ],
+        })
+      })
+
+    it("shows today's insight with its references", async () => {
+      server.use(insight(today, 'Easy run [act:7] after [day:2026-11-02].'))
+      renderApp('/')
+      const c = await card('Coach insight')
+      expect(await c.findByRole('link', { name: 'activity 7' })).toHaveAttribute(
+        'href',
+        '/activities/7',
+      )
+      expect(c.getByRole('link', { name: '2 November 2026' })).toHaveAttribute(
+        'href',
+        '/calendar?day=2026-11-02',
+      )
+      expect(c.getByText('Today')).toBeInTheDocument()
+      expect(c.queryByText(/written after the morning sync/)).not.toBeInTheDocument()
+    })
+
+    it('shows an older insight until today is written', async () => {
+      server.use(insight('2026-11-02', 'Rest well.'))
+      renderApp('/')
+      const c = await card('Coach insight')
+      expect(await c.findByText('Rest well.')).toBeInTheDocument()
+      expect(c.getByText('2 November 2026')).toBeInTheDocument()
+      expect(c.getByText("Today's insight is written after the morning sync.")).toBeInTheDocument()
+    })
+
+    it('shows the insight loading, then failing', async () => {
+      server.use(http.get('/api/coach-reports', () => delay('infinite')))
+      renderApp('/')
+      expect(await (await card('Coach insight')).findByText('Loading…')).toBeInTheDocument()
+
+      server.use(
+        http.get('/api/coach-reports', () => problem(500, 'internal', 'Something went wrong')),
+      )
+      renderApp('/')
+      expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong')
+    })
+
+    it('says when nothing is written yet', async () => {
+      renderApp('/')
+      expect(
+        await (
+          await card('Coach insight')
+        ).findByText("Today's insight is written after the morning sync."),
+      ).toBeInTheDocument()
+    })
   })
 
   it('shows fitness, volume, latest activities and sync', async () => {
