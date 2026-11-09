@@ -296,6 +296,33 @@ paths:
           description: Removed, or there was none.
         default:
           $ref: "#/components/responses/Problem"
+  /api/chat:
+    post:
+      operationId: chat
+      summary: Ask the AI coach
+      description: |
+        Streams the coach's reply to the conversation as server-sent events.
+        The client keeps the conversation and sends it whole each turn; nothing
+        is stored. Each `data:` line is a JSON ChatEvent: `text` pieces of the
+        reply, then one `done`, or one `error` if the provider fails after the
+        stream started. Errors before it starts are problem+json; a user
+        without a provider gets `llm-not-configured`.
+      tags: [llm]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChatRequest"
+      responses:
+        "200":
+          description: The reply as server-sent events.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Problem"
   /api/garmin:
     get:
       operationId: getGarminConnection
@@ -1623,6 +1650,42 @@ components:
         keySet:
           type: boolean
           description: Whether an API key is stored; the key itself is never returned.
+    ChatMessage:
+      type: object
+      required: [role, content]
+      properties:
+        role:
+          type: string
+          enum: [user, assistant]
+        content:
+          type: string
+          minLength: 1
+          maxLength: 8000
+    ChatRequest:
+      type: object
+      required: [messages]
+      properties:
+        messages:
+          description: The conversation so far, oldest first, ending with the user's new message.
+          type: array
+          minItems: 1
+          maxItems: 40
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+    ChatEvent:
+      description: One server-sent event of a chat reply.
+      type: object
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [text, done, error]
+        text:
+          description: The next piece of the reply, for `text`.
+          type: string
+        detail:
+          description: What went wrong, for `error`.
+          type: string
     GarminConnection:
       type: object
       required: [connected]

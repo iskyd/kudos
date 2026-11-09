@@ -216,6 +216,14 @@ func TestBuildContextEdges(t *testing.T) {
 			t.Errorf("pace(%v) = %q", in, got)
 		}
 	}
+	for e, want := range map[analytics.EffortName]string{
+		analytics.Fastest5K: "Fastest 5k 22:01", analytics.LongestRide: "Longest ride 120.50 km", analytics.Power20m: "Power 20m 251 W",
+	} {
+		v := map[analytics.EffortName]float64{analytics.Fastest5K: 1321, analytics.LongestRide: 120500, analytics.Power20m: 250.6}[e]
+		if r := EffortRecord(e, v, 7, date("2026-10-01")); r.Label+" "+r.Value != want || r.ActivityID != 7 || !r.Day.Equal(date("2026-10-01")) {
+			t.Errorf("EffortRecord(%s) = %+v", e, r)
+		}
+	}
 	if got := metricValue("ascent", 1234.6); got != "1235 m" {
 		t.Errorf("ascent = %q", got)
 	}

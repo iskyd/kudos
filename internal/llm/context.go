@@ -98,6 +98,22 @@ type Record struct {
 	Day        time.Time
 }
 
+// EffortRecord renders a best effort as a Record: fastest efforts are times,
+// longest distances, the rest power.
+func EffortRecord(e analytics.EffortName, value float64, activityID int64, d time.Time) Record {
+	label := strings.ReplaceAll(string(e), "_", " ")
+	r := Record{Label: strings.ToUpper(label[:1]) + label[1:], ActivityID: activityID, Day: d}
+	switch {
+	case e.LowerIsBetter():
+		r.Value = duration(value)
+	case strings.HasPrefix(string(e), "longest"):
+		r.Value = km(value)
+	default:
+		r.Value = fmt.Sprintf("%.0f W", value)
+	}
+	return r
+}
+
 // RefActivity and RefDay are the references every item carries for the model
 // to cite and the UI to link.
 func RefActivity(id int64) string { return fmt.Sprintf("[act:%d]", id) }

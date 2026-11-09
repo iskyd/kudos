@@ -9,6 +9,7 @@ import { AICoachPage } from '@/pages/ai-coach'
 import { ActivityComparePage } from '@/pages/activity-compare'
 import { ActivityDetailPage } from '@/pages/activity-detail'
 import { CalendarPage } from '@/pages/calendar'
+import { CoachPage } from '@/pages/coach'
 import { DashboardPage } from '@/pages/dashboard'
 import { GearPage } from '@/pages/gear'
 import { GoalsPage } from '@/pages/goals'
@@ -23,6 +24,7 @@ const pages: Partial<Record<string, ReactElement>> = {
   '/': <DashboardPage />,
   '/activities': <ActivitiesPage />,
   '/calendar': <CalendarPage />,
+  '/coach': <CoachPage />,
   '/gear': <GearPage />,
   '/goals': <GoalsPage />,
   '/records': <RecordsPage />,

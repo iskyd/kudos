@@ -185,6 +185,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/chat": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the AI coach
+         * @description Streams the coach's reply to the conversation as server-sent events.
+         *     The client keeps the conversation and sends it whole each turn; nothing
+         *     is stored. Each `data:` line is a JSON ChatEvent: `text` pieces of the
+         *     reply, then one `done`, or one `error` if the provider fails after the
+         *     stream started. Errors before it starts are problem+json; a user
+         *     without a provider gets `llm-not-configured`.
+         */
+        post: operations["chat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/garmin": {
         parameters: {
             query?: never;
@@ -1138,6 +1163,24 @@ export interface components {
             model?: string;
             /** @description Whether an API key is stored; the key itself is never returned. */
             keySet: boolean;
+        };
+        ChatMessage: {
+            /** @enum {string} */
+            role: "user" | "assistant";
+            content: string;
+        };
+        ChatRequest: {
+            /** @description The conversation so far, oldest first, ending with the user's new message. */
+            messages: components["schemas"]["ChatMessage"][];
+        };
+        /** @description One server-sent event of a chat reply. */
+        ChatEvent: {
+            /** @enum {string} */
+            type: "text" | "done" | "error";
+            /** @description The next piece of the reply, for `text`. */
+            text?: string;
+            /** @description What went wrong, for `error`. */
+            detail?: string;
         };
         GarminConnection: {
             connected: boolean;
@@ -2366,6 +2409,31 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    chat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChatRequest"];
+            };
+        };
+        responses: {
+            /** @description The reply as server-sent events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/event-stream": string;
+                };
             };
             default: components["responses"]["Problem"];
         };
