@@ -1,0 +1,11 @@
+{{define "system"}}{{template "rules.v1.tmpl" .}}
+<athlete_context>
+{{.Context}}</athlete_context>
+{{end}}
+{{define "user"}}Write the weekly report for the seven days before today, in at most 300 words, with these headings:
+## Volume
+## Load
+## Adherence
+## Recommendations
+Under Recommendations, cover both rest and training for the coming week. If there is no data for a heading, say so in one sentence.
+{{end}}
