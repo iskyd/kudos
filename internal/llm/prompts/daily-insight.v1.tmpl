@@ -1,0 +1,10 @@
+{{define "system"}}{{template "rules.v1.tmpl" .}}
+<athlete_context>
+{{.Context}}</athlete_context>
+{{end}}
+{{define "user"}}Write today's daily insight in at most 150 words, in three short parts:
+1. Yesterday's training: what was done and how it went.
+2. Today's readiness and what it means for training today.
+3. Today's planned workout, if there is one, and whether to keep, ease or skip it.
+If there is no data for a part, say so in one sentence.
+{{end}}

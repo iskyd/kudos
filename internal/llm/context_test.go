@@ -79,7 +79,7 @@ func sample() AthleteContext {
 
 func golden(t *testing.T, name, got string) {
 	t.Helper()
-	path := filepath.Join("testdata", "context", name+".golden")
+	path := filepath.Join("testdata", name+".golden")
 	if *update {
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
@@ -100,10 +100,10 @@ func golden(t *testing.T, name, got string) {
 func TestBuildContextGolden(t *testing.T) {
 	t.Parallel()
 	full := BuildContext(sample(), 0)
-	golden(t, "full", full)
+	golden(t, "context/full", full)
 	// A budget of about half: lower sections are cut item by item, then dropped.
 	trimmed := BuildContext(sample(), tokens(full)/2)
-	golden(t, "trimmed", trimmed)
+	golden(t, "context/trimmed", trimmed)
 	if tokens(trimmed) > tokens(full)/2 {
 		t.Errorf("trimmed is %d tokens, over the budget of %d", tokens(trimmed), tokens(full)/2)
 	}
