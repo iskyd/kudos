@@ -51,6 +51,13 @@ describe('CalendarPage', () => {
     )
   })
 
+  it('opens on the linked day, ignoring a malformed one', async () => {
+    renderApp('/calendar?day=2026-03-14')
+    expect(await screen.findByRole('list', { name: 'March 2026' })).toBeInTheDocument()
+    renderApp('/calendar?day=soon')
+    expect(await screen.findByRole('list', { name: 'October 2026' })).toBeInTheDocument()
+  })
+
   it('places activities on the local day where they happened', async () => {
     const asked: (string | null)[][] = []
     const calendar: Calendar = {

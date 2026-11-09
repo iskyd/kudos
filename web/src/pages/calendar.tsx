@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import type { ActivitySummary } from '@/api/activities'
 import { type Calendar, useCalendar } from '@/api/analytics'
 import type { HealthLogEntry, WellnessDay } from '@/api/wellness'
@@ -19,7 +19,12 @@ const healthLabels = { injury: 'Injury', illness: 'Illness', period: 'Period' } 
 export function CalendarPage() {
   const today = toISODay(new Date())
   const [view, setView] = useState<View>('month')
-  const [anchor, setAnchor] = useState(today)
+  // A link can open the calendar on a day, as the coach's references do.
+  const [searchParams] = useSearchParams()
+  const linked = searchParams.get('day')
+  const [anchor, setAnchor] = useState(
+    linked && /^\d{4}-\d{2}-\d{2}$/.test(linked) ? linked : today,
+  )
   const days = calendarDays(view, anchor)
   const from = days[0] ?? anchor
   const to = days.at(-1) ?? anchor

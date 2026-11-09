@@ -35,6 +35,8 @@ const (
 	KindGarminUnavailable Kind = "garmin-unavailable"
 	KindBackfillExists    Kind = "backfill-exists"
 	KindBackfillRunning   Kind = "backfill-running"
+
+	KindLLMNotConfigured Kind = "llm-not-configured"
 )
 
 func (k Kind) status() int {
@@ -45,7 +47,7 @@ func (k Kind) status() int {
 		return http.StatusUnauthorized
 	case KindCSRF, KindCrossOrigin, KindRegistrationDisabled:
 		return http.StatusForbidden
-	case KindUsernameTaken, KindBackfillExists, KindBackfillRunning:
+	case KindUsernameTaken, KindBackfillExists, KindBackfillRunning, KindLLMNotConfigured:
 		return http.StatusConflict
 	case KindNotFound:
 		return http.StatusNotFound
@@ -98,6 +100,8 @@ func (k Kind) title() string {
 		return "Backfill already started"
 	case KindBackfillRunning:
 		return "History import still running"
+	case KindLLMNotConfigured:
+		return "No AI coach provider set up"
 	default:
 		return "Internal error"
 	}
