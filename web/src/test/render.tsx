@@ -34,7 +34,7 @@ export function problem(status: number, kind: string, title: string, detail?: st
 // gear pickers find no gear and activities ran no structured workout. The
 // dashboard, trends, records, goals and calendar pages find no data: no
 // activities, load, volume, curves, records, goals or calendar entries,
-// readiness collecting.
+// readiness collecting; no AI coach is set up and it has written nothing.
 export function loggedInAs(user: Me | null) {
   server.use(
     http.get('/api/me', () =>
@@ -49,6 +49,8 @@ export function loggedInAs(user: Me | null) {
     http.get('/api/volume', () => HttpResponse.json({ periods: [], timeInZones: [] })),
     http.get('/api/curves', () => HttpResponse.json({ power: [], pace: [], racePredictions: [] })),
     http.get('/api/records', () => HttpResponse.json({ records: [] })),
+    http.get('/api/llm-provider', () => HttpResponse.json({ configured: false, keySet: false })),
+    http.get('/api/coach-reports', () => HttpResponse.json({ items: [] })),
     http.get('/api/calendar', () =>
       HttpResponse.json({ activities: [], wellness: [], healthLog: [] }),
     ),

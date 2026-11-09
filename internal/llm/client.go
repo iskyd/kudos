@@ -102,6 +102,9 @@ func (e *APIError) Error() string {
 	return fmt.Sprintf("LLM provider returned %d: %s", e.Status, e.Message)
 }
 
+// ErrNotConfigured means the user has no provider set up.
+var ErrNotConfigured = errors.New("no LLM provider configured")
+
 // ErrMalformed means the provider's reply could not be read.
 var ErrMalformed = errors.New("malformed LLM provider response")
 

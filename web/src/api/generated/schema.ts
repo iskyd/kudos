@@ -210,6 +210,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/coach-reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the coach's daily insights or weekly reports
+         * @description Latest day first. Daily insights are written after the morning sync in
+         *     the user's timezone, weekly reports on Monday mornings; each records the
+         *     prompt version that produced it.
+         */
+        get: operations["listCoachReports"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/garmin": {
         parameters: {
             query?: never;
@@ -1181,6 +1203,27 @@ export interface components {
             text?: string;
             /** @description What went wrong, for `error`. */
             detail?: string;
+        };
+        /** @enum {string} */
+        CoachReportKind: "daily_insight" | "weekly_report";
+        CoachReport: {
+            /** Format: int64 */
+            id: number;
+            kind: components["schemas"]["CoachReportKind"];
+            /**
+             * Format: date
+             * @description The local day of an insight, or the Monday a report was written for the week before.
+             */
+            day: string;
+            /** @example daily-insight.v1 */
+            promptVersion: string;
+            /** @description The coach's text, citing [act:ID] and [day:YYYY-MM-DD] references. */
+            content: string;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        CoachReportPage: components["schemas"]["Page"] & {
+            items: components["schemas"]["CoachReport"][];
         };
         GarminConnection: {
             connected: boolean;
@@ -2433,6 +2476,33 @@ export interface operations {
                 };
                 content: {
                     "text/event-stream": string;
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listCoachReports: {
+        parameters: {
+            query: {
+                kind: components["schemas"]["CoachReportKind"];
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of outputs. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CoachReportPage"];
                 };
             };
             default: components["responses"]["Problem"];

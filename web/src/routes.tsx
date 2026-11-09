@@ -14,6 +14,7 @@ import { DashboardPage } from '@/pages/dashboard'
 import { GearPage } from '@/pages/gear'
 import { GoalsPage } from '@/pages/goals'
 import { RecordsPage } from '@/pages/records'
+import { ReportsPage } from '@/pages/reports'
 import { LoginPage, RegisterPage } from '@/pages/auth'
 import { SettingsPage } from '@/pages/settings'
 import { TrendsPage } from '@/pages/trends'
@@ -28,6 +29,7 @@ const pages: Partial<Record<string, ReactElement>> = {
   '/gear': <GearPage />,
   '/goals': <GoalsPage />,
   '/records': <RecordsPage />,
+  '/reports': <ReportsPage />,
   '/settings': <SettingsPage />,
   '/trends': <TrendsPage />,
   '/wellness': <WellnessPage />,

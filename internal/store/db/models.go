@@ -112,6 +112,16 @@ type ActivityThreshold struct {
 	PowerZonesW    []int16
 }
 
+type CoachReport struct {
+	ID            int64
+	UserID        int64
+	Kind          string
+	Day           time.Time
+	PromptVersion string
+	Content       string
+	CreatedAt     time.Time
+}
+
 type DailyMetric struct {
 	UserID         int64
 	Day            time.Time

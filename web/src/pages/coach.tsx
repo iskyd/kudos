@@ -4,32 +4,10 @@ import { useCurrentUser } from '@/api/auth'
 import { type ChatMessage, maxChatMessages, streamChat } from '@/api/chat'
 import { useLLMProvider } from '@/api/llm'
 import { problemMessage } from '@/api/problem'
+import { CoachText } from '@/components/coach-text'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { formatDay } from '@/lib/format/date'
-import { splitReferences } from '@/lib/references'
-
-// CoachText renders a reply with its references as links to what they cite.
-function CoachText({ text }: { text: string }) {
-  return (
-    <p className="whitespace-pre-wrap">
-      {splitReferences(text).map((part, i) =>
-        typeof part === 'string' ? (
-          part
-        ) : part.kind === 'activity' ? (
-          <Link key={i} to={`/activities/${part.id}`} className="underline">
-            activity {part.id}
-          </Link>
-        ) : (
-          <Link key={i} to={`/calendar?day=${part.day}`} className="underline">
-            {formatDay(part.day)}
-          </Link>
-        ),
-      )}
-    </p>
-  )
-}
 
 function Turn({ message }: { message: ChatMessage }) {
   const user = message.role === 'user'

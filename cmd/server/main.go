@@ -22,6 +22,7 @@ import (
 	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/jobs"
+	"github.com/iskyd/kudos/internal/llm/reports"
 	"github.com/iskyd/kudos/internal/store"
 	"github.com/iskyd/kudos/internal/store/db"
 	"github.com/iskyd/kudos/web"
@@ -69,11 +70,13 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	garminDeps := &garminsync.Deps{Pool: pool, Connector: garminClient, Cipher: cipher, Logger: logger}
 	scheduler := &garminsync.ScheduleWorker{Pool: pool}
 	derived := &ingest.Workers{}
+	// The coach's workers load context and clients through the API server, set below.
+	coach := &reports.Deps{Pool: pool, Logger: logger}
 	jobClient, err := jobs.NewClient(pool, logger, func(w *river.Workers) {
 		river.AddWorker(w, &garminsync.Worker{Deps: garminDeps})
 		river.AddWorker(w, &garminsync.SyncWorker{Deps: garminDeps})
 		river.AddWorker(w, scheduler)
-	}, derived.Register)
+	}, derived.Register, coach.Register)
 	if err != nil {
 		return fmt.Errorf("creating job client: %w", err)
 	}
@@ -82,7 +85,12 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 	derived.Service = ingester
 	garminSync := garminsync.NewService(pool, jobClient)
 	scheduler.Service = garminSync
+	server := api.NewServer(db.New(pool), ingester, cursors, api.GarminDeps{
+		Auth: garminClient, Cipher: cipher, Sync: garminSync,
+	}, cfg.RegistrationEnabled, cfg.MapTileURL)
+	coach.Context, coach.Client = server.AthleteContext, server.LLMClient
 	jobClient.PeriodicJobs().Add(garminsync.SchedulePeriodic())
+	jobClient.PeriodicJobs().Add(reports.SchedulePeriodic())
 	// Detached from the signal context: canceling it would hard-stop running jobs; Stop below drains them.
 	if err := jobClient.Start(context.WithoutCancel(ctx)); err != nil {
 		return fmt.Errorf("starting job client: %w", err)
@@ -99,10 +107,8 @@ func run(logger *slog.Logger, level *slog.LevelVar) error {
 
 	listenAddr := cfg.ListenAddr
 	srv := &http.Server{
-		Addr: listenAddr,
-		Handler: api.NewRouter(logger, api.NewServer(db.New(pool), ingester, cursors, api.GarminDeps{
-			Auth: garminClient, Cipher: cipher, Sync: garminSync,
-		}, cfg.RegistrationEnabled, cfg.MapTileURL), spa),
+		Addr:              listenAddr,
+		Handler:           api.NewRouter(logger, server, spa),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
