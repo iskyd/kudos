@@ -727,6 +727,76 @@ paths:
           description: Deleted.
         default:
           $ref: "#/components/responses/Problem"
+  /api/races:
+    get:
+      operationId: listRaces
+      summary: List races
+      description: Latest race day first.
+      tags: [races]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: One page of races.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RacePage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      operationId: createRace
+      summary: Add a race
+      tags: [races]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RaceInput"
+      responses:
+        "201":
+          description: The new race.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Race"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/races/{id}:
+    put:
+      operationId: updateRace
+      summary: Replace a race
+      tags: [races]
+      parameters:
+        - $ref: "#/components/parameters/RaceID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RaceInput"
+      responses:
+        "200":
+          description: The saved race.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Race"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: deleteRace
+      summary: Delete a race
+      tags: [races]
+      parameters:
+        - $ref: "#/components/parameters/RaceID"
+      responses:
+        "204":
+          description: Deleted.
+        default:
+          $ref: "#/components/responses/Problem"
   /api/calendar:
     get:
       operationId: getCalendar
@@ -736,8 +806,8 @@ paths:
         42, six weeks): activities by the local day where they happened (start
         plus the activity's own UTC offset), effective values as in
         /api/activities, oldest first, at most 500; the days with a check-in or
-        body metrics entered; and the injury and illness entries overlapping the
-        range (an entry without an end date is ongoing).
+        body metrics entered; the injury and illness entries overlapping the
+        range (an entry without an end date is ongoing); and the races in it.
       tags: [calendar]
       parameters:
         - name: from
@@ -1454,6 +1524,13 @@ components:
       schema:
         type: integer
         format: int64
+    RaceID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
     Cursor:
       name: cursor
       in: query
@@ -2160,10 +2237,59 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Goal"
+    RaceInput:
+      type: object
+      required: [name, day, sport, distanceM, priority]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        day:
+          description: The local race day.
+          type: string
+          format: date
+        sport:
+          $ref: "#/components/schemas/ActivitySport"
+        distanceM:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+        goalTimeS:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+        priority:
+          description: A is the season's goal, B a tune-up worth racing, C a training race.
+          type: string
+          enum: [A, B, C]
+    Race:
+      allOf:
+        - $ref: "#/components/schemas/RaceInput"
+        - type: object
+          required: [id]
+          properties:
+            id:
+              type: integer
+              format: int64
+    RacePage:
+      allOf:
+        - $ref: "#/components/schemas/Page"
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items:
+                $ref: "#/components/schemas/Race"
     Calendar:
       type: object
-      required: [activities, wellness, healthLog]
+      required: [activities, wellness, healthLog, races]
       properties:
+        races:
+          type: array
+          items:
+            $ref: "#/components/schemas/Race"
         activities:
           type: array
           items:

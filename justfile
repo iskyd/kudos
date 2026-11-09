@@ -34,10 +34,12 @@ coverage:
 E2E_DB_PORT := env("KUDOS_E2E_DB_PORT", "5433")
 
 # Fuzz the FIT, GPX and TCX decoders briefly (CI runs this on every pull request).
-fuzz time="30s":
-    go test ./internal/importer/fit -run '^$' -fuzz FuzzDecodeActivity -fuzztime {{time}}
-    go test ./internal/importer/gpx -run '^$' -fuzz FuzzDecodeGPX -fuzztime {{time}}
-    go test ./internal/importer/tcx -run '^$' -fuzz FuzzDecodeTCX -fuzztime {{time}}
+# Runs are bounded by executions, not time: a -fuzztime duration can end in a
+# spurious "context deadline exceeded" from a race in Go's fuzz coordinator.
+fuzz execs="1000000":
+    go test ./internal/importer/fit -run '^$' -fuzz FuzzDecodeActivity -fuzztime {{execs}}x
+    go test ./internal/importer/gpx -run '^$' -fuzz FuzzDecodeGPX -fuzztime {{execs}}x
+    go test ./internal/importer/tcx -run '^$' -fuzz FuzzDecodeTCX -fuzztime {{execs}}x
 
 # Run the Playwright end-to-end tests against the real server and a throwaway database.
 e2e:

@@ -98,6 +98,12 @@ func TestChatStreamsWithTheUsersContext(t *testing.T) {
 	decodeJSON[Goal](t, alice.do(http.MethodPost, "/api/goals",
 		GoalInput{Period: GoalInputPeriodYear, Metric: GoalInputMetricDistance, Start: on(yesterday), Target: 1e6}, nil), http.StatusCreated)
 	putDay(t, alice, yesterday.Format(time.DateOnly), WellnessDayInput{Soreness: new(4), Note: new("Heavy legs")})
+	decodeJSON[Race](t, alice.do(http.MethodPost, "/api/races", RaceInput{
+		Name: "Autumn Half", Day: on(yesterday.AddDate(0, 0, 30)), Sport: ActivitySportRunning, DistanceM: 21097.5, Priority: RaceInputPriorityA,
+	}, nil), http.StatusCreated)
+	decodeJSON[Race](t, alice.do(http.MethodPost, "/api/races", RaceInput{
+		Name: "Last Year's 10K", Day: on(yesterday.AddDate(-1, 0, 0)), Sport: ActivitySportRunning, DistanceM: 10000, Priority: RaceInputPriorityC,
+	}, nil), http.StatusCreated)
 	putDay(t, alice, yesterday.AddDate(0, 0, -1).Format(time.DateOnly), WellnessDayInput{WeightKg: new(70.0)})
 	decodeJSON[HealthLogEntry](t, bob.do(http.MethodPost, "/api/health-log",
 		HealthLogInput{Kind: Illness, Description: new("Bob's flu"), StartDate: Day{Time: yesterday}}, nil), http.StatusCreated)
@@ -123,10 +129,13 @@ func TestChatStreamsWithTheUsersContext(t *testing.T) {
 		t.Fatalf("provider got %+v", msgs)
 	}
 	for _, want := range []string{"<athlete_context>", "Sore left knee", fmt.Sprintf("[act:%d]", actID), "Cite every item",
-		"LTHR 171", "Heavy legs", "## Goals", "## Training load, last 6 weeks", "- Sports: running"} {
+		"LTHR 171", "Heavy legs", "Autumn Half", "priority A, in 29 days", "## Goals", "## Training load, last 6 weeks", "- Sports: running"} {
 		if !strings.Contains(msgs[0].Content, want) {
 			t.Errorf("system prompt lacks %q", want)
 		}
+	}
+	if strings.Contains(msgs[0].Content, "Last Year's 10K") {
+		t.Error("the context lists a past race as upcoming")
 	}
 	if strings.Contains(msgs[0].Content, "Bob's flu") {
 		t.Error("alice's context has bob's health log")

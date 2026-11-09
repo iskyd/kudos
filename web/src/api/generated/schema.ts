@@ -543,6 +543,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/races": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List races
+         * @description Latest race day first.
+         */
+        get: operations["listRaces"];
+        put?: never;
+        /** Add a race */
+        post: operations["createRace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/races/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace a race */
+        put: operations["updateRace"];
+        post?: never;
+        /** Delete a race */
+        delete: operations["deleteRace"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendar": {
         parameters: {
             query?: never;
@@ -556,8 +595,8 @@ export interface paths {
          *     42, six weeks): activities by the local day where they happened (start
          *     plus the activity's own UTC offset), effective values as in
          *     /api/activities, oldest first, at most 500; the days with a check-in or
-         *     body metrics entered; and the injury and illness entries overlapping the
-         *     range (an entry without an end date is ongoing).
+         *     body metrics entered; the injury and illness entries overlapping the
+         *     range (an entry without an end date is ongoing); and the races in it.
          */
         get: operations["getCalendar"];
         put?: never;
@@ -1504,7 +1543,33 @@ export interface components {
         GoalPage: components["schemas"]["Page"] & {
             items: components["schemas"]["Goal"][];
         };
+        RaceInput: {
+            name: string;
+            /**
+             * Format: date
+             * @description The local race day.
+             */
+            day: string;
+            sport: components["schemas"]["ActivitySport"];
+            /** Format: double */
+            distanceM: number;
+            /** Format: double */
+            goalTimeS?: number;
+            /**
+             * @description A is the season's goal, B a tune-up worth racing, C a training race.
+             * @enum {string}
+             */
+            priority: "A" | "B" | "C";
+        };
+        Race: components["schemas"]["RaceInput"] & {
+            /** Format: int64 */
+            id: number;
+        };
+        RacePage: components["schemas"]["Page"] & {
+            items: components["schemas"]["Race"][];
+        };
         Calendar: {
+            races: components["schemas"]["Race"][];
             activities: components["schemas"]["ActivitySummary"][];
             wellness: components["schemas"]["WellnessDay"][];
             healthLog: components["schemas"]["HealthLogEntry"][];
@@ -2128,6 +2193,7 @@ export interface components {
         EntryID: number;
         GearID: number;
         GoalID: number;
+        RaceID: number;
         /** @description Opaque cursor from a previous page's `nextCursor`. */
         Cursor: string;
         /** @description Maximum number of items to return. */
@@ -2973,6 +3039,105 @@ export interface operations {
             header?: never;
             path: {
                 id: components["parameters"]["GoalID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listRaces: {
+        parameters: {
+            query?: {
+                /** @description Opaque cursor from a previous page's `nextCursor`. */
+                cursor?: components["parameters"]["Cursor"];
+                /** @description Maximum number of items to return. */
+                limit?: components["parameters"]["Limit"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of races. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RacePage"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createRace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RaceInput"];
+            };
+        };
+        responses: {
+            /** @description The new race. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Race"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    updateRace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["RaceID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RaceInput"];
+            };
+        };
+        responses: {
+            /** @description The saved race. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Race"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    deleteRace: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["RaceID"];
             };
             cookie?: never;
         };

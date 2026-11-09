@@ -135,6 +135,7 @@ function DayCell({
   // Activities sit on the local day where they happened, whatever the viewer's timezone.
   const activities = c?.activities.filter((a) => localDay(a.startTime, a.utcOffsetS) === day) ?? []
   const checkIn = c?.wellness.find((w) => w.day === day && isCheckIn(w))
+  const races = c?.races.filter((r) => r.day === day) ?? []
   const health =
     c?.healthLog.filter(
       (e) => e.startDate <= day && (e.endDate === undefined || e.endDate >= day),
@@ -148,6 +149,15 @@ function DayCell({
       <span className={`self-end text-xs ${today ? 'font-semibold text-primary' : ''}`}>
         {Number(day.slice(8))}
       </span>
+      {races.map((r) => (
+        <Link
+          key={r.id}
+          to="/races"
+          className="truncate rounded bg-primary/15 px-1 text-xs font-medium text-primary"
+        >
+          Race {r.priority}: {r.name}
+        </Link>
+      ))}
       {health.map((e) => (
         <HealthTag key={e.id} entry={e} />
       ))}

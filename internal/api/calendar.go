@@ -17,7 +17,7 @@ const (
 	maxCalendarActivities = 500
 )
 
-// GetCalendar returns the range's activities, check-ins and injury or illness entries.
+// GetCalendar returns the range's activities, check-ins, injury or illness entries and races.
 func (s *Server) GetCalendar(ctx context.Context, req GetCalendarRequestObject) (GetCalendarResponseObject, error) {
 	from, to := req.Params.From.Time, req.Params.To.Time
 	switch days := int(to.Sub(from).Hours()/24) + 1; {
@@ -47,8 +47,19 @@ func (s *Server) GetCalendar(ctx context.Context, req GetCalendarRequestObject) 
 		return nil, fmt.Errorf("listing health log: %w", err)
 	}
 
+	races, err := s.q.ListRacesBetween(ctx, db.ListRacesBetweenParams{
+		UserID: userID, FromDay: from, ToDay: to, MaxRows: maxPageSize,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("listing races: %w", err)
+	}
+
 	out := GetCalendar200JSONResponse{
 		Activities: make([]ActivitySummary, 0, len(rows)), Wellness: make([]WellnessDay, len(wellness)), HealthLog: make([]HealthLogEntry, len(log)),
+		Races: make([]Race, len(races)),
+	}
+	for i, r := range races {
+		out.Races[i] = race(r)
 	}
 	slices.Reverse(rows) // newest first from the list query
 	for _, r := range rows {
