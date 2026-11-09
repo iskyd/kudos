@@ -41,6 +41,10 @@ func sample() AthleteContext {
 			{Kind: "illness", Description: "Cold", Start: date("2026-10-28")},
 			{Kind: "period", Start: date("2026-10-12"), End: new(date("2026-10-16"))},
 		},
+		Races: []Race{
+			{Day: date("2026-12-06"), Name: "City Marathon", Sport: "running", DistanceM: 42195, GoalTimeS: new(11700.0), Priority: "A"},
+			{Day: date("2026-11-15"), Name: "Park 10K", Sport: "running", DistanceM: 10000, Priority: "C"},
+		},
 		Goals: []GoalProgress{
 			{Period: "year", Start: date("2026-01-01"), Sport: "running", Metric: "distance", Target: 2e6, Value: 1.5e6, Projected: 1.8e6, Status: "behind"},
 			{Period: "month", Start: date("2026-11-01"), Metric: "duration", Target: 36000, Value: 5400, Projected: 81000, Status: "ahead"},
@@ -163,7 +167,7 @@ func TestBuildContextIsDeterministic(t *testing.T) {
 func TestBuildContextTrimsLowestPriorityFirst(t *testing.T) {
 	t.Parallel()
 	full := BuildContext(sample(), 0)
-	headings := []string{"## Athlete profile", "## Injury and illness history", "## Goals", "## Readiness and check-ins",
+	headings := []string{"## Athlete profile", "## Injury and illness history", "## Upcoming races", "## Goals", "## Readiness and check-ins",
 		"## Training load, last 6 weeks", "## Recent activities", "## Health trends", "## Personal records"}
 	last := -1
 	for _, h := range headings {

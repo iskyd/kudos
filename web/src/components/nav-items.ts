@@ -7,6 +7,7 @@ export const navItems = [
   { path: '/gear', label: 'Gear' },
   { path: '/wellness', label: 'Wellness' },
   { path: '/calendar', label: 'Calendar' },
+  { path: '/races', label: 'Races' },
   { path: '/plans', label: 'Plans' },
   { path: '/coach', label: 'Coach' },
   { path: '/reports', label: 'Reports' },

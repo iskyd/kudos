@@ -258,6 +258,18 @@ type OriginalFile struct {
 	ReceivedAt time.Time
 }
 
+type Race struct {
+	ID        int64
+	UserID    int64
+	Name      string
+	Day       time.Time
+	Sport     string
+	DistanceM float64
+	GoalTimeS *float64
+	Priority  string
+	CreatedAt time.Time
+}
+
 type RecordedWorkout struct {
 	UserID     int64
 	ActivityID int64

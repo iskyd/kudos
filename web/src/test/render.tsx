@@ -32,8 +32,8 @@ export function problem(status: number, kind: string, title: string, detail?: st
 // loggedInAs answers GET /api/me with user, or with 401 when user is null. The
 // app shell's Garmin banner asks for the connection on every page: none by default,
 // gear pickers find no gear and activities ran no structured workout. The
-// dashboard, trends, records, goals and calendar pages find no data: no
-// activities, load, volume, curves, records, goals or calendar entries,
+// dashboard, trends, records, goals, races and calendar pages find no data: no
+// activities, load, volume, curves, records, goals, races or calendar entries,
 // readiness collecting; no AI coach is set up and it has written nothing.
 export function loggedInAs(user: Me | null) {
   server.use(
@@ -43,6 +43,7 @@ export function loggedInAs(user: Me | null) {
     http.get('/api/garmin', () => HttpResponse.json({ connected: false })),
     http.get('/api/gear', () => HttpResponse.json({ items: [] })),
     http.get('/api/goals', () => HttpResponse.json({ items: [] })),
+    http.get('/api/races', () => HttpResponse.json({ items: [] })),
     http.get('/api/activities/:id/execution', () => HttpResponse.json({ kind: 'none' })),
     http.get('/api/activities', () => HttpResponse.json({ items: [] })),
     http.get('/api/fitness', () => HttpResponse.json([])),
@@ -52,7 +53,7 @@ export function loggedInAs(user: Me | null) {
     http.get('/api/llm-provider', () => HttpResponse.json({ configured: false, keySet: false })),
     http.get('/api/coach-reports', () => HttpResponse.json({ items: [] })),
     http.get('/api/calendar', () =>
-      HttpResponse.json({ activities: [], wellness: [], healthLog: [] }),
+      HttpResponse.json({ activities: [], wellness: [], healthLog: [], races: [] }),
     ),
     http.get('/api/readiness', ({ request }) =>
       HttpResponse.json({

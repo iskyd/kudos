@@ -20,6 +20,7 @@ type AthleteContext struct {
 	Sports     []string
 	Thresholds []Threshold // the version valid today, per sport
 	HealthLog  []HealthEntry
+	Races      []Race // upcoming
 	Goals      []GoalProgress
 	Readiness  *analytics.Readiness // today's; nil when unknown
 	CheckIns   []CheckIn
@@ -45,6 +46,16 @@ type HealthEntry struct {
 	Description string
 	Start       time.Time
 	End         *time.Time
+}
+
+// Race is a race the athlete entered; GoalTimeS is nil without a goal.
+type Race struct {
+	Day       time.Time
+	Name      string
+	Sport     string
+	DistanceM float64
+	GoalTimeS *float64
+	Priority  string // A, B or C
 }
 
 // GoalProgress is a volume goal with its progress.
@@ -136,6 +147,7 @@ func BuildContext(c AthleteContext, budget int) string {
 	sections := []section{
 		{title: "Athlete profile", items: profileItems(c)},
 		{title: "Injury and illness history", items: healthLogItems(c.HealthLog), keep: true, empty: "- None recorded."},
+		{title: "Upcoming races", items: raceItems(c.Races, c.Today)},
 		{title: "Goals", items: goalItems(c.Goals)},
 		{title: "Readiness and check-ins", items: readinessItems(c)},
 		{title: "Training load, last 6 weeks", items: loadItems(c.Load)},
@@ -250,6 +262,24 @@ func healthLogItems(log []HealthEntry) []string {
 		if e.Description != "" {
 			items[i] += ": " + oneLine(e.Description)
 		}
+	}
+	return items
+}
+
+func raceItems(races []Race, today time.Time) []string {
+	rs := slices.Clone(races)
+	slices.SortStableFunc(rs, func(a, b Race) int {
+		return cmp.Or(a.Day.Compare(b.Day), strings.Compare(a.Name, b.Name))
+	})
+	items := make([]string, len(rs))
+	for i, r := range rs {
+		goal := "no goal time"
+		if r.GoalTimeS != nil {
+			goal = "goal " + duration(*r.GoalTimeS)
+		}
+		days := int(math.Round(r.Day.Sub(today).Hours() / 24))
+		items[i] = fmt.Sprintf("- %s %s %s: %s, %s, %s, priority %s, in %d days",
+			day(r.Day), oneLine(r.Name), RefDay(r.Day), r.Sport, km(r.DistanceM), goal, r.Priority, days)
 	}
 	return items
 }

@@ -38,6 +38,7 @@ const (
 	// shortcut: past 500 health log entries or 50 goals the oldest are left out; page if anyone gets close.
 	maxContextHealthLog = 500
 	maxContextGoals     = 50
+	maxContextRaces     = 20 // of the coming year, soonest first
 	maxContextActivity  = 100
 )
 
@@ -175,6 +176,18 @@ func (s *Server) AthleteContext(ctx context.Context, userID int64, today time.Ti
 	}
 	for _, e := range log {
 		c.HealthLog = append(c.HealthLog, llm.HealthEntry{Kind: e.Kind, Description: deref(e.Description), Start: e.StartDate, End: e.EndDate})
+	}
+
+	races, err := s.q.ListRacesBetween(ctx, db.ListRacesBetweenParams{
+		UserID: userID, FromDay: today, ToDay: today.AddDate(1, 0, 0), MaxRows: maxContextRaces,
+	})
+	if err != nil {
+		return fail("races", err)
+	}
+	for _, r := range races {
+		c.Races = append(c.Races, llm.Race{
+			Day: r.Day, Name: r.Name, Sport: r.Sport, DistanceM: r.DistanceM, GoalTimeS: r.GoalTimeS, Priority: r.Priority,
+		})
 	}
 
 	goals, err := s.q.ListGoals(ctx, db.ListGoalsParams{UserID: userID, MaxRows: maxContextGoals})

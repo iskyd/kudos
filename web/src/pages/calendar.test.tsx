@@ -84,6 +84,16 @@ describe('CalendarPage', () => {
         },
         { id: 2, kind: 'illness', description: 'Cold', startDate: '2026-10-30' },
       ],
+      races: [
+        {
+          id: 9,
+          name: 'Autumn 10K',
+          day: '2026-10-31',
+          sport: 'running',
+          distanceM: 10000,
+          priority: 'B',
+        },
+      ],
     }
     server.use(
       http.get('/api/calendar', ({ request }) => {
@@ -110,6 +120,9 @@ describe('CalendarPage', () => {
     expect((await day('21 October 2026')).queryByText('Check-in')).not.toBeInTheDocument()
     expect((await day('3 October 2026')).getByText('Injury: Sore knee')).toBeInTheDocument()
     expect((await day('4 October 2026')).queryByText(/Injury/)).not.toBeInTheDocument()
+    expect(
+      (await day('31 October 2026')).getByRole('link', { name: 'Race B: Autumn 10K' }),
+    ).toHaveAttribute('href', '/races')
     // Ongoing: every day from its start.
     expect((await day('1 November 2026')).getByText('Illness: Cold')).toBeInTheDocument()
   })
@@ -120,7 +133,7 @@ describe('CalendarPage', () => {
       http.get('/api/calendar', ({ request }) => {
         const p = new URL(request.url).searchParams
         asked.push([p.get('from'), p.get('to')])
-        return HttpResponse.json({ activities: [], wellness: [], healthLog: [] })
+        return HttpResponse.json({ activities: [], wellness: [], healthLog: [], races: [] })
       }),
     )
     renderApp('/calendar')

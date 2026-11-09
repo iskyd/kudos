@@ -646,6 +646,48 @@ func (e LapIntensity) Valid() bool {
 	}
 }
 
+// Defines values for RacePriority.
+const (
+	RacePriorityA RacePriority = "A"
+	RacePriorityB RacePriority = "B"
+	RacePriorityC RacePriority = "C"
+)
+
+// Valid indicates whether the value is a known member of the RacePriority enum.
+func (e RacePriority) Valid() bool {
+	switch e {
+	case RacePriorityA:
+		return true
+	case RacePriorityB:
+		return true
+	case RacePriorityC:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for RaceInputPriority.
+const (
+	RaceInputPriorityA RaceInputPriority = "A"
+	RaceInputPriorityB RaceInputPriority = "B"
+	RaceInputPriorityC RaceInputPriority = "C"
+)
+
+// Valid indicates whether the value is a known member of the RaceInputPriority enum.
+func (e RaceInputPriority) Valid() bool {
+	switch e {
+	case RaceInputPriorityA:
+		return true
+	case RaceInputPriorityB:
+		return true
+	case RaceInputPriorityC:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ReadinessStatus.
 const (
 	CollectingBaseline ReadinessStatus = "collecting_baseline"
@@ -1254,6 +1296,7 @@ type ActivityZones struct {
 type Calendar struct {
 	Activities []ActivitySummary `json:"activities"`
 	HealthLog  []HealthLogEntry  `json:"healthLog"`
+	Races      []Race            `json:"races"`
 	Wellness   []WellnessDay     `json:"wellness"`
 }
 
@@ -1736,6 +1779,51 @@ type Problem struct {
 
 	// Type Stable URI identifying the error kind, e.g. urn:kudos:problem:not-found.
 	Type string `json:"type"`
+}
+
+// Race defines model for Race.
+type Race struct {
+	// Day The local race day.
+	Day       openapi_types.Date `json:"day"`
+	DistanceM float64            `json:"distanceM"`
+	GoalTimeS *float64           `json:"goalTimeS,omitempty"`
+	Id        int64              `json:"id"`
+	Name      string             `json:"name"`
+
+	// Priority A is the season's goal, B a tune-up worth racing, C a training race.
+	Priority RacePriority `json:"priority"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport ActivitySport `json:"sport"`
+}
+
+// RacePriority A is the season's goal, B a tune-up worth racing, C a training race.
+type RacePriority string
+
+// RaceInput defines model for RaceInput.
+type RaceInput struct {
+	// Day The local race day.
+	Day       openapi_types.Date `json:"day"`
+	DistanceM float64            `json:"distanceM"`
+	GoalTimeS *float64           `json:"goalTimeS,omitempty"`
+	Name      string             `json:"name"`
+
+	// Priority A is the season's goal, B a tune-up worth racing, C a training race.
+	Priority RaceInputPriority `json:"priority"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport ActivitySport `json:"sport"`
+}
+
+// RaceInputPriority A is the season's goal, B a tune-up worth racing, C a training race.
+type RaceInputPriority string
+
+// RacePage defines model for RacePage.
+type RacePage struct {
+	Items []Race `json:"items"`
+
+	// NextCursor Cursor for the next page; absent on the last page.
+	NextCursor *string `json:"nextCursor,omitempty"`
 }
 
 // RacePrediction defines model for RacePrediction.
@@ -2223,6 +2311,9 @@ type GoalID = int64
 // Limit defines model for Limit.
 type Limit = int
 
+// RaceID defines model for RaceID.
+type RaceID = int64
+
 // SuggestionID defines model for SuggestionID.
 type SuggestionID = int64
 
@@ -2377,6 +2468,15 @@ type ListHealthLogParams struct {
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// ListRacesParams defines parameters for ListRaces.
+type ListRacesParams struct {
+	// Cursor Opaque cursor from a previous page's `nextCursor`.
+	Cursor *Cursor `form:"cursor,omitempty" json:"cursor,omitempty"`
+
+	// Limit Maximum number of items to return.
+	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
 // GetReadinessParams defines parameters for GetReadiness.
 type GetReadinessParams struct {
 	// Day Local day.
@@ -2503,6 +2603,12 @@ type SetLLMProviderJSONRequestBody = LLMProviderInput
 
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
+
+// CreateRaceJSONRequestBody defines body for CreateRace for application/json ContentType.
+type CreateRaceJSONRequestBody = RaceInput
+
+// UpdateRaceJSONRequestBody defines body for UpdateRace for application/json ContentType.
+type UpdateRaceJSONRequestBody = RaceInput
 
 // PutWellnessDayJSONRequestBody defines body for PutWellnessDay for application/json ContentType.
 type PutWellnessDayJSONRequestBody = WellnessDayInput
@@ -2656,6 +2762,18 @@ type ServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// ListRaces List races
+	// (GET /api/races)
+	ListRaces(w http.ResponseWriter, r *http.Request, params ListRacesParams)
+	// CreateRace Add a race
+	// (POST /api/races)
+	CreateRace(w http.ResponseWriter, r *http.Request)
+	// DeleteRace Delete a race
+	// (DELETE /api/races/{id})
+	DeleteRace(w http.ResponseWriter, r *http.Request, id RaceID)
+	// UpdateRace Replace a race
+	// (PUT /api/races/{id})
+	UpdateRace(w http.ResponseWriter, r *http.Request, id RaceID)
 	// GetReadiness Readiness for a day
 	// (GET /api/readiness)
 	GetReadiness(w http.ResponseWriter, r *http.Request, params GetReadinessParams)
@@ -2989,6 +3107,30 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 // UpdateMe Update profile settings
 // (PATCH /api/me)
 func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRaces List races
+// (GET /api/races)
+func (_ Unimplemented) ListRaces(w http.ResponseWriter, r *http.Request, params ListRacesParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateRace Add a race
+// (POST /api/races)
+func (_ Unimplemented) CreateRace(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DeleteRace Delete a race
+// (DELETE /api/races/{id})
+func (_ Unimplemented) DeleteRace(w http.ResponseWriter, r *http.Request, id RaceID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UpdateRace Replace a race
+// (PUT /api/races/{id})
+func (_ Unimplemented) UpdateRace(w http.ResponseWriter, r *http.Request, id RaceID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4508,6 +4650,118 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// ListRaces operation middleware
+func (siw *ServerInterfaceWrapper) ListRaces(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRacesParams
+
+	// ------------- Optional query parameter "cursor" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "cursor", r.URL.Query(), &params.Cursor, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "cursor"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "cursor", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRaces(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateRace operation middleware
+func (siw *ServerInterfaceWrapper) CreateRace(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRace(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteRace operation middleware
+func (siw *ServerInterfaceWrapper) DeleteRace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id RaceID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteRace(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateRace operation middleware
+func (siw *ServerInterfaceWrapper) UpdateRace(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id RaceID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateRace(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetReadiness operation middleware
 func (siw *ServerInterfaceWrapper) GetReadiness(w http.ResponseWriter, r *http.Request) {
 
@@ -5251,6 +5505,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Delete(options.BaseURL+"/api/goals/{id}", wrapper.DeleteGoal)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/races", wrapper.ListRaces)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/races", wrapper.CreateRace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/races/{id}", wrapper.DeleteRace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/races/{id}", wrapper.UpdateRace)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/calendar", wrapper.GetCalendar)
@@ -7233,6 +7499,157 @@ func (response UpdateMedefaultApplicationProblemPlusJSONResponse) VisitUpdateMeR
 	return err
 }
 
+type ListRacesRequestObject struct {
+	Params ListRacesParams
+}
+
+type ListRacesResponseObject interface {
+	VisitListRacesResponse(w http.ResponseWriter) error
+}
+
+type ListRaces200JSONResponse RacePage
+
+func (response ListRaces200JSONResponse) VisitListRacesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRacesdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListRacesdefaultApplicationProblemPlusJSONResponse) VisitListRacesResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRaceRequestObject struct {
+	Body *CreateRaceJSONRequestBody
+}
+
+type CreateRaceResponseObject interface {
+	VisitCreateRaceResponse(w http.ResponseWriter) error
+}
+
+type CreateRace201JSONResponse Race
+
+func (response CreateRace201JSONResponse) VisitCreateRaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRacedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreateRacedefaultApplicationProblemPlusJSONResponse) VisitCreateRaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DeleteRaceRequestObject struct {
+	Id RaceID `json:"id"`
+}
+
+type DeleteRaceResponseObject interface {
+	VisitDeleteRaceResponse(w http.ResponseWriter) error
+}
+
+type DeleteRace204Response struct {
+}
+
+func (response DeleteRace204Response) VisitDeleteRaceResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type DeleteRacedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DeleteRacedefaultApplicationProblemPlusJSONResponse) VisitDeleteRaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRaceRequestObject struct {
+	Id   RaceID `json:"id"`
+	Body *UpdateRaceJSONRequestBody
+}
+
+type UpdateRaceResponseObject interface {
+	VisitUpdateRaceResponse(w http.ResponseWriter) error
+}
+
+type UpdateRace200JSONResponse Race
+
+func (response UpdateRace200JSONResponse) VisitUpdateRaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UpdateRacedefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response UpdateRacedefaultApplicationProblemPlusJSONResponse) VisitUpdateRaceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type GetReadinessRequestObject struct {
 	Params GetReadinessParams
 }
@@ -7903,6 +8320,18 @@ type StrictServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// ListRaces List races
+	// (GET /api/races)
+	ListRaces(ctx context.Context, request ListRacesRequestObject) (ListRacesResponseObject, error)
+	// CreateRace Add a race
+	// (POST /api/races)
+	CreateRace(ctx context.Context, request CreateRaceRequestObject) (CreateRaceResponseObject, error)
+	// DeleteRace Delete a race
+	// (DELETE /api/races/{id})
+	DeleteRace(ctx context.Context, request DeleteRaceRequestObject) (DeleteRaceResponseObject, error)
+	// UpdateRace Replace a race
+	// (PUT /api/races/{id})
+	UpdateRace(ctx context.Context, request UpdateRaceRequestObject) (UpdateRaceResponseObject, error)
 	// GetReadiness Readiness for a day
 	// (GET /api/readiness)
 	GetReadiness(ctx context.Context, request GetReadinessRequestObject) (GetReadinessResponseObject, error)
@@ -9313,6 +9742,122 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRaces operation middleware
+func (sh *strictHandler) ListRaces(w http.ResponseWriter, r *http.Request, params ListRacesParams) {
+	var request ListRacesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRaces(ctx, request.(ListRacesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRaces")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRacesResponseObject); ok {
+		if err := validResponse.VisitListRacesResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRace operation middleware
+func (sh *strictHandler) CreateRace(w http.ResponseWriter, r *http.Request) {
+	var request CreateRaceRequestObject
+
+	var body CreateRaceJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRace(ctx, request.(CreateRaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRaceResponseObject); ok {
+		if err := validResponse.VisitCreateRaceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DeleteRace operation middleware
+func (sh *strictHandler) DeleteRace(w http.ResponseWriter, r *http.Request, id RaceID) {
+	var request DeleteRaceRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteRace(ctx, request.(DeleteRaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteRace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DeleteRaceResponseObject); ok {
+		if err := validResponse.VisitDeleteRaceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UpdateRace operation middleware
+func (sh *strictHandler) UpdateRace(w http.ResponseWriter, r *http.Request, id RaceID) {
+	var request UpdateRaceRequestObject
+
+	request.Id = id
+
+	var body UpdateRaceJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UpdateRace(ctx, request.(UpdateRaceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UpdateRace")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UpdateRaceResponseObject); ok {
+		if err := validResponse.VisitUpdateRaceResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
