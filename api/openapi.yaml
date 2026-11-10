@@ -797,6 +797,54 @@ paths:
           description: Deleted.
         default:
           $ref: "#/components/responses/Problem"
+  /api/planned-workouts:
+    get:
+      operationId: listPlannedWorkouts
+      summary: Planned workouts for a range of days
+      description: The planned workouts on the local days from from to to (at most 42), soonest first.
+      tags: [plans]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          description: First local day, inclusive.
+          schema:
+            type: string
+            format: date
+        - name: to
+          in: query
+          required: true
+          description: Last local day, inclusive.
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: The planned workouts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PlannedWorkout"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/planned-workouts/{id}:
+    get:
+      operationId: getPlannedWorkout
+      summary: A planned workout with its steps
+      tags: [plans]
+      parameters:
+        - $ref: "#/components/parameters/PlannedWorkoutID"
+      responses:
+        "200":
+          description: The planned workout.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlannedWorkout"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/calendar:
     get:
       operationId: getCalendar
@@ -807,7 +855,8 @@ paths:
         plus the activity's own UTC offset), effective values as in
         /api/activities, oldest first, at most 500; the days with a check-in or
         body metrics entered; the injury and illness entries overlapping the
-        range (an entry without an end date is ongoing); and the races in it.
+        range (an entry without an end date is ongoing); and the races and
+        planned workouts in it.
       tags: [calendar]
       parameters:
         - name: from
@@ -1525,6 +1574,13 @@ components:
         type: integer
         format: int64
     RaceID:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    PlannedWorkoutID:
       name: id
       in: path
       required: true
@@ -2282,10 +2338,110 @@ components:
               type: array
               items:
                 $ref: "#/components/schemas/Race"
+    PlannedWorkoutInput:
+      description: |
+        A planned workout. This schema and the ones it uses are also the JSON
+        Schema the LLM's workouts are validated against (internal/plans,
+        generated). Values are SI: durations s, distances m, pace targets m/s.
+      type: object
+      required: [day, sport, title, steps]
+      additionalProperties: false
+      properties:
+        day:
+          description: The local day it is planned for.
+          type: string
+          format: date
+        sport:
+          $ref: "#/components/schemas/ActivitySport"
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+        description:
+          type: string
+          maxLength: 2000
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/PlanStep"
+    PlanStep:
+      description: |
+        A step, or a repeat of steps. A repeat has count and steps and nothing
+        else, and holds at most one more level of repeats; any other step has a
+        durationType and, unless it is open (until the lap button), a duration.
+      type: object
+      required: [kind]
+      additionalProperties: false
+      properties:
+        kind:
+          type: string
+          enum: [warmup, interval, recovery, cooldown, repeat]
+        durationType:
+          type: string
+          enum: [time, distance, open]
+        duration:
+          description: Seconds for time, metres for distance.
+          type: number
+          format: double
+          minimum: 1
+        target:
+          $ref: "#/components/schemas/PlanTarget"
+        note:
+          type: string
+          maxLength: 200
+        count:
+          type: integer
+          minimum: 2
+          maximum: 50
+        steps:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/PlanStep"
+    PlanTarget:
+      description: Either a zone of the metric's current zones, or a low-to-high range (bpm, m/s or W).
+      type: object
+      required: [metric]
+      additionalProperties: false
+      properties:
+        metric:
+          type: string
+          enum: [heart_rate, pace, power]
+        zone:
+          type: integer
+          minimum: 1
+          maximum: 7
+        low:
+          type: number
+          format: double
+          minimum: 0
+        high:
+          type: number
+          format: double
+          minimum: 0
+    PlannedWorkout:
+      allOf:
+        - $ref: "#/components/schemas/PlannedWorkoutInput"
+        - type: object
+          required: [id, planId]
+          properties:
+            id:
+              type: integer
+              format: int64
+            planId:
+              type: integer
+              format: int64
     Calendar:
       type: object
-      required: [activities, wellness, healthLog, races]
+      required: [activities, wellness, healthLog, races, plannedWorkouts]
       properties:
+        plannedWorkouts:
+          type: array
+          items:
+            $ref: "#/components/schemas/PlannedWorkout"
         races:
           type: array
           items:

@@ -2,6 +2,7 @@ import { Link } from 'react-router'
 import { useActivities } from '@/api/activities'
 import { useVolume } from '@/api/analytics'
 import { useGarminConnection } from '@/api/garmin'
+import { usePlannedWorkouts } from '@/api/plans'
 import { Card, Empty, QueryStatus } from '@/components/card'
 import { FitnessCard } from '@/components/fitness-card'
 import { InsightCard } from '@/components/insight-card'
@@ -26,11 +27,7 @@ export function DashboardPage() {
         <VolumeCard today={today} />
         <LatestActivitiesCard />
         <SyncCard />
-        <Card title="Planned workouts">
-          <p className="text-sm text-muted-foreground">
-            Your next planned workouts will appear here once training plans are available.
-          </p>
-        </Card>
+        <PlannedCard today={today} />
         <InsightCard today={today} />
       </div>
     </div>
@@ -110,6 +107,35 @@ function LatestActivitiesCard() {
             ))}
           </tbody>
         </table>
+      )}
+    </Card>
+  )
+}
+
+// plannedDays is how far ahead the dashboard lists planned workouts, today included.
+const plannedDays = 7
+
+function PlannedCard({ today }: { today: string }) {
+  const planned = usePlannedWorkouts(today, addDays(today, plannedDays - 1))
+  return (
+    <Card title="Planned workouts">
+      <QueryStatus query={planned} />
+      {planned.data?.length === 0 && (
+        <Empty>Nothing planned for the next {plannedDays} days.</Empty>
+      )}
+      {planned.data && planned.data.length > 0 && (
+        <ul className="flex flex-col gap-1 text-sm">
+          {planned.data.map((w) => (
+            <li key={w.id} className="flex justify-between gap-4">
+              <Link to={`/planned/${String(w.id)}`} className="underline">
+                {w.title}
+              </Link>
+              <span className="text-muted-foreground">
+                {w.day === today ? 'Today' : formatDay(w.day)}
+              </span>
+            </li>
+          ))}
+        </ul>
       )}
     </Card>
   )

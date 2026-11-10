@@ -13,6 +13,7 @@ import { CoachPage } from '@/pages/coach'
 import { DashboardPage } from '@/pages/dashboard'
 import { GearPage } from '@/pages/gear'
 import { GoalsPage } from '@/pages/goals'
+import { PlannedWorkoutPage } from '@/pages/planned-workout'
 import { RacesPage } from '@/pages/races'
 import { RecordsPage } from '@/pages/records'
 import { ReportsPage } from '@/pages/reports'
@@ -52,6 +53,7 @@ export const routes: RouteObject[] = [
           })),
           { path: '/activities/:id', element: <ActivityDetailPage /> },
           { path: '/activities/:id/compare/:other', element: <ActivityComparePage /> },
+          { path: '/planned/:id', element: <PlannedWorkoutPage /> },
           { path: '/settings/zones', element: <ZonesPage /> },
           { path: '/settings/ai-coach', element: <AICoachPage /> },
           { path: '*', element: <EmptyPage title="Page not found" /> },

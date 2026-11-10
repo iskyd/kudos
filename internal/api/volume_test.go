@@ -67,13 +67,13 @@ func TestVolume(t *testing.T) {
 	if len(v.TimeInZones) != 2 {
 		t.Fatalf("time in zones: %+v", v.TimeInZones)
 	}
-	if z := v.TimeInZones[0]; z.Metric != Hr || z.Model != "friel_run_hr" || !slices.Equal(z.Seconds, []float64{70, 140}) {
+	if z := v.TimeInZones[0]; z.Metric != ZoneTimeMetricHr || z.Model != "friel_run_hr" || !slices.Equal(z.Seconds, []float64{70, 140}) {
 		t.Errorf("hr: %+v", z)
 	}
-	if z := v.TimeInZones[1]; z.Metric != Power || z.Model != "coggan_power" || !slices.Equal(z.Seconds, []float64{100, 200, 300}) {
+	if z := v.TimeInZones[1]; z.Metric != ZoneTimeMetricPower || z.Model != "coggan_power" || !slices.Equal(z.Seconds, []float64{100, 200, 300}) {
 		t.Errorf("power: %+v", z)
 	}
-	if v := get(c, "period=month&from=2026-10-01&to=2026-11-30&sport=running"); len(v.TimeInZones) != 1 || v.TimeInZones[0].Metric != Hr {
+	if v := get(c, "period=month&from=2026-10-01&to=2026-11-30&sport=running"); len(v.TimeInZones) != 1 || v.TimeInZones[0].Metric != ZoneTimeMetricHr {
 		t.Errorf("running time in zones: %+v", v.TimeInZones)
 	}
 

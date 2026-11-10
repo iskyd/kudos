@@ -582,6 +582,43 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/planned-workouts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Planned workouts for a range of days
+         * @description The planned workouts on the local days from from to to (at most 42), soonest first.
+         */
+        get: operations["listPlannedWorkouts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/planned-workouts/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A planned workout with its steps */
+        get: operations["getPlannedWorkout"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendar": {
         parameters: {
             query?: never;
@@ -596,7 +633,8 @@ export interface paths {
          *     plus the activity's own UTC offset), effective values as in
          *     /api/activities, oldest first, at most 500; the days with a check-in or
          *     body metrics entered; the injury and illness entries overlapping the
-         *     range (an entry without an end date is ongoing); and the races in it.
+         *     range (an entry without an end date is ongoing); and the races and
+         *     planned workouts in it.
          */
         get: operations["getCalendar"];
         put?: never;
@@ -1568,7 +1606,60 @@ export interface components {
         RacePage: components["schemas"]["Page"] & {
             items: components["schemas"]["Race"][];
         };
+        /**
+         * @description A planned workout. This schema and the ones it uses are also the JSON
+         *     Schema the LLM's workouts are validated against (internal/plans,
+         *     generated). Values are SI: durations s, distances m, pace targets m/s.
+         */
+        PlannedWorkoutInput: {
+            /**
+             * Format: date
+             * @description The local day it is planned for.
+             */
+            day: string;
+            sport: components["schemas"]["ActivitySport"];
+            title: string;
+            description?: string;
+            steps: components["schemas"]["PlanStep"][];
+        };
+        /**
+         * @description A step, or a repeat of steps. A repeat has count and steps and nothing
+         *     else, and holds at most one more level of repeats; any other step has a
+         *     durationType and, unless it is open (until the lap button), a duration.
+         */
+        PlanStep: {
+            /** @enum {string} */
+            kind: "warmup" | "interval" | "recovery" | "cooldown" | "repeat";
+            /** @enum {string} */
+            durationType?: "time" | "distance" | "open";
+            /**
+             * Format: double
+             * @description Seconds for time, metres for distance.
+             */
+            duration?: number;
+            target?: components["schemas"]["PlanTarget"];
+            note?: string;
+            count?: number;
+            steps?: components["schemas"]["PlanStep"][];
+        };
+        /** @description Either a zone of the metric's current zones, or a low-to-high range (bpm, m/s or W). */
+        PlanTarget: {
+            /** @enum {string} */
+            metric: "heart_rate" | "pace" | "power";
+            zone?: number;
+            /** Format: double */
+            low?: number;
+            /** Format: double */
+            high?: number;
+        };
+        PlannedWorkout: components["schemas"]["PlannedWorkoutInput"] & {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            planId: number;
+        };
         Calendar: {
+            plannedWorkouts: components["schemas"]["PlannedWorkout"][];
             races: components["schemas"]["Race"][];
             activities: components["schemas"]["ActivitySummary"][];
             wellness: components["schemas"]["WellnessDay"][];
@@ -2194,6 +2285,7 @@ export interface components {
         GearID: number;
         GoalID: number;
         RaceID: number;
+        PlannedWorkoutID: number;
         /** @description Opaque cursor from a previous page's `nextCursor`. */
         Cursor: string;
         /** @description Maximum number of items to return. */
@@ -3149,6 +3241,55 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    listPlannedWorkouts: {
+        parameters: {
+            query: {
+                /** @description First local day, inclusive. */
+                from: string;
+                /** @description Last local day, inclusive. */
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The planned workouts. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannedWorkout"][];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPlannedWorkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PlannedWorkoutID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The planned workout. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannedWorkout"];
+                };
             };
             default: components["responses"]["Problem"];
         };

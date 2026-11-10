@@ -646,6 +646,75 @@ func (e LapIntensity) Valid() bool {
 	}
 }
 
+// Defines values for PlanStepDurationType.
+const (
+	PlanStepDurationTypeDistance PlanStepDurationType = "distance"
+	PlanStepDurationTypeOpen     PlanStepDurationType = "open"
+	PlanStepDurationTypeTime     PlanStepDurationType = "time"
+)
+
+// Valid indicates whether the value is a known member of the PlanStepDurationType enum.
+func (e PlanStepDurationType) Valid() bool {
+	switch e {
+	case PlanStepDurationTypeDistance:
+		return true
+	case PlanStepDurationTypeOpen:
+		return true
+	case PlanStepDurationTypeTime:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlanStepKind.
+const (
+	PlanStepKindCooldown PlanStepKind = "cooldown"
+	PlanStepKindInterval PlanStepKind = "interval"
+	PlanStepKindRecovery PlanStepKind = "recovery"
+	PlanStepKindRepeat   PlanStepKind = "repeat"
+	PlanStepKindWarmup   PlanStepKind = "warmup"
+)
+
+// Valid indicates whether the value is a known member of the PlanStepKind enum.
+func (e PlanStepKind) Valid() bool {
+	switch e {
+	case PlanStepKindCooldown:
+		return true
+	case PlanStepKindInterval:
+		return true
+	case PlanStepKindRecovery:
+		return true
+	case PlanStepKindRepeat:
+		return true
+	case PlanStepKindWarmup:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlanTargetMetric.
+const (
+	PlanTargetMetricHeartRate PlanTargetMetric = "heart_rate"
+	PlanTargetMetricPace      PlanTargetMetric = "pace"
+	PlanTargetMetricPower     PlanTargetMetric = "power"
+)
+
+// Valid indicates whether the value is a known member of the PlanTargetMetric enum.
+func (e PlanTargetMetric) Valid() bool {
+	switch e {
+	case PlanTargetMetricHeartRate:
+		return true
+	case PlanTargetMetricPace:
+		return true
+	case PlanTargetMetricPower:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RacePriority.
 const (
 	RacePriorityA RacePriority = "A"
@@ -933,19 +1002,19 @@ func (e ZoneSport) Valid() bool {
 
 // Defines values for ZoneTimeMetric.
 const (
-	Hr    ZoneTimeMetric = "hr"
-	Pace  ZoneTimeMetric = "pace"
-	Power ZoneTimeMetric = "power"
+	ZoneTimeMetricHr    ZoneTimeMetric = "hr"
+	ZoneTimeMetricPace  ZoneTimeMetric = "pace"
+	ZoneTimeMetricPower ZoneTimeMetric = "power"
 )
 
 // Valid indicates whether the value is a known member of the ZoneTimeMetric enum.
 func (e ZoneTimeMetric) Valid() bool {
 	switch e {
-	case Hr:
+	case ZoneTimeMetricHr:
 		return true
-	case Pace:
+	case ZoneTimeMetricPace:
 		return true
-	case Power:
+	case ZoneTimeMetricPower:
 		return true
 	default:
 		return false
@@ -1294,10 +1363,11 @@ type ActivityZones struct {
 
 // Calendar defines model for Calendar.
 type Calendar struct {
-	Activities []ActivitySummary `json:"activities"`
-	HealthLog  []HealthLogEntry  `json:"healthLog"`
-	Races      []Race            `json:"races"`
-	Wellness   []WellnessDay     `json:"wellness"`
+	Activities      []ActivitySummary `json:"activities"`
+	HealthLog       []HealthLogEntry  `json:"healthLog"`
+	PlannedWorkouts []PlannedWorkout  `json:"plannedWorkouts"`
+	Races           []Race            `json:"races"`
+	Wellness        []WellnessDay     `json:"wellness"`
 }
 
 // ChatEvent One server-sent event of a chat reply.
@@ -1751,6 +1821,68 @@ type Page struct {
 
 // Password defines model for Password.
 type Password = string
+
+// PlanStep A step, or a repeat of steps. A repeat has count and steps and nothing
+// else, and holds at most one more level of repeats; any other step has a
+// durationType and, unless it is open (until the lap button), a duration.
+type PlanStep struct {
+	Count *int `json:"count,omitempty"`
+
+	// Duration Seconds for time, metres for distance.
+	Duration     *float64              `json:"duration,omitempty"`
+	DurationType *PlanStepDurationType `json:"durationType,omitempty"`
+	Kind         PlanStepKind          `json:"kind"`
+	Note         *string               `json:"note,omitempty"`
+	Steps        *[]PlanStep           `json:"steps,omitempty"`
+
+	// Target Either a zone of the metric's current zones, or a low-to-high range (bpm, m/s or W).
+	Target *PlanTarget `json:"target,omitempty"`
+}
+
+// PlanStepDurationType defines model for PlanStep.DurationType.
+type PlanStepDurationType string
+
+// PlanStepKind defines model for PlanStep.Kind.
+type PlanStepKind string
+
+// PlanTarget Either a zone of the metric's current zones, or a low-to-high range (bpm, m/s or W).
+type PlanTarget struct {
+	High   *float64         `json:"high,omitempty"`
+	Low    *float64         `json:"low,omitempty"`
+	Metric PlanTargetMetric `json:"metric"`
+	Zone   *int             `json:"zone,omitempty"`
+}
+
+// PlanTargetMetric defines model for PlanTarget.Metric.
+type PlanTargetMetric string
+
+// PlannedWorkout defines model for PlannedWorkout.
+type PlannedWorkout struct {
+	// Day The local day it is planned for.
+	Day         openapi_types.Date `json:"day"`
+	Description *string            `json:"description,omitempty"`
+	Id          int64              `json:"id"`
+	PlanId      int64              `json:"planId"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport ActivitySport `json:"sport"`
+	Steps []PlanStep    `json:"steps"`
+	Title string        `json:"title"`
+}
+
+// PlannedWorkoutInput A planned workout. This schema and the ones it uses are also the JSON
+// Schema the LLM's workouts are validated against (internal/plans,
+// generated). Values are SI: durations s, distances m, pace targets m/s.
+type PlannedWorkoutInput struct {
+	// Day The local day it is planned for.
+	Day         openapi_types.Date `json:"day"`
+	Description *string            `json:"description,omitempty"`
+
+	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
+	Sport ActivitySport `json:"sport"`
+	Steps []PlanStep    `json:"steps"`
+	Title string        `json:"title"`
+}
 
 // PowerInterval defines model for PowerInterval.
 type PowerInterval struct {
@@ -2311,6 +2443,9 @@ type GoalID = int64
 // Limit defines model for Limit.
 type Limit = int
 
+// PlannedWorkoutID defines model for PlannedWorkoutID.
+type PlannedWorkoutID = int64
+
 // RaceID defines model for RaceID.
 type RaceID = int64
 
@@ -2466,6 +2601,15 @@ type ListHealthLogParams struct {
 
 	// Limit Maximum number of items to return.
 	Limit *Limit `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// ListPlannedWorkoutsParams defines parameters for ListPlannedWorkouts.
+type ListPlannedWorkoutsParams struct {
+	// From First local day, inclusive.
+	From openapi_types.Date `form:"from" json:"from"`
+
+	// To Last local day, inclusive.
+	To openapi_types.Date `form:"to" json:"to"`
 }
 
 // ListRacesParams defines parameters for ListRaces.
@@ -2762,6 +2906,12 @@ type ServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// ListPlannedWorkouts Planned workouts for a range of days
+	// (GET /api/planned-workouts)
+	ListPlannedWorkouts(w http.ResponseWriter, r *http.Request, params ListPlannedWorkoutsParams)
+	// GetPlannedWorkout A planned workout with its steps
+	// (GET /api/planned-workouts/{id})
+	GetPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID)
 	// ListRaces List races
 	// (GET /api/races)
 	ListRaces(w http.ResponseWriter, r *http.Request, params ListRacesParams)
@@ -3107,6 +3257,18 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 // UpdateMe Update profile settings
 // (PATCH /api/me)
 func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListPlannedWorkouts Planned workouts for a range of days
+// (GET /api/planned-workouts)
+func (_ Unimplemented) ListPlannedWorkouts(w http.ResponseWriter, r *http.Request, params ListPlannedWorkoutsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetPlannedWorkout A planned workout with its steps
+// (GET /api/planned-workouts/{id})
+func (_ Unimplemented) GetPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4650,6 +4812,78 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// ListPlannedWorkouts operation middleware
+func (siw *ServerInterfaceWrapper) ListPlannedWorkouts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListPlannedWorkoutsParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListPlannedWorkouts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetPlannedWorkout operation middleware
+func (siw *ServerInterfaceWrapper) GetPlannedWorkout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id PlannedWorkoutID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPlannedWorkout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRaces operation middleware
 func (siw *ServerInterfaceWrapper) ListRaces(w http.ResponseWriter, r *http.Request) {
 
@@ -5517,6 +5751,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Put(options.BaseURL+"/api/races/{id}", wrapper.UpdateRace)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/planned-workouts", wrapper.ListPlannedWorkouts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/planned-workouts/{id}", wrapper.GetPlannedWorkout)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/calendar", wrapper.GetCalendar)
@@ -7499,6 +7739,84 @@ func (response UpdateMedefaultApplicationProblemPlusJSONResponse) VisitUpdateMeR
 	return err
 }
 
+type ListPlannedWorkoutsRequestObject struct {
+	Params ListPlannedWorkoutsParams
+}
+
+type ListPlannedWorkoutsResponseObject interface {
+	VisitListPlannedWorkoutsResponse(w http.ResponseWriter) error
+}
+
+type ListPlannedWorkouts200JSONResponse []PlannedWorkout
+
+func (response ListPlannedWorkouts200JSONResponse) VisitListPlannedWorkoutsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListPlannedWorkoutsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response ListPlannedWorkoutsdefaultApplicationProblemPlusJSONResponse) VisitListPlannedWorkoutsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPlannedWorkoutRequestObject struct {
+	Id PlannedWorkoutID `json:"id"`
+}
+
+type GetPlannedWorkoutResponseObject interface {
+	VisitGetPlannedWorkoutResponse(w http.ResponseWriter) error
+}
+
+type GetPlannedWorkout200JSONResponse PlannedWorkout
+
+func (response GetPlannedWorkout200JSONResponse) VisitGetPlannedWorkoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPlannedWorkoutdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetPlannedWorkoutdefaultApplicationProblemPlusJSONResponse) VisitGetPlannedWorkoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListRacesRequestObject struct {
 	Params ListRacesParams
 }
@@ -8320,6 +8638,12 @@ type StrictServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// ListPlannedWorkouts Planned workouts for a range of days
+	// (GET /api/planned-workouts)
+	ListPlannedWorkouts(ctx context.Context, request ListPlannedWorkoutsRequestObject) (ListPlannedWorkoutsResponseObject, error)
+	// GetPlannedWorkout A planned workout with its steps
+	// (GET /api/planned-workouts/{id})
+	GetPlannedWorkout(ctx context.Context, request GetPlannedWorkoutRequestObject) (GetPlannedWorkoutResponseObject, error)
 	// ListRaces List races
 	// (GET /api/races)
 	ListRaces(ctx context.Context, request ListRacesRequestObject) (ListRacesResponseObject, error)
@@ -9742,6 +10066,58 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListPlannedWorkouts operation middleware
+func (sh *strictHandler) ListPlannedWorkouts(w http.ResponseWriter, r *http.Request, params ListPlannedWorkoutsParams) {
+	var request ListPlannedWorkoutsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListPlannedWorkouts(ctx, request.(ListPlannedWorkoutsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListPlannedWorkouts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListPlannedWorkoutsResponseObject); ok {
+		if err := validResponse.VisitListPlannedWorkoutsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetPlannedWorkout operation middleware
+func (sh *strictHandler) GetPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID) {
+	var request GetPlannedWorkoutRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPlannedWorkout(ctx, request.(GetPlannedWorkoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPlannedWorkout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPlannedWorkoutResponseObject); ok {
+		if err := validResponse.VisitGetPlannedWorkoutResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatLocalClock,
   formatPace,
+  formatPaceRange,
   formatSpeed,
   formatOneDecimal,
   formatShare,
@@ -56,6 +57,18 @@ describe('formatActivityStart', () => {
   it('crosses midnight with the offset', () => {
     expect(formatActivityStart('2026-10-14T23:30:00Z', 7200)).toBe('15 Oct 2026, 01:30')
     expect(formatActivityStart('2026-10-15T02:00:00Z', -18000)).toBe('14 Oct 2026, 21:00')
+  })
+})
+
+describe('formatPaceRange', () => {
+  it('renders the fastest pace first', () => {
+    expect(formatPaceRange(1000 / 256, 1000 / 244)).toBe('4:04–4:16 /km')
+    expect(formatPaceRange(1, 1.25, 100)).toBe('1:20–1:40 /100 m')
+  })
+
+  it('falls back when a speed is not positive', () => {
+    expect(formatPaceRange(1000 / 256, 0)).toBe('4:16 /km')
+    expect(formatPaceRange(0, 0)).toBe('—')
   })
 })
 

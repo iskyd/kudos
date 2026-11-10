@@ -44,6 +44,7 @@ export function loggedInAs(user: Me | null) {
     http.get('/api/gear', () => HttpResponse.json({ items: [] })),
     http.get('/api/goals', () => HttpResponse.json({ items: [] })),
     http.get('/api/races', () => HttpResponse.json({ items: [] })),
+    http.get('/api/planned-workouts', () => HttpResponse.json([])),
     http.get('/api/activities/:id/execution', () => HttpResponse.json({ kind: 'none' })),
     http.get('/api/activities', () => HttpResponse.json({ items: [] })),
     http.get('/api/fitness', () => HttpResponse.json([])),
@@ -53,7 +54,13 @@ export function loggedInAs(user: Me | null) {
     http.get('/api/llm-provider', () => HttpResponse.json({ configured: false, keySet: false })),
     http.get('/api/coach-reports', () => HttpResponse.json({ items: [] })),
     http.get('/api/calendar', () =>
-      HttpResponse.json({ activities: [], wellness: [], healthLog: [], races: [] }),
+      HttpResponse.json({
+        activities: [],
+        wellness: [],
+        healthLog: [],
+        races: [],
+        plannedWorkouts: [],
+      }),
     ),
     http.get('/api/readiness', ({ request }) =>
       HttpResponse.json({
