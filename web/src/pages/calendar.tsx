@@ -136,6 +136,7 @@ function DayCell({
   const activities = c?.activities.filter((a) => localDay(a.startTime, a.utcOffsetS) === day) ?? []
   const checkIn = c?.wellness.find((w) => w.day === day && isCheckIn(w))
   const races = c?.races.filter((r) => r.day === day) ?? []
+  const planned = c?.plannedWorkouts.filter((w) => w.day === day) ?? []
   const health =
     c?.healthLog.filter(
       (e) => e.startDate <= day && (e.endDate === undefined || e.endDate >= day),
@@ -160,6 +161,15 @@ function DayCell({
       ))}
       {health.map((e) => (
         <HealthTag key={e.id} entry={e} />
+      ))}
+      {planned.map((w) => (
+        <Link
+          key={w.id}
+          to={`/planned/${String(w.id)}`}
+          className="truncate rounded border border-dashed border-primary px-1 text-xs text-primary"
+        >
+          Planned: {w.title}
+        </Link>
       ))}
       {activities.map((a) => (
         <ActivityLink key={a.id} activity={a} />

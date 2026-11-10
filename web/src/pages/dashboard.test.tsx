@@ -18,6 +18,7 @@ const endpoints: [string, string][] = [
   ['Latest activities', '/api/activities'],
   ['Sync', '/api/garmin'],
   ['Readiness', '/api/readiness'],
+  ['Planned workouts', '/api/planned-workouts'],
 ]
 
 describe('DashboardPage', () => {
@@ -50,11 +51,32 @@ describe('DashboardPage', () => {
     ).toBeInTheDocument()
     expect(await (await card('Sync')).findByText(/Garmin is not connected/)).toBeInTheDocument()
     expect(
-      (await card('Planned workouts')).getByText(/once training plans are available/),
+      await (await card('Planned workouts')).findByText('Nothing planned for the next 7 days.'),
     ).toBeInTheDocument()
     expect(
       await (await card('Coach insight')).findByRole('link', { name: 'Set up the AI coach' }),
     ).toHaveAttribute('href', '/settings/ai-coach')
+  })
+
+  it('lists the next 7 days of planned workouts', async () => {
+    const asked: (string | null)[][] = []
+    server.use(
+      http.get('/api/planned-workouts', ({ request }) => {
+        const p = new URL(request.url).searchParams
+        asked.push([p.get('from'), p.get('to')])
+        return HttpResponse.json([
+          { id: 3, planId: 1, day: today, sport: 'running', title: 'Easy run', steps: [] },
+          { id: 4, planId: 1, day: '2026-11-15', sport: 'running', title: 'Long run', steps: [] },
+        ])
+      }),
+    )
+    renderApp('/')
+    const c = await card('Planned workouts')
+    expect(await c.findByRole('link', { name: 'Easy run' })).toHaveAttribute('href', '/planned/3')
+    expect(c.getByText('Today')).toBeInTheDocument()
+    expect(c.getByRole('link', { name: 'Long run' })).toHaveAttribute('href', '/planned/4')
+    expect(c.getByText('15 November 2026')).toBeInTheDocument()
+    expect(asked[0]).toEqual([today, addDays(today, 6)])
   })
 
   describe('with the AI coach set up', () => {

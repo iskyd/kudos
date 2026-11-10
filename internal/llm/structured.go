@@ -64,15 +64,23 @@ func Structured(ctx context.Context, c Client, req Request, schema *Schema) (jso
 	return out, nil
 }
 
+// Validate checks a JSON document against the schema.
+func (s *Schema) Validate(doc []byte) error {
+	v, err := jsonschema.UnmarshalJSON(bytes.NewReader(doc))
+	if err != nil {
+		return fmt.Errorf("not JSON: %w", err)
+	}
+	if err := s.s.Validate(v); err != nil {
+		return fmt.Errorf("does not match the schema: %w", err)
+	}
+	return nil
+}
+
 // check extracts the JSON from a reply and validates it.
 func (s *Schema) check(reply string) (json.RawMessage, error) {
 	text := extractJSON(reply)
-	v, err := jsonschema.UnmarshalJSON(strings.NewReader(text))
-	if err != nil {
-		return nil, fmt.Errorf("not JSON: %w", err)
-	}
-	if err := s.s.Validate(v); err != nil {
-		return nil, fmt.Errorf("does not match the schema: %w", err)
+	if err := s.Validate([]byte(text)); err != nil {
+		return nil, err
 	}
 	return json.RawMessage(text), nil
 }

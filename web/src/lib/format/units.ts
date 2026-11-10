@@ -58,6 +58,15 @@ export function formatPace(metresPerSecond: number, per = 1000): string {
   return `${formatDuration(s)} ${per === 1000 ? '/km' : `/${String(per)} m`}`
 }
 
+// formatPaceRange renders a low-to-high speed range as the pace range
+// "4:04–4:16 /km", fastest pace first.
+export function formatPaceRange(lowMS: number, highMS: number, per = 1000): string {
+  const fastest = paceSeconds(highMS, per)
+  return fastest === null
+    ? formatPace(lowMS, per)
+    : `${formatDuration(fastest)}–${formatPace(lowMS, per)}`
+}
+
 // formatSpeed renders metres per second as "28.4 km/h".
 export function formatSpeed(metresPerSecond: number): string {
   return `${(metresPerSecond * 3.6).toFixed(1)} km/h`
