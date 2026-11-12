@@ -646,6 +646,99 @@ func (e LapIntensity) Valid() bool {
 	}
 }
 
+// Defines values for PlanProposalFailure.
+const (
+	InvalidOutput PlanProposalFailure = "invalid_output"
+	NotConfigured PlanProposalFailure = "not_configured"
+	ProviderError PlanProposalFailure = "provider_error"
+	Timeout       PlanProposalFailure = "timeout"
+)
+
+// Valid indicates whether the value is a known member of the PlanProposalFailure enum.
+func (e PlanProposalFailure) Valid() bool {
+	switch e {
+	case InvalidOutput:
+		return true
+	case NotConfigured:
+		return true
+	case ProviderError:
+		return true
+	case Timeout:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlanProposalStatus.
+const (
+	PlanProposalStatusClosed     PlanProposalStatus = "closed"
+	PlanProposalStatusFailed     PlanProposalStatus = "failed"
+	PlanProposalStatusGenerating PlanProposalStatus = "generating"
+	PlanProposalStatusOpen       PlanProposalStatus = "open"
+	PlanProposalStatusSuperseded PlanProposalStatus = "superseded"
+)
+
+// Valid indicates whether the value is a known member of the PlanProposalStatus enum.
+func (e PlanProposalStatus) Valid() bool {
+	switch e {
+	case PlanProposalStatusClosed:
+		return true
+	case PlanProposalStatusFailed:
+		return true
+	case PlanProposalStatusGenerating:
+		return true
+	case PlanProposalStatusOpen:
+		return true
+	case PlanProposalStatusSuperseded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlanProposalItemAction.
+const (
+	Add    PlanProposalItemAction = "add"
+	Change PlanProposalItemAction = "change"
+	Remove PlanProposalItemAction = "remove"
+)
+
+// Valid indicates whether the value is a known member of the PlanProposalItemAction enum.
+func (e PlanProposalItemAction) Valid() bool {
+	switch e {
+	case Add:
+		return true
+	case Change:
+		return true
+	case Remove:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlanProposalItemStatus.
+const (
+	Approved PlanProposalItemStatus = "approved"
+	Pending  PlanProposalItemStatus = "pending"
+	Rejected PlanProposalItemStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the PlanProposalItemStatus enum.
+func (e PlanProposalItemStatus) Valid() bool {
+	switch e {
+	case Approved:
+		return true
+	case Pending:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PlanStepDurationType.
 const (
 	PlanStepDurationTypeDistance PlanStepDurationType = "distance"
@@ -1822,6 +1915,79 @@ type Page struct {
 // Password defines model for Password.
 type Password = string
 
+// PlanDecisions defines model for PlanDecisions.
+type PlanDecisions struct {
+	// Approve Item IDs to apply.
+	Approve []int64 `json:"approve"`
+
+	// Reject Item IDs to drop.
+	Reject []int64 `json:"reject"`
+}
+
+// PlanDraft What the LLM replies when it plans (internal/plans, generated as a JSON
+// Schema): the IDs of current workouts it keeps as they are, and every
+// other workout of the planned days. Current workouts it neither keeps
+// nor replaces with one on the same day and sport are proposed for removal.
+type PlanDraft struct {
+	Keep     []int64               `json:"keep"`
+	Workouts []PlannedWorkoutInput `json:"workouts"`
+}
+
+// PlanProposal defines model for PlanProposal.
+type PlanProposal struct {
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Failure Why it failed.
+	Failure *PlanProposalFailure `json:"failure,omitempty"`
+
+	// From First planned local day.
+	From openapi_types.Date `json:"from"`
+	Id   int64              `json:"id"`
+
+	// Items The changes, by day; empty until it is open.
+	Items []PlanProposalItem `json:"items"`
+
+	// Status generating until a job fills it in; then open with items to decide,
+	// closed once every item is decided (or when it proposed no change),
+	// failed when the model's plan stayed invalid or the provider failed,
+	// superseded when a newer proposal opened.
+	Status PlanProposalStatus `json:"status"`
+
+	// To Last planned local day.
+	To openapi_types.Date `json:"to"`
+}
+
+// PlanProposalFailure Why it failed.
+type PlanProposalFailure string
+
+// PlanProposalStatus generating until a job fills it in; then open with items to decide,
+// closed once every item is decided (or when it proposed no change),
+// failed when the model's plan stayed invalid or the provider failed,
+// superseded when a newer proposal opened.
+type PlanProposalStatus string
+
+// PlanProposalItem defines model for PlanProposalItem.
+type PlanProposalItem struct {
+	Action PlanProposalItemAction `json:"action"`
+
+	// After The workout proposed; additions and changes.
+	After *PlannedWorkoutInput `json:"after,omitempty"`
+
+	// Before The workout as it was planned; changes and removals.
+	Before *PlannedWorkoutInput   `json:"before,omitempty"`
+	Id     int64                  `json:"id"`
+	Status PlanProposalItemStatus `json:"status"`
+
+	// WorkoutId The planned workout a change or removal is for.
+	WorkoutId *int64 `json:"workoutId,omitempty"`
+}
+
+// PlanProposalItemAction defines model for PlanProposalItem.Action.
+type PlanProposalItemAction string
+
+// PlanProposalItemStatus defines model for PlanProposalItem.Status.
+type PlanProposalItemStatus string
+
 // PlanStep A step, or a repeat of steps. A repeat has count and steps and nothing
 // else, and holds at most one more level of repeats; any other step has a
 // durationType and, unless it is open (until the lap button), a duration.
@@ -2748,6 +2914,9 @@ type SetLLMProviderJSONRequestBody = LLMProviderInput
 // UpdateMeJSONRequestBody defines body for UpdateMe for application/json ContentType.
 type UpdateMeJSONRequestBody = UpdateMeRequest
 
+// DecidePlanProposalJSONRequestBody defines body for DecidePlanProposal for application/json ContentType.
+type DecidePlanProposalJSONRequestBody = PlanDecisions
+
 // CreateRaceJSONRequestBody defines body for CreateRace for application/json ContentType.
 type CreateRaceJSONRequestBody = RaceInput
 
@@ -2906,6 +3075,15 @@ type ServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(w http.ResponseWriter, r *http.Request)
+	// CreatePlanProposal Ask the coach for a new plan
+	// (POST /api/plan-proposals)
+	CreatePlanProposal(w http.ResponseWriter, r *http.Request)
+	// GetLatestPlanProposal The latest plan proposal
+	// (GET /api/plan-proposals/latest)
+	GetLatestPlanProposal(w http.ResponseWriter, r *http.Request)
+	// DecidePlanProposal Approve or reject proposal items
+	// (POST /api/plan-proposals/{id}/decisions)
+	DecidePlanProposal(w http.ResponseWriter, r *http.Request, id int64)
 	// ListPlannedWorkouts Planned workouts for a range of days
 	// (GET /api/planned-workouts)
 	ListPlannedWorkouts(w http.ResponseWriter, r *http.Request, params ListPlannedWorkoutsParams)
@@ -3257,6 +3435,24 @@ func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
 // UpdateMe Update profile settings
 // (PATCH /api/me)
 func (_ Unimplemented) UpdateMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreatePlanProposal Ask the coach for a new plan
+// (POST /api/plan-proposals)
+func (_ Unimplemented) CreatePlanProposal(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetLatestPlanProposal The latest plan proposal
+// (GET /api/plan-proposals/latest)
+func (_ Unimplemented) GetLatestPlanProposal(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DecidePlanProposal Approve or reject proposal items
+// (POST /api/plan-proposals/{id}/decisions)
+func (_ Unimplemented) DecidePlanProposal(w http.ResponseWriter, r *http.Request, id int64) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -4812,6 +5008,60 @@ func (siw *ServerInterfaceWrapper) UpdateMe(w http.ResponseWriter, r *http.Reque
 	handler.ServeHTTP(w, r)
 }
 
+// CreatePlanProposal operation middleware
+func (siw *ServerInterfaceWrapper) CreatePlanProposal(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreatePlanProposal(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetLatestPlanProposal operation middleware
+func (siw *ServerInterfaceWrapper) GetLatestPlanProposal(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetLatestPlanProposal(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DecidePlanProposal operation middleware
+func (siw *ServerInterfaceWrapper) DecidePlanProposal(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id int64
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DecidePlanProposal(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPlannedWorkouts operation middleware
 func (siw *ServerInterfaceWrapper) ListPlannedWorkouts(w http.ResponseWriter, r *http.Request) {
 
@@ -5757,6 +6007,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/planned-workouts/{id}", wrapper.GetPlannedWorkout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/plan-proposals", wrapper.CreatePlanProposal)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/plan-proposals/latest", wrapper.GetLatestPlanProposal)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/api/plan-proposals/{id}/decisions", wrapper.DecidePlanProposal)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/calendar", wrapper.GetCalendar)
@@ -7739,6 +7998,122 @@ func (response UpdateMedefaultApplicationProblemPlusJSONResponse) VisitUpdateMeR
 	return err
 }
 
+type CreatePlanProposalRequestObject struct {
+}
+
+type CreatePlanProposalResponseObject interface {
+	VisitCreatePlanProposalResponse(w http.ResponseWriter) error
+}
+
+type CreatePlanProposal202JSONResponse PlanProposal
+
+func (response CreatePlanProposal202JSONResponse) VisitCreatePlanProposalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreatePlanProposaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response CreatePlanProposaldefaultApplicationProblemPlusJSONResponse) VisitCreatePlanProposalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLatestPlanProposalRequestObject struct {
+}
+
+type GetLatestPlanProposalResponseObject interface {
+	VisitGetLatestPlanProposalResponse(w http.ResponseWriter) error
+}
+
+type GetLatestPlanProposal200JSONResponse PlanProposal
+
+func (response GetLatestPlanProposal200JSONResponse) VisitGetLatestPlanProposalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetLatestPlanProposaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetLatestPlanProposaldefaultApplicationProblemPlusJSONResponse) VisitGetLatestPlanProposalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecidePlanProposalRequestObject struct {
+	Id   int64 `json:"id"`
+	Body *DecidePlanProposalJSONRequestBody
+}
+
+type DecidePlanProposalResponseObject interface {
+	VisitDecidePlanProposalResponse(w http.ResponseWriter) error
+}
+
+type DecidePlanProposal200JSONResponse PlanProposal
+
+func (response DecidePlanProposal200JSONResponse) VisitDecidePlanProposalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecidePlanProposaldefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response DecidePlanProposaldefaultApplicationProblemPlusJSONResponse) VisitDecidePlanProposalResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListPlannedWorkoutsRequestObject struct {
 	Params ListPlannedWorkoutsParams
 }
@@ -8638,6 +9013,15 @@ type StrictServerInterface interface {
 	// UpdateMe Update profile settings
 	// (PATCH /api/me)
 	UpdateMe(ctx context.Context, request UpdateMeRequestObject) (UpdateMeResponseObject, error)
+	// CreatePlanProposal Ask the coach for a new plan
+	// (POST /api/plan-proposals)
+	CreatePlanProposal(ctx context.Context, request CreatePlanProposalRequestObject) (CreatePlanProposalResponseObject, error)
+	// GetLatestPlanProposal The latest plan proposal
+	// (GET /api/plan-proposals/latest)
+	GetLatestPlanProposal(ctx context.Context, request GetLatestPlanProposalRequestObject) (GetLatestPlanProposalResponseObject, error)
+	// DecidePlanProposal Approve or reject proposal items
+	// (POST /api/plan-proposals/{id}/decisions)
+	DecidePlanProposal(ctx context.Context, request DecidePlanProposalRequestObject) (DecidePlanProposalResponseObject, error)
 	// ListPlannedWorkouts Planned workouts for a range of days
 	// (GET /api/planned-workouts)
 	ListPlannedWorkouts(ctx context.Context, request ListPlannedWorkoutsRequestObject) (ListPlannedWorkoutsResponseObject, error)
@@ -10066,6 +10450,87 @@ func (sh *strictHandler) UpdateMe(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(UpdateMeResponseObject); ok {
 		if err := validResponse.VisitUpdateMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreatePlanProposal operation middleware
+func (sh *strictHandler) CreatePlanProposal(w http.ResponseWriter, r *http.Request) {
+	var request CreatePlanProposalRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreatePlanProposal(ctx, request.(CreatePlanProposalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreatePlanProposal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreatePlanProposalResponseObject); ok {
+		if err := validResponse.VisitCreatePlanProposalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetLatestPlanProposal operation middleware
+func (sh *strictHandler) GetLatestPlanProposal(w http.ResponseWriter, r *http.Request) {
+	var request GetLatestPlanProposalRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetLatestPlanProposal(ctx, request.(GetLatestPlanProposalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetLatestPlanProposal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetLatestPlanProposalResponseObject); ok {
+		if err := validResponse.VisitGetLatestPlanProposalResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DecidePlanProposal operation middleware
+func (sh *strictHandler) DecidePlanProposal(w http.ResponseWriter, r *http.Request, id int64) {
+	var request DecidePlanProposalRequestObject
+
+	request.Id = id
+
+	var body DecidePlanProposalJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DecidePlanProposal(ctx, request.(DecidePlanProposalRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DecidePlanProposal")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DecidePlanProposalResponseObject); ok {
+		if err := validResponse.VisitDecidePlanProposalResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -264,6 +264,29 @@ type Plan struct {
 	CreatedAt time.Time
 }
 
+type PlanProposal struct {
+	ID            int64
+	UserID        int64
+	Status        string
+	Failure       *string
+	PromptVersion *string
+	FromDay       time.Time
+	ToDay         time.Time
+	PlanID        *int64
+	CreatedAt     time.Time
+}
+
+type PlanProposalItem struct {
+	ID         int64
+	UserID     int64
+	ProposalID int64
+	Action     string
+	Status     string
+	WorkoutID  *int64
+	Before     []byte
+	After      []byte
+}
+
 type PlannedWorkout struct {
 	ID          int64
 	UserID      int64

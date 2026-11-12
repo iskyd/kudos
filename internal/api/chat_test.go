@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/iskyd/kudos/internal/store/db"
 )
 
 // fakeProvider speaks the OpenAI chat completions stream and keeps the last request.
@@ -105,6 +107,9 @@ func TestChatStreamsWithTheUsersContext(t *testing.T) {
 		Name: "Last Year's 10K", Day: on(yesterday.AddDate(-1, 0, 0)), Sport: ActivitySportRunning, DistanceM: 10000, Priority: RaceInputPriorityC,
 	}, nil), http.StatusCreated)
 	putDay(t, alice, yesterday.AddDate(0, 0, -1).Format(time.DateOnly), WellnessDayInput{WeightKg: new(70.0)})
+	aliceID := alice.session(alice.do(http.MethodGet, "/api/me", nil, nil), http.StatusOK).Id
+	planned := planWorkout(t, db.New(pool), aliceID, yesterday.AddDate(0, 0, 2).Format(time.DateOnly), "Tomorrow's intervals")
+	planWorkout(t, db.New(pool), aliceID, yesterday.Format(time.DateOnly), "Yesterday's run")
 	decodeJSON[HealthLogEntry](t, bob.do(http.MethodPost, "/api/health-log",
 		HealthLogInput{Kind: Illness, Description: new("Bob's flu"), StartDate: Day{Time: yesterday}}, nil), http.StatusCreated)
 
@@ -129,13 +134,17 @@ func TestChatStreamsWithTheUsersContext(t *testing.T) {
 		t.Fatalf("provider got %+v", msgs)
 	}
 	for _, want := range []string{"<athlete_context>", "Sore left knee", fmt.Sprintf("[act:%d]", actID), "Cite every item",
-		"LTHR 171", "Heavy legs", "Autumn Half", "priority A, in 29 days", "## Goals", "## Training load, last 6 weeks", "- Sports: running"} {
+		"LTHR 171", "Heavy legs", "Autumn Half", "priority A, in 29 days", "## Goals", "## Training load, last 6 weeks", "- Sports: running",
+		fmt.Sprintf("workout %d, running, Tomorrow's intervals", planned.ID)} {
 		if !strings.Contains(msgs[0].Content, want) {
 			t.Errorf("system prompt lacks %q", want)
 		}
 	}
 	if strings.Contains(msgs[0].Content, "Last Year's 10K") {
 		t.Error("the context lists a past race as upcoming")
+	}
+	if strings.Contains(msgs[0].Content, "Yesterday's run") {
+		t.Error("the context lists a past planned workout as current")
 	}
 	if strings.Contains(msgs[0].Content, "Bob's flu") {
 		t.Error("alice's context has bob's health log")

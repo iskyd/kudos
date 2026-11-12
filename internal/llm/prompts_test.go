@@ -35,8 +35,8 @@ func TestRenderGolden(t *testing.T) {
 			t.Errorf("%s: user prompt %q", m, p.User)
 		}
 	}
-	if p, _ := Render(ModePlan, in); !strings.Contains(p.User, in.Schema) {
-		t.Errorf("plan prompt lacks the schema:\n%s", p.User)
+	if p, _ := Render(ModePlan, in); !strings.Contains(p.User, in.Schema) || !strings.Contains(p.User, "from 2026-11-03 to 2026-11-16") {
+		t.Errorf("plan prompt lacks the schema or its days:\n%s", p.User)
 	}
 }
 
@@ -65,6 +65,7 @@ func TestReleasedPromptsNeverChange(t *testing.T) {
 		"daily-insight.v1.tmpl": "e32d504ecab9e46322aa1a913645f3224d422837249ea8171fec3e2badcbe2e7",
 		"weekly-report.v1.tmpl": "92532c2685bfc2e7707ca5de54dd50df32e86c87543c32b49648c14ed32e5d30",
 		"plan.v1.tmpl":          "39916f2b44205222069c269efc8ebd6661589181724e781e1de3370d2db3c43a",
+		"plan.v2.tmpl":          "be94423a93c25ac189d4f4349ab8b4558627b1602c200b5f390c243661f9abc0",
 	}
 	files, err := fs.Glob(promptFiles, "prompts/*.tmpl")
 	if err != nil {

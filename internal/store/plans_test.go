@@ -65,3 +65,151 @@ func TestPlannedWorkouts(t *testing.T) {
 		t.Error("bob added a workout to alice's plan")
 	}
 }
+
+func TestPlannedWorkoutWritesAreIsolated(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	plan, err := q.CreatePlan(ctx, alice.ID)
+	check(t, err)
+	steps := []byte(`[{"kind": "recovery", "durationType": "time", "duration": 1800}]`)
+	w, err := q.CreatePlannedWorkout(ctx, db.CreatePlannedWorkoutParams{
+		UserID: alice.ID, PlanID: plan.ID, Day: time.Date(2026, 11, 15, 0, 0, 0, 0, time.UTC), Sport: "running", Title: "Long run", Steps: steps,
+	})
+	check(t, err)
+	update := db.UpdatePlannedWorkoutParams{ID: w.ID, Day: w.Day, Sport: "cycling", Title: "Ride", Steps: steps}
+
+	update.UserID = bob.ID
+	if n, err := q.UpdatePlannedWorkout(ctx, update); err != nil || n != 0 {
+		t.Errorf("bob updated alice's workout: %d, %v", n, err)
+	}
+	if n, err := q.DeletePlannedWorkout(ctx, db.DeletePlannedWorkoutParams{UserID: bob.ID, ID: w.ID}); err != nil || n != 0 {
+		t.Errorf("bob deleted alice's workout: %d, %v", n, err)
+	}
+	update.UserID = alice.ID
+	if n, err := q.UpdatePlannedWorkout(ctx, update); err != nil || n != 1 {
+		t.Fatalf("update: %d, %v", n, err)
+	}
+	got, err := q.GetPlannedWorkout(ctx, db.GetPlannedWorkoutParams{UserID: alice.ID, ID: w.ID})
+	if err != nil || got.Title != "Ride" || got.Sport != "cycling" {
+		t.Errorf("after update %+v, %v", got, err)
+	}
+	if n, err := q.DeletePlannedWorkout(ctx, db.DeletePlannedWorkoutParams{UserID: alice.ID, ID: w.ID}); err != nil || n != 1 {
+		t.Errorf("delete: %d, %v", n, err)
+	}
+}
+
+func TestPlanProposals(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	from, to := time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC), time.Date(2026, 11, 26, 0, 0, 0, 0, time.UTC)
+	create := func(userID int64) db.PlanProposal {
+		t.Helper()
+		p, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: userID, FromDay: from, ToDay: to})
+		check(t, err)
+		return p
+	}
+	old := create(alice.ID)
+	if old.Status != "generating" {
+		t.Fatalf("created %+v", old)
+	}
+	// One generating proposal per user.
+	if _, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: alice.ID, FromDay: from, ToDay: to}); err == nil {
+		t.Fatal("a second generating proposal")
+	}
+	bobs := create(bob.ID) // bob's does not count against alice
+
+	// Expiring and failing touch only the user's own.
+	check(t, q.ExpirePlanProposals(ctx, db.ExpirePlanProposalsParams{UserID: bob.ID, Before: time.Now().Add(time.Hour)}))
+	if p, err := q.GetPlanProposal(ctx, db.GetPlanProposalParams{UserID: alice.ID, ID: old.ID}); err != nil || p.Status != "generating" {
+		t.Errorf("bob's expiry reached alice: %+v, %v", p, err)
+	}
+	if p, err := q.GetPlanProposal(ctx, db.GetPlanProposalParams{UserID: bob.ID, ID: bobs.ID}); err != nil || p.Status != "failed" || *p.Failure != "timeout" {
+		t.Errorf("bob's after expiry: %+v, %v", p, err)
+	}
+	invalid := "invalid_output"
+	check(t, q.FailPlanProposal(ctx, db.FailPlanProposalParams{UserID: bob.ID, ID: old.ID, Failure: &invalid}))
+	version := "plan.v2"
+	if n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{UserID: bob.ID, ID: old.ID, Status: "open", PromptVersion: &version}); err != nil || n != 0 {
+		t.Errorf("bob filled alice's proposal: %d, %v", n, err)
+	}
+	if n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{UserID: alice.ID, ID: old.ID, Status: "open", PromptVersion: &version}); err != nil || n != 1 {
+		t.Fatalf("fill: %d, %v", n, err)
+	}
+
+	// Items join only the user's own proposals.
+	after := []byte(`{"day": "2026-11-13", "sport": "running", "title": "Easy", "steps": []}`)
+	check(t, q.CreatePlanProposalItem(ctx, db.CreatePlanProposalItemParams{UserID: alice.ID, ProposalID: old.ID, Action: "add", After: after}))
+	if err := q.CreatePlanProposalItem(ctx, db.CreatePlanProposalItemParams{UserID: bob.ID, ProposalID: old.ID, Action: "add", After: after}); err == nil {
+		t.Error("bob added an item to alice's proposal")
+	}
+	// An item's action decides what it holds.
+	if err := q.CreatePlanProposalItem(ctx, db.CreatePlanProposalItemParams{UserID: alice.ID, ProposalID: old.ID, Action: "remove", After: after}); err == nil {
+		t.Error("a removal without a workout and before was stored")
+	}
+	items, err := q.ListPlanProposalItems(ctx, db.ListPlanProposalItemsParams{UserID: alice.ID, ProposalID: old.ID, MaxRows: 10})
+	check(t, err)
+	if len(items) != 1 || items[0].Status != "pending" {
+		t.Fatalf("items %+v", items)
+	}
+	if rows, err := q.ListPlanProposalItems(ctx, db.ListPlanProposalItemsParams{UserID: bob.ID, ProposalID: old.ID, MaxRows: 10}); err != nil || len(rows) != 0 {
+		t.Errorf("bob lists %+v, %v", rows, err)
+	}
+	if n, err := q.DecidePlanProposalItem(ctx, db.DecidePlanProposalItemParams{UserID: bob.ID, ProposalID: old.ID, ID: items[0].ID, Status: "approved"}); err != nil || n != 0 {
+		t.Errorf("bob decided alice's item: %d, %v", n, err)
+	}
+	if n, err := q.CountPendingPlanProposalItems(ctx, db.CountPendingPlanProposalItemsParams{UserID: bob.ID, ProposalID: old.ID}); err != nil || n != 0 {
+		t.Errorf("bob counts %d, %v", n, err)
+	}
+	if n, err := q.CountPendingPlanProposalItems(ctx, db.CountPendingPlanProposalItemsParams{UserID: alice.ID, ProposalID: old.ID}); err != nil || n != 1 {
+		t.Errorf("alice counts %d, %v", n, err)
+	}
+	if n, err := q.DecidePlanProposalItem(ctx, db.DecidePlanProposalItemParams{UserID: alice.ID, ProposalID: old.ID, ID: items[0].ID, Status: "approved"}); err != nil || n != 1 {
+		t.Errorf("decide: %d, %v", n, err)
+	}
+	if n, err := q.DecidePlanProposalItem(ctx, db.DecidePlanProposalItemParams{UserID: alice.ID, ProposalID: old.ID, ID: items[0].ID, Status: "rejected"}); err != nil || n != 0 {
+		t.Errorf("decided twice: %d, %v", n, err)
+	}
+
+	// Plans link only within the user; status and superseding stay with the user.
+	bobPlan, err := q.CreatePlan(ctx, bob.ID)
+	check(t, err)
+	if err := q.SetPlanProposalPlan(ctx, db.SetPlanProposalPlanParams{UserID: alice.ID, ID: old.ID, PlanID: &bobPlan.ID}); err == nil {
+		t.Error("alice's proposal links bob's plan")
+	}
+	check(t, q.SetPlanProposalStatus(ctx, db.SetPlanProposalStatusParams{UserID: bob.ID, ID: old.ID, Status: "closed"}))
+	check(t, q.SupersedePlanProposals(ctx, db.SupersedePlanProposalsParams{UserID: bob.ID, ID: 0}))
+	if p, err := q.LockPlanProposal(ctx, db.LockPlanProposalParams{UserID: alice.ID, ID: old.ID}); err != nil || p.Status != "open" {
+		t.Errorf("bob changed alice's status: %+v, %v", p, err)
+	}
+	newer := create(alice.ID)
+	check(t, q.SupersedePlanProposals(ctx, db.SupersedePlanProposalsParams{UserID: alice.ID, ID: newer.ID}))
+	if p, err := q.GetPlanProposal(ctx, db.GetPlanProposalParams{UserID: alice.ID, ID: old.ID}); err != nil || p.Status != "superseded" {
+		t.Errorf("after superseding %+v, %v", p, err)
+	}
+	if p, err := q.GetLatestPlanProposal(ctx, alice.ID); err != nil || p.ID != newer.ID {
+		t.Errorf("latest %+v, %v", p, err)
+	}
+	for _, read := range []func() error{
+		func() error {
+			_, err := q.GetPlanProposal(ctx, db.GetPlanProposalParams{UserID: bob.ID, ID: newer.ID})
+			return err
+		},
+		func() error {
+			_, err := q.LockPlanProposal(ctx, db.LockPlanProposalParams{UserID: bob.ID, ID: newer.ID})
+			return err
+		},
+	} {
+		if err := read(); !errors.Is(err, pgx.ErrNoRows) {
+			t.Errorf("bob reads alice's proposal: %v", err)
+		}
+	}
+	if p, err := q.GetLatestPlanProposal(ctx, bob.ID); err != nil || p.ID != bobs.ID {
+		t.Errorf("bob's latest %+v, %v", p, err)
+	}
+}

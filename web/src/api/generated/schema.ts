@@ -619,6 +619,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/plan-proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Ask the coach for a new plan
+         * @description Starts generating a proposal for the 14 local days from tomorrow; it
+         *     comes back as `generating` and a job fills it in. A user without a
+         *     provider gets `llm-not-configured`; one whose last proposal is still
+         *     generating gets `proposal-generating`.
+         */
+        post: operations["createPlanProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plan-proposals/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The latest plan proposal
+         * @description The most recent proposal in any status; `not-found` when there is none.
+         */
+        get: operations["getLatestPlanProposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plan-proposals/{id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve or reject proposal items
+         * @description Approves and rejects pending items of an open proposal in one
+         *     transaction: approved items change the planned workouts, rejected ones
+         *     change nothing. Items not named stay pending; once none are, the
+         *     proposal is closed. An item that is not pending in this proposal, or is
+         *     named twice, is `invalid-request`; a proposal that is not open is
+         *     `proposal-closed`.
+         */
+        post: operations["decidePlanProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/calendar": {
         parameters: {
             query?: never;
@@ -1657,6 +1725,70 @@ export interface components {
             id: number;
             /** Format: int64 */
             planId: number;
+        };
+        /**
+         * @description What the LLM replies when it plans (internal/plans, generated as a JSON
+         *     Schema): the IDs of current workouts it keeps as they are, and every
+         *     other workout of the planned days. Current workouts it neither keeps
+         *     nor replaces with one on the same day and sport are proposed for removal.
+         */
+        PlanDraft: {
+            keep: number[];
+            workouts: components["schemas"]["PlannedWorkoutInput"][];
+        };
+        PlanProposal: {
+            /** Format: int64 */
+            id: number;
+            /**
+             * @description generating until a job fills it in; then open with items to decide,
+             *     closed once every item is decided (or when it proposed no change),
+             *     failed when the model's plan stayed invalid or the provider failed,
+             *     superseded when a newer proposal opened.
+             * @enum {string}
+             */
+            status: "generating" | "open" | "closed" | "failed" | "superseded";
+            /**
+             * @description Why it failed.
+             * @enum {string}
+             */
+            failure?: "invalid_output" | "provider_error" | "not_configured" | "timeout";
+            /** Format: date-time */
+            createdAt: string;
+            /**
+             * Format: date
+             * @description First planned local day.
+             */
+            from: string;
+            /**
+             * Format: date
+             * @description Last planned local day.
+             */
+            to: string;
+            /** @description The changes, by day; empty until it is open. */
+            items: components["schemas"]["PlanProposalItem"][];
+        };
+        PlanProposalItem: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            action: "add" | "change" | "remove";
+            /** @enum {string} */
+            status: "pending" | "approved" | "rejected";
+            /**
+             * Format: int64
+             * @description The planned workout a change or removal is for.
+             */
+            workoutId?: number;
+            /** @description The workout as it was planned; changes and removals. */
+            before?: components["schemas"]["PlannedWorkoutInput"];
+            /** @description The workout proposed; additions and changes. */
+            after?: components["schemas"]["PlannedWorkoutInput"];
+        };
+        PlanDecisions: {
+            /** @description Item IDs to apply. */
+            approve: number[];
+            /** @description Item IDs to drop. */
+            reject: number[];
         };
         Calendar: {
             plannedWorkouts: components["schemas"]["PlannedWorkout"][];
@@ -3289,6 +3421,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlannedWorkout"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    createPlanProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposal, being generated. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanProposal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getLatestPlanProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The proposal with its items. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanProposal"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    decidePlanProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanDecisions"];
+            };
+        };
+        responses: {
+            /** @description The proposal after the decisions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanProposal"];
                 };
             };
             default: components["responses"]["Problem"];

@@ -45,20 +45,10 @@ const (
 // morning: from 06:00 local, once a connected Garmin has synced since then, or
 // from 10:00 if it has not. A report missed on its Monday is skipped.
 func Due(c db.ListCoachCandidatesRow, now time.Time) (insight, report *time.Time) {
-	loc, err := time.LoadLocation(c.Timezone)
-	if err != nil {
-		loc = time.UTC // validated when set; this is only a guard
-	}
-	y, m, d := now.In(loc).Date()
-	at := func(hour int) time.Time { return time.Date(y, m, d, hour, 0, 0, 0, loc) }
-	morning := at(morningHour)
-	if now.Before(morning) {
+	today, ok := Morning(c.Timezone, c.GarminConnected, c.LastSyncAt, now)
+	if !ok {
 		return nil, nil
 	}
-	if c.GarminConnected && c.LastSyncAt.Before(morning) && now.Before(at(syncWaitHour)) {
-		return nil, nil
-	}
-	today := time.Date(y, m, d, 0, 0, 0, 0, time.UTC)
 	if c.LastInsight.Before(today) {
 		insight = &today
 	}
@@ -66,6 +56,23 @@ func Due(c db.ListCoachCandidatesRow, now time.Time) (insight, report *time.Time
 		report = &today
 	}
 	return insight, report
+}
+
+// Morning reports whether the morning's data is in at now in timezone: from
+// 06:00 local, once a connected Garmin has synced since then, or from 10:00 if
+// it has not. today is the local day, as a date at UTC midnight.
+func Morning(timezone string, garminConnected bool, lastSync, now time.Time) (today time.Time, ok bool) {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = time.UTC // validated when set; this is only a guard
+	}
+	y, m, d := now.In(loc).Date()
+	at := func(hour int) time.Time { return time.Date(y, m, d, hour, 0, 0, 0, loc) }
+	morning := at(morningHour)
+	if now.Before(morning) || garminConnected && lastSync.Before(morning) && now.Before(at(syncWaitHour)) {
+		return time.Time{}, false
+	}
+	return time.Date(y, m, d, 0, 0, 0, 0, time.UTC), true
 }
 
 // Deps are what the workers need. Context and Client come from the API server,

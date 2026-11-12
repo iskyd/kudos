@@ -56,7 +56,7 @@ func TestStructuredValidFirstTime(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c := &scripted{replies: []string{reply}}
-			out, err := Structured(t.Context(), c, conversation, schema(t))
+			out, err := Structured(t.Context(), c, conversation, schema(t).Validate)
 			if err != nil || string(out) != `{"name": "Easy run", "minutes": 40}` || len(c.got) != 1 {
 				t.Errorf("out %s, err %v, %d calls", out, err, len(c.got))
 			}
@@ -67,7 +67,7 @@ func TestStructuredValidFirstTime(t *testing.T) {
 func TestStructuredRetriesOnceWithTheErrors(t *testing.T) {
 	t.Parallel()
 	c := &scripted{replies: []string{`{"name": "Easy run", "minutes": "forty"}`, `{"name": "Easy run", "minutes": 40}`}}
-	out, err := Structured(t.Context(), c, conversation, schema(t))
+	out, err := Structured(t.Context(), c, conversation, schema(t).Validate)
 	if err != nil || string(out) != `{"name": "Easy run", "minutes": 40}` {
 		t.Fatalf("out %s, err %v", out, err)
 	}
@@ -83,6 +83,24 @@ func TestStructuredRetriesOnceWithTheErrors(t *testing.T) {
 	}
 }
 
+func TestStructuredRetriesOnRulesBeyondTheSchema(t *testing.T) {
+	t.Parallel()
+	short := func(doc []byte) error {
+		if err := schema(t).Validate(doc); err != nil {
+			return err
+		}
+		if strings.Contains(string(doc), `"minutes": 5}`) {
+			return errors.New("minutes: at least 10")
+		}
+		return nil
+	}
+	c := &scripted{replies: []string{`{"name": "Run", "minutes": 5}`, `{"name": "Run", "minutes": 10}`}}
+	out, err := Structured(t.Context(), c, conversation, short)
+	if err != nil || string(out) != `{"name": "Run", "minutes": 10}` || !strings.Contains(c.got[1].Messages[2].Content, "minutes: at least 10") {
+		t.Errorf("out %s, err %v, %+v", out, err, c.got)
+	}
+}
+
 func TestStructuredFailsAfterTheRetry(t *testing.T) {
 	t.Parallel()
 	for name, replies := range map[string][]string{
@@ -93,7 +111,7 @@ func TestStructuredFailsAfterTheRetry(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			c := &scripted{replies: replies}
-			if out, err := Structured(t.Context(), c, conversation, schema(t)); !errors.Is(err, ErrInvalidOutput) || out != nil || len(c.got) != 2 {
+			if out, err := Structured(t.Context(), c, conversation, schema(t).Validate); !errors.Is(err, ErrInvalidOutput) || out != nil || len(c.got) != 2 {
 				t.Errorf("out %s, err %v, %d calls", out, err, len(c.got))
 			}
 		})
@@ -109,7 +127,7 @@ func TestStructuredClientErrors(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if _, err := Structured(t.Context(), c, conversation, schema(t)); !errors.Is(err, down) {
+			if _, err := Structured(t.Context(), c, conversation, schema(t).Validate); !errors.Is(err, down) {
 				t.Errorf("err = %v", err)
 			}
 		})

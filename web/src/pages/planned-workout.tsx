@@ -1,9 +1,8 @@
 import { useParams } from 'react-router'
-import type { ActivitySport } from '@/api/activities'
 import { usePlannedWorkout } from '@/api/plans'
 import { QueryStatus } from '@/components/card'
+import { PlanSteps } from '@/components/plan-steps'
 import { formatDay } from '@/lib/format/date'
-import { type PlanStep, stepText } from '@/lib/plans'
 import { sportLabels } from '@/lib/sports'
 
 export function PlannedWorkoutPage() {
@@ -26,31 +25,10 @@ export function PlannedWorkoutPage() {
             <h2 id="steps-heading" className="text-lg font-semibold">
               Steps
             </h2>
-            <Steps steps={w.steps} sport={w.sport} />
+            <PlanSteps steps={w.steps} sport={w.sport} />
           </section>
         </>
       )}
     </div>
-  )
-}
-
-// Steps lists steps in order; a repeat lists its own steps under "n ×".
-function Steps({ steps, sport }: { steps: PlanStep[]; sport: ActivitySport }) {
-  return (
-    <ol className="flex flex-col gap-2 border-l border-border pl-4">
-      {steps.map((s, i) =>
-        s.kind === 'repeat' ? (
-          <li key={i} aria-label={`${String(s.count)} times`} className="flex flex-col gap-2">
-            <span className="font-medium">{s.count} ×</span>
-            <Steps steps={s.steps ?? []} sport={sport} />
-          </li>
-        ) : (
-          <li key={i} className="flex flex-col">
-            <span>{stepText(s, sport)}</span>
-            {s.note && <span className="text-sm text-muted-foreground">{s.note}</span>}
-          </li>
-        ),
-      )}
-    </ol>
   )
 }

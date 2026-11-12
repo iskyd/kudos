@@ -37,6 +37,9 @@ const (
 	KindBackfillRunning   Kind = "backfill-running"
 
 	KindLLMNotConfigured Kind = "llm-not-configured"
+
+	KindProposalGenerating Kind = "proposal-generating"
+	KindProposalClosed     Kind = "proposal-closed"
 )
 
 func (k Kind) status() int {
@@ -47,7 +50,7 @@ func (k Kind) status() int {
 		return http.StatusUnauthorized
 	case KindCSRF, KindCrossOrigin, KindRegistrationDisabled:
 		return http.StatusForbidden
-	case KindUsernameTaken, KindBackfillExists, KindBackfillRunning, KindLLMNotConfigured:
+	case KindUsernameTaken, KindBackfillExists, KindBackfillRunning, KindLLMNotConfigured, KindProposalGenerating, KindProposalClosed:
 		return http.StatusConflict
 	case KindNotFound:
 		return http.StatusNotFound
@@ -102,6 +105,10 @@ func (k Kind) title() string {
 		return "History import still running"
 	case KindLLMNotConfigured:
 		return "No AI coach provider set up"
+	case KindProposalGenerating:
+		return "A plan is being generated"
+	case KindProposalClosed:
+		return "Plan proposal closed"
 	default:
 		return "Internal error"
 	}

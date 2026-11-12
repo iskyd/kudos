@@ -14,6 +14,7 @@ import { DashboardPage } from '@/pages/dashboard'
 import { GearPage } from '@/pages/gear'
 import { GoalsPage } from '@/pages/goals'
 import { PlannedWorkoutPage } from '@/pages/planned-workout'
+import { PlansPage } from '@/pages/plans'
 import { RacesPage } from '@/pages/races'
 import { RecordsPage } from '@/pages/records'
 import { ReportsPage } from '@/pages/reports'
@@ -30,6 +31,7 @@ const pages: Partial<Record<string, ReactElement>> = {
   '/coach': <CoachPage />,
   '/gear': <GearPage />,
   '/goals': <GoalsPage />,
+  '/plans': <PlansPage />,
   '/races': <RacesPage />,
   '/records': <RecordsPage />,
   '/reports': <ReportsPage />,

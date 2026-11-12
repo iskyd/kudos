@@ -19,6 +19,7 @@ import (
 	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
 	"github.com/iskyd/kudos/internal/jobs"
+	"github.com/iskyd/kudos/internal/plans/proposals"
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
@@ -55,11 +56,11 @@ func newAPI(t *testing.T, registration bool, logs *bytes.Buffer) (*apiClient, *d
 func newAPIOn(t testing.TB, pool *pgxpool.Pool, registration bool, logs *bytes.Buffer) (*apiClient, *db.Queries) {
 	t.Helper()
 	q := db.New(pool)
-	// The backfill worker is registered so jobs can be queued; tests never work them.
+	// The workers are registered so jobs can be queued; tests never work them.
 	jobClient, err := jobs.NewClient(pool, discard(), func(w *river.Workers) {
 		river.AddWorker(w, &garminsync.Worker{})
 		river.AddWorker(w, &garminsync.SyncWorker{})
-	}, (&ingest.Workers{}).Register)
+	}, (&ingest.Workers{}).Register, (&proposals.Deps{}).Register)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +74,7 @@ func newAPIOn(t testing.TB, pool *pgxpool.Pool, registration bool, logs *bytes.B
 	}
 	h := NewRouter(logger, newServer(q, ingest.New(pool, jobClient, t.TempDir()), cursors, GarminDeps{
 		Auth: fakeGarmin{}, Cipher: testCipher(t), Sync: garminsync.NewService(pool, jobClient),
-	}, registration, testTileURL, cheapArgon()), spaStub)
+	}, proposals.NewService(pool, jobClient), registration, testTileURL, cheapArgon()), spaStub)
 	return &apiClient{t: t, h: h}, q
 }
 

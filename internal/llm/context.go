@@ -26,6 +26,7 @@ type AthleteContext struct {
 	CheckIns   []CheckIn
 	Load       []LoadWeek
 	Activities []ActivitySummary
+	Plan       []PlannedSummary // from today
 	Health     []HealthDay
 	Records    []Record
 }
@@ -93,6 +94,14 @@ type ActivitySummary struct {
 	Load      *float64
 }
 
+// PlannedSummary is a planned workout; ID is how a plan draft keeps it.
+type PlannedSummary struct {
+	ID    int64
+	Day   time.Time
+	Sport string
+	Title string
+}
+
 // HealthDay is a day's recovery metrics.
 type HealthDay struct {
 	Day       time.Time
@@ -152,6 +161,7 @@ func BuildContext(c AthleteContext, budget int) string {
 		{title: "Readiness and check-ins", items: readinessItems(c)},
 		{title: "Training load, last 6 weeks", items: loadItems(c.Load)},
 		{title: "Recent activities", items: activityItems(c.Activities)},
+		{title: "Current plan", items: planItems(c.Plan)},
 		{title: "Health trends", items: healthItems(c.Health)},
 		{title: "Personal records", items: recordItems(c.Records)},
 	}
@@ -369,6 +379,16 @@ func activityItems(acts []ActivitySummary) []string {
 			parts = append(parts, fmt.Sprintf("load %.0f", *a.Load))
 		}
 		items[i] = fmt.Sprintf("- %s %s %s: %s", a.Start.Format("2006-01-02 15:04"), strings.ReplaceAll(a.Sport, "_", " "), RefActivity(a.ID), strings.Join(parts, ", "))
+	}
+	return items
+}
+
+func planItems(plan []PlannedSummary) []string {
+	ps := slices.Clone(plan)
+	slices.SortStableFunc(ps, func(a, b PlannedSummary) int { return cmp.Or(a.Day.Compare(b.Day), cmp.Compare(a.ID, b.ID)) })
+	items := make([]string, len(ps))
+	for i, p := range ps {
+		items[i] = fmt.Sprintf("- %s %s: workout %d, %s, %s", day(p.Day), RefDay(p.Day), p.ID, strings.ReplaceAll(p.Sport, "_", " "), oneLine(p.Title))
 	}
 	return items
 }

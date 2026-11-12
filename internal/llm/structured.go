@@ -38,15 +38,16 @@ func CompileSchema(name string, doc []byte) (*Schema, error) {
 // ErrInvalidOutput means the model's output failed validation on both tries.
 var ErrInvalidOutput = errors.New("LLM output failed validation")
 
-// Structured asks for JSON matching schema. Invalid output gets one retry that
+// Structured asks for JSON that validate accepts: a Schema's Validate, or one
+// that also checks what a schema cannot say. Invalid output gets one retry that
 // shows the model its reply and the validation errors; a second failure is
 // ErrInvalidOutput. Only validated output is returned (invariant 33).
-func Structured(ctx context.Context, c Client, req Request, schema *Schema) (json.RawMessage, error) {
+func Structured(ctx context.Context, c Client, req Request, validate func([]byte) error) (json.RawMessage, error) {
 	reply, err := c.Complete(ctx, req)
 	if err != nil {
 		return nil, err
 	}
-	out, invalid := schema.check(reply)
+	out, invalid := check(reply, validate)
 	if invalid == nil {
 		return out, nil
 	}
@@ -58,7 +59,7 @@ func Structured(ctx context.Context, c Client, req Request, schema *Schema) (jso
 	if reply, err = c.Complete(ctx, retry); err != nil {
 		return nil, err
 	}
-	if out, invalid = schema.check(reply); invalid != nil {
+	if out, invalid = check(reply, validate); invalid != nil {
 		return nil, fmt.Errorf("%w: %w", ErrInvalidOutput, invalid)
 	}
 	return out, nil
@@ -77,9 +78,9 @@ func (s *Schema) Validate(doc []byte) error {
 }
 
 // check extracts the JSON from a reply and validates it.
-func (s *Schema) check(reply string) (json.RawMessage, error) {
+func check(reply string, validate func([]byte) error) (json.RawMessage, error) {
 	text := extractJSON(reply)
-	if err := s.Validate([]byte(text)); err != nil {
+	if err := validate([]byte(text)); err != nil {
 		return nil, err
 	}
 	return json.RawMessage(text), nil

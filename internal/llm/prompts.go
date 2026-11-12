@@ -36,7 +36,7 @@ func promptVersion(m Mode) (string, error) {
 	case ModeWeeklyReport:
 		return "weekly-report.v1", nil
 	case ModePlan:
-		return "plan.v1", nil
+		return "plan.v2", nil
 	}
 	return "", fmt.Errorf("unknown prompt mode %q", m)
 }
@@ -47,6 +47,15 @@ type PromptInput struct {
 	Context string // from BuildContext
 	Schema  string // the JSON Schema the reply must match; plan prompts only
 }
+
+// PlanDays is how many days a plan covers, from the day after Today.
+const PlanDays = 14
+
+// PlanFrom is the first day a plan covers.
+func (in PromptInput) PlanFrom() string { return in.Today.AddDate(0, 0, 1).Format(time.DateOnly) }
+
+// PlanTo is the last day a plan covers.
+func (in PromptInput) PlanTo() string { return in.Today.AddDate(0, 0, PlanDays).Format(time.DateOnly) }
 
 // Prompt is a rendered template.
 type Prompt struct {
