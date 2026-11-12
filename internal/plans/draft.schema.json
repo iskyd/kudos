@@ -1,0 +1,168 @@
+{
+  "$defs": {
+    "ActivitySport": {
+      "description": "A stored activity's sport; transition is a multisport leg between disciplines.",
+      "enum": [
+        "running",
+        "trail_running",
+        "cycling",
+        "pool_swimming",
+        "open_water_swimming",
+        "hiking",
+        "strength",
+        "transition",
+        "other"
+      ],
+      "type": "string"
+    },
+    "PlanDraft": {
+      "additionalProperties": false,
+      "description": "What the LLM replies when it plans (internal/plans, generated as a JSON\nSchema): the IDs of current workouts it keeps as they are, and every\nother workout of the planned days. Current workouts it neither keeps\nnor replaces with one on the same day and sport are proposed for removal.\n",
+      "properties": {
+        "keep": {
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 50,
+          "type": "array"
+        },
+        "workouts": {
+          "items": {
+            "$ref": "#/$defs/PlannedWorkoutInput"
+          },
+          "maxItems": 50,
+          "type": "array"
+        }
+      },
+      "required": [
+        "keep",
+        "workouts"
+      ],
+      "type": "object"
+    },
+    "PlanStep": {
+      "additionalProperties": false,
+      "description": "A step, or a repeat of steps. A repeat has count and steps and nothing\nelse, and holds at most one more level of repeats; any other step has a\ndurationType and, unless it is open (until the lap button), a duration.\n",
+      "properties": {
+        "count": {
+          "maximum": 50,
+          "minimum": 2,
+          "type": "integer"
+        },
+        "duration": {
+          "description": "Seconds for time, metres for distance.",
+          "minimum": 1,
+          "type": "number"
+        },
+        "durationType": {
+          "enum": [
+            "time",
+            "distance",
+            "open"
+          ],
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "warmup",
+            "interval",
+            "recovery",
+            "cooldown",
+            "repeat"
+          ],
+          "type": "string"
+        },
+        "note": {
+          "maxLength": 200,
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/PlanStep"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "type": "array"
+        },
+        "target": {
+          "$ref": "#/$defs/PlanTarget"
+        }
+      },
+      "required": [
+        "kind"
+      ],
+      "type": "object"
+    },
+    "PlanTarget": {
+      "additionalProperties": false,
+      "description": "Either a zone of the metric's current zones, or a low-to-high range (bpm, m/s or W).",
+      "properties": {
+        "high": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "low": {
+          "minimum": 0,
+          "type": "number"
+        },
+        "metric": {
+          "enum": [
+            "heart_rate",
+            "pace",
+            "power"
+          ],
+          "type": "string"
+        },
+        "zone": {
+          "maximum": 7,
+          "minimum": 1,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "metric"
+      ],
+      "type": "object"
+    },
+    "PlannedWorkoutInput": {
+      "additionalProperties": false,
+      "description": "A planned workout. This schema and the ones it uses are also the JSON\nSchema the LLM's workouts are validated against (internal/plans,\ngenerated). Values are SI: durations s, distances m, pace targets m/s.\n",
+      "properties": {
+        "day": {
+          "description": "The local day it is planned for.",
+          "format": "date",
+          "type": "string"
+        },
+        "description": {
+          "maxLength": 2000,
+          "type": "string"
+        },
+        "sport": {
+          "$ref": "#/$defs/ActivitySport"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/PlanStep"
+          },
+          "maxItems": 50,
+          "minItems": 1,
+          "type": "array"
+        },
+        "title": {
+          "maxLength": 200,
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "day",
+        "sport",
+        "title",
+        "steps"
+      ],
+      "type": "object"
+    }
+  },
+  "$ref": "#/$defs/PlanDraft",
+  "$schema": "https://json-schema.org/draft/2020-12/schema"
+}

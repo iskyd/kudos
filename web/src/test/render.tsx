@@ -34,7 +34,8 @@ export function problem(status: number, kind: string, title: string, detail?: st
 // gear pickers find no gear and activities ran no structured workout. The
 // dashboard, trends, records, goals, races and calendar pages find no data: no
 // activities, load, volume, curves, records, goals, races or calendar entries,
-// readiness collecting; no AI coach is set up and it has written nothing.
+// readiness collecting; no AI coach is set up, it has written nothing and
+// proposed no plan.
 export function loggedInAs(user: Me | null) {
   server.use(
     http.get('/api/me', () =>
@@ -45,6 +46,7 @@ export function loggedInAs(user: Me | null) {
     http.get('/api/goals', () => HttpResponse.json({ items: [] })),
     http.get('/api/races', () => HttpResponse.json({ items: [] })),
     http.get('/api/planned-workouts', () => HttpResponse.json([])),
+    http.get('/api/plan-proposals/latest', () => problem(404, 'not-found', 'Not found')),
     http.get('/api/activities/:id/execution', () => HttpResponse.json({ kind: 'none' })),
     http.get('/api/activities', () => HttpResponse.json({ items: [] })),
     http.get('/api/fitness', () => HttpResponse.json([])),

@@ -69,6 +69,10 @@ func sample() AthleteContext {
 			{ID: 10, Start: localTime("2026-10-29 06:45"), Sport: "strength", DurationS: 2700},
 			{ID: 9, Start: localTime("2026-10-28 19:00"), Sport: "trail_running", DurationS: 5400, DistanceM: new(14000.0), AvgHR: new(145)},
 		},
+		Plan: []PlannedSummary{
+			{ID: 21, Day: date("2026-11-04"), Sport: "trail_running", Title: "Hills\n6 × 2 min"},
+			{ID: 20, Day: date("2026-11-03"), Sport: "running", Title: "Easy 45 min"},
+		},
 		Health: []HealthDay{
 			{Day: date("2026-11-01"), HRV: new(58.4), RestingHR: new(49), SleepS: new(7*3600 + 1800.0)},
 			{Day: date("2026-11-02"), HRV: new(55.0), RestingHR: new(51)},

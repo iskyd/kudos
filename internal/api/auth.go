@@ -14,6 +14,7 @@ import (
 
 	"github.com/iskyd/kudos/internal/crypto"
 	"github.com/iskyd/kudos/internal/importer/ingest"
+	"github.com/iskyd/kudos/internal/plans/proposals"
 	"github.com/iskyd/kudos/internal/store/db"
 )
 
@@ -32,6 +33,7 @@ type Server struct {
 	ingest              *ingest.Service
 	cursors             *Cursors
 	garmin              GarminDeps
+	proposals           *proposals.Service
 	cipher              *crypto.Cipher // seals every stored secret: Garmin's and LLM keys
 	registrationEnabled bool
 	mapTileURL          string
@@ -43,21 +45,23 @@ type Server struct {
 
 var _ StrictServerInterface = (*Server)(nil)
 
-// NewServer returns the API server backed by q, storing activities with ingester.
-func NewServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool,
-	mapTileURL string,
+// NewServer returns the API server backed by q, storing activities with
+// ingester and starting and deciding plan proposals with plans.
+func NewServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, plans *proposals.Service,
+	registrationEnabled bool, mapTileURL string,
 ) *Server {
-	return newServer(q, ingester, cursors, garmin, registrationEnabled, mapTileURL, defaultArgon())
+	return newServer(q, ingester, cursors, garmin, plans, registrationEnabled, mapTileURL, defaultArgon())
 }
 
-func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, registrationEnabled bool,
-	mapTileURL string, p argonParams,
+func newServer(q *db.Queries, ingester *ingest.Service, cursors *Cursors, garmin GarminDeps, plans *proposals.Service,
+	registrationEnabled bool, mapTileURL string, p argonParams,
 ) *Server {
 	return &Server{
 		q:                   q,
 		ingest:              ingester,
 		cursors:             cursors,
 		garmin:              garmin,
+		proposals:           plans,
 		cipher:              garmin.Cipher,
 		registrationEnabled: registrationEnabled,
 		mapTileURL:          mapTileURL,

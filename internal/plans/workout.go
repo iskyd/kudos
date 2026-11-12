@@ -53,12 +53,17 @@ func ValidateWorkout(doc []byte) error {
 	if err := json.Unmarshal(doc, &w); err != nil {
 		return fmt.Errorf("reading workout: %w", err)
 	}
-	n, err := checkSteps(w.Steps, "steps", 0)
+	return checkWorkout(w.Steps, "steps")
+}
+
+// checkWorkout checks a workout's steps, found at path, past the schema.
+func checkWorkout(steps []step, path string) error {
+	n, err := checkSteps(steps, path, 0)
 	if err != nil {
 		return err
 	}
 	if n > maxUnrolledSteps {
-		return fmt.Errorf("the workout has %d steps once its repeats are written out, more than %d", n, maxUnrolledSteps)
+		return fmt.Errorf("%s: the workout has %d steps once its repeats are written out, more than %d", path, n, maxUnrolledSteps)
 	}
 	return nil
 }

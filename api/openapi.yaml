@@ -845,6 +845,74 @@ paths:
                 $ref: "#/components/schemas/PlannedWorkout"
         default:
           $ref: "#/components/responses/Problem"
+  /api/plan-proposals:
+    post:
+      operationId: createPlanProposal
+      summary: Ask the coach for a new plan
+      description: |
+        Starts generating a proposal for the 14 local days from tomorrow; it
+        comes back as `generating` and a job fills it in. A user without a
+        provider gets `llm-not-configured`; one whose last proposal is still
+        generating gets `proposal-generating`.
+      tags: [plans]
+      responses:
+        "202":
+          description: The proposal, being generated.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanProposal"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/plan-proposals/latest:
+    get:
+      operationId: getLatestPlanProposal
+      summary: The latest plan proposal
+      description: The most recent proposal in any status; `not-found` when there is none.
+      tags: [plans]
+      responses:
+        "200":
+          description: The proposal with its items.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanProposal"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/plan-proposals/{id}/decisions:
+    post:
+      operationId: decidePlanProposal
+      summary: Approve or reject proposal items
+      description: |
+        Approves and rejects pending items of an open proposal in one
+        transaction: approved items change the planned workouts, rejected ones
+        change nothing. Items not named stay pending; once none are, the
+        proposal is closed. An item that is not pending in this proposal, or is
+        named twice, is `invalid-request`; a proposal that is not open is
+        `proposal-closed`.
+      tags: [plans]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanDecisions"
+      responses:
+        "200":
+          description: The proposal after the decisions.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanProposal"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/calendar:
     get:
       operationId: getCalendar
@@ -2434,6 +2502,106 @@ components:
             planId:
               type: integer
               format: int64
+    PlanDraft:
+      description: |
+        What the LLM replies when it plans (internal/plans, generated as a JSON
+        Schema): the IDs of current workouts it keeps as they are, and every
+        other workout of the planned days. Current workouts it neither keeps
+        nor replaces with one on the same day and sport are proposed for removal.
+      type: object
+      required: [keep, workouts]
+      additionalProperties: false
+      properties:
+        keep:
+          type: array
+          maxItems: 50
+          items:
+            type: integer
+            format: int64
+        workouts:
+          type: array
+          maxItems: 50
+          items:
+            $ref: "#/components/schemas/PlannedWorkoutInput"
+    PlanProposal:
+      type: object
+      required: [id, status, createdAt, from, to, items]
+      properties:
+        id:
+          type: integer
+          format: int64
+        status:
+          description: |
+            generating until a job fills it in; then open with items to decide,
+            closed once every item is decided (or when it proposed no change),
+            failed when the model's plan stayed invalid or the provider failed,
+            superseded when a newer proposal opened.
+          type: string
+          enum: [generating, open, closed, failed, superseded]
+        failure:
+          description: Why it failed.
+          type: string
+          enum: [invalid_output, provider_error, not_configured, timeout]
+        createdAt:
+          type: string
+          format: date-time
+        from:
+          description: First planned local day.
+          type: string
+          format: date
+        to:
+          description: Last planned local day.
+          type: string
+          format: date
+        items:
+          description: The changes, by day; empty until it is open.
+          type: array
+          items:
+            $ref: "#/components/schemas/PlanProposalItem"
+    PlanProposalItem:
+      type: object
+      required: [id, action, status]
+      properties:
+        id:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum: [add, change, remove]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        workoutId:
+          description: The planned workout a change or removal is for.
+          type: integer
+          format: int64
+        before:
+          description: The workout as it was planned; changes and removals.
+          allOf:
+            - $ref: "#/components/schemas/PlannedWorkoutInput"
+        after:
+          description: The workout proposed; additions and changes.
+          allOf:
+            - $ref: "#/components/schemas/PlannedWorkoutInput"
+    PlanDecisions:
+      type: object
+      required: [approve, reject]
+      additionalProperties: false
+      properties:
+        approve:
+          description: Item IDs to apply.
+          type: array
+          maxItems: 200
+          items:
+            type: integer
+            format: int64
+        reject:
+          description: Item IDs to drop.
+          type: array
+          maxItems: 200
+          items:
+            type: integer
+            format: int64
     Calendar:
       type: object
       required: [activities, wellness, healthLog, races, plannedWorkouts]

@@ -10,6 +10,22 @@ import (
 	"time"
 )
 
+const countPendingPlanProposalItems = `-- name: CountPendingPlanProposalItems :one
+SELECT count(*) FROM plan_proposal_items WHERE user_id = $1 AND proposal_id = $2 AND status = 'pending'
+`
+
+type CountPendingPlanProposalItemsParams struct {
+	UserID     int64
+	ProposalID int64
+}
+
+func (q *Queries) CountPendingPlanProposalItems(ctx context.Context, arg CountPendingPlanProposalItemsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countPendingPlanProposalItems, arg.UserID, arg.ProposalID)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const createPlan = `-- name: CreatePlan :one
 INSERT INTO plans (user_id) VALUES ($1) RETURNING id, user_id, created_at
 `
@@ -19,6 +35,61 @@ func (q *Queries) CreatePlan(ctx context.Context, userID int64) (Plan, error) {
 	var i Plan
 	err := row.Scan(&i.ID, &i.UserID, &i.CreatedAt)
 	return i, err
+}
+
+const createPlanProposal = `-- name: CreatePlanProposal :one
+INSERT INTO plan_proposals (user_id, from_day, to_day) VALUES ($1, $2, $3) RETURNING id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at
+`
+
+type CreatePlanProposalParams struct {
+	UserID  int64
+	FromDay time.Time
+	ToDay   time.Time
+}
+
+// Fails with a unique violation while another proposal of the user is generating.
+func (q *Queries) CreatePlanProposal(ctx context.Context, arg CreatePlanProposalParams) (PlanProposal, error) {
+	row := q.db.QueryRow(ctx, createPlanProposal, arg.UserID, arg.FromDay, arg.ToDay)
+	var i PlanProposal
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Status,
+		&i.Failure,
+		&i.PromptVersion,
+		&i.FromDay,
+		&i.ToDay,
+		&i.PlanID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createPlanProposalItem = `-- name: CreatePlanProposalItem :exec
+INSERT INTO plan_proposal_items (user_id, proposal_id, action, workout_id, before, after)
+VALUES ($1, $2, $3, $4, $5, $6)
+`
+
+type CreatePlanProposalItemParams struct {
+	UserID     int64
+	ProposalID int64
+	Action     string
+	WorkoutID  *int64
+	Before     []byte
+	After      []byte
+}
+
+// before and after must already be validated (internal/plans).
+func (q *Queries) CreatePlanProposalItem(ctx context.Context, arg CreatePlanProposalItemParams) error {
+	_, err := q.db.Exec(ctx, createPlanProposalItem,
+		arg.UserID,
+		arg.ProposalID,
+		arg.Action,
+		arg.WorkoutID,
+		arg.Before,
+		arg.After,
+	)
+	return err
 }
 
 const createPlannedWorkout = `-- name: CreatePlannedWorkout :one
@@ -63,6 +134,154 @@ func (q *Queries) CreatePlannedWorkout(ctx context.Context, arg CreatePlannedWor
 	return i, err
 }
 
+const decidePlanProposalItem = `-- name: DecidePlanProposalItem :execrows
+UPDATE plan_proposal_items SET status = $1
+WHERE user_id = $2 AND proposal_id = $3 AND id = $4 AND status = 'pending'
+`
+
+type DecidePlanProposalItemParams struct {
+	Status     string
+	UserID     int64
+	ProposalID int64
+	ID         int64
+}
+
+// Decides a pending item; 0 rows when it is not pending in this proposal.
+func (q *Queries) DecidePlanProposalItem(ctx context.Context, arg DecidePlanProposalItemParams) (int64, error) {
+	result, err := q.db.Exec(ctx, decidePlanProposalItem,
+		arg.Status,
+		arg.UserID,
+		arg.ProposalID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const deletePlannedWorkout = `-- name: DeletePlannedWorkout :execrows
+DELETE FROM planned_workouts WHERE user_id = $1 AND id = $2
+`
+
+type DeletePlannedWorkoutParams struct {
+	UserID int64
+	ID     int64
+}
+
+func (q *Queries) DeletePlannedWorkout(ctx context.Context, arg DeletePlannedWorkoutParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePlannedWorkout, arg.UserID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const expirePlanProposals = `-- name: ExpirePlanProposals :exec
+UPDATE plan_proposals SET status = 'failed', failure = 'timeout'
+WHERE user_id = $1 AND status = 'generating' AND created_at < $2
+`
+
+type ExpirePlanProposalsParams struct {
+	UserID int64
+	Before time.Time
+}
+
+// Fails proposals still generating since before: their job is gone.
+func (q *Queries) ExpirePlanProposals(ctx context.Context, arg ExpirePlanProposalsParams) error {
+	_, err := q.db.Exec(ctx, expirePlanProposals, arg.UserID, arg.Before)
+	return err
+}
+
+const failPlanProposal = `-- name: FailPlanProposal :exec
+UPDATE plan_proposals SET status = 'failed', failure = $1
+WHERE user_id = $2 AND id = $3 AND status = 'generating'
+`
+
+type FailPlanProposalParams struct {
+	Failure *string
+	UserID  int64
+	ID      int64
+}
+
+func (q *Queries) FailPlanProposal(ctx context.Context, arg FailPlanProposalParams) error {
+	_, err := q.db.Exec(ctx, failPlanProposal, arg.Failure, arg.UserID, arg.ID)
+	return err
+}
+
+const fillPlanProposal = `-- name: FillPlanProposal :execrows
+UPDATE plan_proposals SET status = $1, prompt_version = $2
+WHERE user_id = $3 AND id = $4 AND status = 'generating'
+`
+
+type FillPlanProposalParams struct {
+	Status        string
+	PromptVersion *string
+	UserID        int64
+	ID            int64
+}
+
+// status is open, or closed when it proposes no change.
+func (q *Queries) FillPlanProposal(ctx context.Context, arg FillPlanProposalParams) (int64, error) {
+	result, err := q.db.Exec(ctx, fillPlanProposal,
+		arg.Status,
+		arg.PromptVersion,
+		arg.UserID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const getLatestPlanProposal = `-- name: GetLatestPlanProposal :one
+SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at FROM plan_proposals WHERE user_id = $1 ORDER BY id DESC LIMIT 1
+`
+
+func (q *Queries) GetLatestPlanProposal(ctx context.Context, userID int64) (PlanProposal, error) {
+	row := q.db.QueryRow(ctx, getLatestPlanProposal, userID)
+	var i PlanProposal
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Status,
+		&i.Failure,
+		&i.PromptVersion,
+		&i.FromDay,
+		&i.ToDay,
+		&i.PlanID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const getPlanProposal = `-- name: GetPlanProposal :one
+SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at FROM plan_proposals WHERE user_id = $1 AND id = $2
+`
+
+type GetPlanProposalParams struct {
+	UserID int64
+	ID     int64
+}
+
+func (q *Queries) GetPlanProposal(ctx context.Context, arg GetPlanProposalParams) (PlanProposal, error) {
+	row := q.db.QueryRow(ctx, getPlanProposal, arg.UserID, arg.ID)
+	var i PlanProposal
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Status,
+		&i.Failure,
+		&i.PromptVersion,
+		&i.FromDay,
+		&i.ToDay,
+		&i.PlanID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getPlannedWorkout = `-- name: GetPlannedWorkout :one
 SELECT id, user_id, plan_id, day, sport, title, description, steps, created_at FROM planned_workouts WHERE user_id = $1 AND id = $2
 `
@@ -87,6 +306,103 @@ func (q *Queries) GetPlannedWorkout(ctx context.Context, arg GetPlannedWorkoutPa
 		&i.CreatedAt,
 	)
 	return i, err
+}
+
+const listPlanCandidates = `-- name: ListPlanCandidates :many
+SELECT u.id AS user_id, u.timezone,
+    coalesce(c.status = 'connected', false)::boolean AS garmin_connected,
+    coalesce(c.last_sync_at, '0001-01-01 00:00:00+00')::timestamptz AS last_sync_at,
+    coalesce((SELECT max(pp.created_at) FROM plan_proposals pp WHERE pp.user_id = u.id), '0001-01-01 00:00:00+00')::timestamptz AS last_proposal
+FROM users u
+JOIN llm_providers p ON p.user_id = u.id
+LEFT JOIN garmin_connections c ON c.user_id = u.id
+WHERE u.id > $1 AND EXISTS (SELECT 1 FROM plans pl WHERE pl.user_id = u.id)
+ORDER BY u.id
+LIMIT $2
+`
+
+type ListPlanCandidatesParams struct {
+	AfterID int64
+	MaxRows int32
+}
+
+type ListPlanCandidatesRow struct {
+	UserID          int64
+	Timezone        string
+	GarminConnected bool
+	LastSyncAt      time.Time
+	LastProposal    time.Time
+}
+
+// The weekly scheduler's scan across users, like ListCoachCandidates: users
+// with an LLM provider and a plan, after after_id, with what decides whether
+// they are due a new proposal. Year 1 stands for never.
+func (q *Queries) ListPlanCandidates(ctx context.Context, arg ListPlanCandidatesParams) ([]ListPlanCandidatesRow, error) {
+	rows, err := q.db.Query(ctx, listPlanCandidates, arg.AfterID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPlanCandidatesRow
+	for rows.Next() {
+		var i ListPlanCandidatesRow
+		if err := rows.Scan(
+			&i.UserID,
+			&i.Timezone,
+			&i.GarminConnected,
+			&i.LastSyncAt,
+			&i.LastProposal,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPlanProposalItems = `-- name: ListPlanProposalItems :many
+SELECT id, user_id, proposal_id, action, status, workout_id, before, after FROM plan_proposal_items WHERE user_id = $1 AND proposal_id = $2
+ORDER BY id
+LIMIT $3
+`
+
+type ListPlanProposalItemsParams struct {
+	UserID     int64
+	ProposalID int64
+	MaxRows    int32
+}
+
+// In the order they were proposed, which is by day.
+func (q *Queries) ListPlanProposalItems(ctx context.Context, arg ListPlanProposalItemsParams) ([]PlanProposalItem, error) {
+	rows, err := q.db.Query(ctx, listPlanProposalItems, arg.UserID, arg.ProposalID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlanProposalItem
+	for rows.Next() {
+		var i PlanProposalItem
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.ProposalID,
+			&i.Action,
+			&i.Status,
+			&i.WorkoutID,
+			&i.Before,
+			&i.After,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listPlannedWorkoutsBetween = `-- name: ListPlannedWorkoutsBetween :many
@@ -137,4 +453,108 @@ func (q *Queries) ListPlannedWorkoutsBetween(ctx context.Context, arg ListPlanne
 		return nil, err
 	}
 	return items, nil
+}
+
+const lockPlanProposal = `-- name: LockPlanProposal :one
+SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at FROM plan_proposals WHERE user_id = $1 AND id = $2 FOR UPDATE
+`
+
+type LockPlanProposalParams struct {
+	UserID int64
+	ID     int64
+}
+
+func (q *Queries) LockPlanProposal(ctx context.Context, arg LockPlanProposalParams) (PlanProposal, error) {
+	row := q.db.QueryRow(ctx, lockPlanProposal, arg.UserID, arg.ID)
+	var i PlanProposal
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.Status,
+		&i.Failure,
+		&i.PromptVersion,
+		&i.FromDay,
+		&i.ToDay,
+		&i.PlanID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const setPlanProposalPlan = `-- name: SetPlanProposalPlan :exec
+UPDATE plan_proposals SET plan_id = $1 WHERE user_id = $2 AND id = $3
+`
+
+type SetPlanProposalPlanParams struct {
+	PlanID *int64
+	UserID int64
+	ID     int64
+}
+
+func (q *Queries) SetPlanProposalPlan(ctx context.Context, arg SetPlanProposalPlanParams) error {
+	_, err := q.db.Exec(ctx, setPlanProposalPlan, arg.PlanID, arg.UserID, arg.ID)
+	return err
+}
+
+const setPlanProposalStatus = `-- name: SetPlanProposalStatus :exec
+UPDATE plan_proposals SET status = $1 WHERE user_id = $2 AND id = $3
+`
+
+type SetPlanProposalStatusParams struct {
+	Status string
+	UserID int64
+	ID     int64
+}
+
+func (q *Queries) SetPlanProposalStatus(ctx context.Context, arg SetPlanProposalStatusParams) error {
+	_, err := q.db.Exec(ctx, setPlanProposalStatus, arg.Status, arg.UserID, arg.ID)
+	return err
+}
+
+const supersedePlanProposals = `-- name: SupersedePlanProposals :exec
+UPDATE plan_proposals SET status = 'superseded' WHERE user_id = $1 AND status = 'open' AND id <> $2
+`
+
+type SupersedePlanProposalsParams struct {
+	UserID int64
+	ID     int64
+}
+
+// Supersedes the open proposals but id, waiting for decisions in flight on
+// them: they lock their rows.
+func (q *Queries) SupersedePlanProposals(ctx context.Context, arg SupersedePlanProposalsParams) error {
+	_, err := q.db.Exec(ctx, supersedePlanProposals, arg.UserID, arg.ID)
+	return err
+}
+
+const updatePlannedWorkout = `-- name: UpdatePlannedWorkout :execrows
+UPDATE planned_workouts SET day = $1, sport = $2, title = $3, description = $4, steps = $5
+WHERE user_id = $6 AND id = $7
+`
+
+type UpdatePlannedWorkoutParams struct {
+	Day         time.Time
+	Sport       string
+	Title       string
+	Description *string
+	Steps       []byte
+	UserID      int64
+	ID          int64
+}
+
+// steps must already be validated (internal/plans).
+func (q *Queries) UpdatePlannedWorkout(ctx context.Context, arg UpdatePlannedWorkoutParams) (int64, error) {
+	result, err := q.db.Exec(ctx, updatePlannedWorkout,
+		arg.Day,
+		arg.Sport,
+		arg.Title,
+		arg.Description,
+		arg.Steps,
+		arg.UserID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }

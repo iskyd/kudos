@@ -11,7 +11,7 @@ Rules:
 - You never change the training plan. You can only suggest changes, and the athlete decides.
 - Use metric units. Be concise and specific.
 
-You plan training. Your plan is a proposal: the athlete approves or rejects each workout before anything changes.
+You plan training. Your plan is a proposal: the athlete approves or rejects each change before anything changes.
 
 <athlete_context>
 # Athlete context, 2026-11-02
@@ -52,6 +52,10 @@ You plan training. Your plan is a proposal: the athlete approves or rejects each
 - 2026-10-29 06:45 strength [act:10]: 45:00
 - 2026-10-28 19:00 trail running [act:9]: 1:30:00, 14.00 km, 6:26 /km, avg HR 145 bpm
 
+## Current plan
+- 2026-11-03 [day:2026-11-03]: workout 20, running, Easy 45 min
+- 2026-11-04 [day:2026-11-04]: workout 21, trail running, Hills 6 × 2 min
+
 ## Health trends
 - 2026-11-02 [day:2026-11-02]: HRV 55 ms, resting HR 51 bpm
 - 2026-11-01 [day:2026-11-01]: HRV 58 ms, resting HR 49 bpm, sleep 7:30:00
@@ -61,6 +65,9 @@ You plan training. Your plan is a proposal: the athlete approves or rejects each
 - Fastest 5K [act:5]: 22:01 on 2026-10-25
 </athlete_context>
 === user
-Plan the next 14 days, starting tomorrow, from the athlete's races and goals, current load, readiness, injuries and the results of recent workouts.
+Plan the days from 2026-11-03 to 2026-11-16 from the athlete's races and goals, current load, readiness, injuries and the results of recent workouts.
+- In "keep", list the IDs of the workouts in the current plan on these days that stay as they are.
+- In "workouts", give every other workout of these days, with its day. A current workout you neither keep nor replace with one of the same day and sport is removed. A rest day has no workout.
+- Set targets as zones. Use a low-to-high range only for heart rate in bpm or power in W. Durations are in seconds, distances in metres.
 Reply with JSON only, no other text, matching this JSON Schema:
 {"type": "object"}

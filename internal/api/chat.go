@@ -40,6 +40,7 @@ const (
 	maxContextGoals     = 50
 	maxContextRaces     = 20 // of the coming year, soonest first
 	maxContextActivity  = 100
+	maxContextPlanned   = 100 // from today through the days a new plan covers
 )
 
 // Chat streams the coach's reply to the conversation. Nothing is stored: the
@@ -267,6 +268,16 @@ func (s *Server) AthleteContext(ctx context.Context, userID int64, today time.Ti
 		if !slices.Contains(c.Sports, a.Sport) {
 			c.Sports = append(c.Sports, a.Sport)
 		}
+	}
+
+	planned, err := s.q.ListPlannedWorkoutsBetween(ctx, db.ListPlannedWorkoutsBetweenParams{
+		UserID: userID, FromDay: today, ToDay: today.AddDate(0, 0, llm.PlanDays), MaxRows: maxContextPlanned,
+	})
+	if err != nil {
+		return fail("the plan", err)
+	}
+	for _, p := range planned {
+		c.Plan = append(c.Plan, llm.PlannedSummary{ID: p.ID, Day: p.Day, Sport: p.Sport, Title: p.Title})
 	}
 
 	metrics, err := s.q.ListDailyMetrics(ctx, db.ListDailyMetricsParams{
