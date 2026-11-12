@@ -2,6 +2,7 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -24,6 +25,7 @@ func TestWriteProblem(t *testing.T) {
 		wantTitle  string
 		wantDetail string
 		wantLogged bool
+		abandoned  bool // the client went away: the request's context is canceled
 	}{
 		{name: "invalid request", err: &Error{Kind: KindInvalidRequest, Detail: "bad limit"}, wantStatus: 400, wantType: "urn:kudos:problem:invalid-request", wantTitle: "Invalid request", wantDetail: "bad limit"},
 		{name: "not found", err: &Error{Kind: KindNotFound}, wantStatus: 404, wantType: "urn:kudos:problem:not-found", wantTitle: "Not found"},
@@ -42,6 +44,8 @@ func TestWriteProblem(t *testing.T) {
 		{name: "internal hides detail", err: &Error{Kind: KindInternal, Detail: "db password wrong"}, wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error"},
 		{name: "wrapped error keeps kind", err: fmt.Errorf("listing: %w", &Error{Kind: KindNotFound, Detail: "no such activity"}), wantStatus: 404, wantType: "urn:kudos:problem:not-found", wantTitle: "Not found", wantDetail: "no such activity"},
 		{name: "plain error is internal and logged", err: errors.New("db password wrong"), wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error", wantLogged: true},
+		{name: "abandoned request is not an error", err: fmt.Errorf("listing volume: %w", context.Canceled), abandoned: true, wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error"},
+		{name: "canceled work of a live request is", err: fmt.Errorf("listing volume: %w", context.Canceled), wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error", wantLogged: true},
 	}
 
 	for _, tt := range tests {
@@ -49,7 +53,12 @@ func TestWriteProblem(t *testing.T) {
 			t.Parallel()
 			var logs bytes.Buffer
 			rec := httptest.NewRecorder()
-			req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+			ctx, cancel := context.WithCancel(t.Context())
+			defer cancel()
+			if tt.abandoned {
+				cancel()
+			}
+			req := httptest.NewRequestWithContext(ctx, http.MethodGet, "/", nil)
 			middleware.RequestID(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				writeProblem(w, r, slog.New(slog.NewJSONHandler(&logs, nil)), tt.err)
 			})).ServeHTTP(rec, req)

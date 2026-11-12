@@ -22,7 +22,7 @@ Done for T8.3 on 2026-11-12, against `AGENTS.md` section 3. Rerun it before each
   - a secret or coach text the run used appears anywhere: the Garmin keys, the password, the fake token, or the plan prompt and reply;
   - no request was logged, so a broken capture cannot pass.
 - [x] The first scans found nothing to fix: no coordinates, health values, secrets, prompts or replies are logged.
-- [ ] Follow-up, not a leak: a request the browser abandons (for example by navigating away) is logged as `request failed` at error level with `context canceled`. It is noise, not a server error.
+- [x] A request the browser abandoned (for example by navigating away) used to be logged as `request failed` at error level with `context canceled`. That was noise, not a server error, and it is now logged at debug level. A failure whose client is still connected stays an error (`TestWriteProblem`).
 
 ## Sessions and CSRF (invariant 39)
 
