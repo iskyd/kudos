@@ -1,0 +1,56 @@
+# KudOS: the app and TimescaleDB, plus an optional local Ollama.
+# Setup, backups and upgrades: see the README. Settings live in .env next to this file.
+name: kudos
+
+services:
+  app:
+    image: ghcr.io/iskyd/kudos:${KUDOS_VERSION:?set KUDOS_VERSION in .env}
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://kudos:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@db:5432/kudos?sslmode=disable
+      ENCRYPTION_KEY_FILE: /run/secrets/kudos_encryption_key
+    secrets:
+      - kudos_encryption_key
+    ports:
+      - "${KUDOS_PORT:-8080}:8080"
+    volumes:
+      - data:/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: timescale/timescaledb:2.31.0-pg18
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: kudos
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: kudos
+    volumes:
+      - db:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "kudos", "-d", "kudos"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  # A local model for the AI coach: `docker compose --profile ollama up -d`, then
+  # choose Ollama in Settings with the base URL http://ollama:11434/v1.
+  ollama:
+    image: ollama/ollama:0.40.15
+    restart: unless-stopped
+    profiles: [ollama]
+    volumes:
+      - ollama:/root/.ollama
+
+secrets:
+  kudos_encryption_key:
+    file: ./encryption_key
+
+volumes:
+  # Original activity files. Back up with db.
+  data:
+  # The database. Back up with data.
+  db:
+  ollama:
