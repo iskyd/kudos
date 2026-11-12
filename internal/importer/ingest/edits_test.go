@@ -454,3 +454,38 @@ func TestEditsOnBrokenData(t *testing.T) {
 		t.Error("UndoEdit on a closed pool")
 	}
 }
+
+func TestSpan(t *testing.T) {
+	t.Parallel()
+	start := time.Date(2026, 5, 1, 6, 0, 0, 0, time.UTC)
+	elapsed := 3600.5
+	for _, tc := range []struct {
+		name     string
+		elapsed  *float64
+		from, to time.Time
+	}{
+		{"elapsed known", &elapsed, start.Add(-sampleSlack), start.Add(time.Hour + 500*time.Millisecond + sampleSlack)},
+		{"elapsed unknown", nil, start.Add(-sampleSlack), maxTime},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			from, to := span(db.Activity{StartTime: start, ElapsedTimeS: tc.elapsed})
+			if !from.Equal(tc.from) || !to.Equal(tc.to) {
+				t.Errorf("span = %s..%s, want %s..%s", from, to, tc.from, tc.to)
+			}
+		})
+	}
+}
+
+// TestViewsKeepEverySample checks, on the whole corpus, that bounding reads by
+// the activity's span drops no stored sample.
+func TestViewsKeepEverySample(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	for _, name := range []string{"bike.fit", "half_marathon.fit", "hike.fit", "intervals.fit", "pool_swim.fit", "strength.fit", "zwift.fit"} {
+		a := e.upload(t, name)
+		if got, want := len(e.viewSamples(t, a.ID)), e.sampleCount(t, e.alice, a.ID); got != want {
+			t.Errorf("%s: the view reads %d of %d samples", name, got, want)
+		}
+	}
+}

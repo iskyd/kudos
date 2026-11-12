@@ -56,6 +56,20 @@ func BenchmarkPages(b *testing.B) {
 	}
 	b.Logf("seeded %d activities and %d samples, derived values of %d, in %s", s.Activities, s.Samples, n, time.Since(started).Round(time.Second))
 
+	// What the columnstore policy does to chunks older than 30 days, done now:
+	// the pages read compressed streams as they do in production.
+	var chunks int
+	var before, after int64
+	if err := pool.QueryRow(b.Context(), `SELECT count(compress_chunk(c, if_not_compressed => true))
+		FROM show_chunks('activity_streams', older_than => INTERVAL '30 days') c`).Scan(&chunks); err != nil {
+		b.Fatal(err)
+	}
+	if err := pool.QueryRow(b.Context(), `SELECT coalesce(sum(before_compression_total_bytes), 0)::bigint,
+		coalesce(sum(after_compression_total_bytes), 0)::bigint FROM chunk_columnstore_stats('activity_streams')`).Scan(&before, &after); err != nil {
+		b.Fatal(err)
+	}
+	b.Logf("compressed %d stream chunks from %d MB to %d MB", chunks, before>>20, after>>20)
+
 	// The activity page of the longest activity: the most samples to downsample.
 	longest, err := q.ListActivities(b.Context(), db.ListActivitiesParams{
 		UserID: me.Id, Sort: "duration", BeforeKey: math.MaxFloat64, BeforeID: math.MaxInt64, MaxRows: 1,
