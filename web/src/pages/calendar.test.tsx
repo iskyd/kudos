@@ -101,6 +101,17 @@ describe('CalendarPage', () => {
           day: '2026-10-29',
           sport: 'running',
           title: 'Strides',
+          link: 'auto',
+          steps: [{ kind: 'interval', durationType: 'time', duration: 20 }],
+        },
+        {
+          id: 5,
+          planId: 1,
+          day: '2026-10-27',
+          sport: 'running',
+          title: 'Easy',
+          link: 'auto',
+          activityId: 3,
           steps: [{ kind: 'interval', durationType: 'time', duration: 20 }],
         },
       ],
@@ -136,6 +147,10 @@ describe('CalendarPage', () => {
     expect(
       (await day('29 October 2026')).getByRole('link', { name: 'Planned: Strides' }),
     ).toHaveAttribute('href', '/planned/4')
+    // Completed by an activity, linked here on another day.
+    expect(
+      (await day('27 October 2026')).getByRole('link', { name: 'Done: Easy' }),
+    ).toHaveAttribute('href', '/planned/5')
     // Ongoing: every day from its start.
     expect((await day('1 November 2026')).getByText('Illness: Cold')).toBeInTheDocument()
   })

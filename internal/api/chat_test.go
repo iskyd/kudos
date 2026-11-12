@@ -109,7 +109,8 @@ func TestChatStreamsWithTheUsersContext(t *testing.T) {
 	putDay(t, alice, yesterday.AddDate(0, 0, -1).Format(time.DateOnly), WellnessDayInput{WeightKg: new(70.0)})
 	aliceID := alice.session(alice.do(http.MethodGet, "/api/me", nil, nil), http.StatusOK).Id
 	planned := planWorkout(t, db.New(pool), aliceID, yesterday.AddDate(0, 0, 2).Format(time.DateOnly), "Tomorrow's intervals")
-	planWorkout(t, db.New(pool), aliceID, yesterday.Format(time.DateOnly), "Yesterday's run")
+	done := planWorkout(t, db.New(pool), aliceID, yesterday.Format(time.DateOnly), "Yesterday's run")
+	planWorkout(t, db.New(pool), aliceID, yesterday.AddDate(0, 0, -20).Format(time.DateOnly), "Long ago")
 	decodeJSON[HealthLogEntry](t, bob.do(http.MethodPost, "/api/health-log",
 		HealthLogInput{Kind: Illness, Description: new("Bob's flu"), StartDate: Day{Time: yesterday}}, nil), http.StatusCreated)
 
@@ -135,7 +136,9 @@ func TestChatStreamsWithTheUsersContext(t *testing.T) {
 	}
 	for _, want := range []string{"<athlete_context>", "Sore left knee", fmt.Sprintf("[act:%d]", actID), "Cite every item",
 		"LTHR 171", "Heavy legs", "Autumn Half", "priority A, in 29 days", "## Goals", "## Training load, last 6 weeks", "- Sports: running",
-		fmt.Sprintf("workout %d, running, Tomorrow's intervals", planned.ID)} {
+		fmt.Sprintf("workout %d, running, Tomorrow's intervals", planned.ID),
+		fmt.Sprintf("workout %d, running, Yesterday's run, done [act:%d]", done.ID, actID),
+		"1 of 1 planned workouts done (100%); time 286% of planned"} {
 		if !strings.Contains(msgs[0].Content, want) {
 			t.Errorf("system prompt lacks %q", want)
 		}
@@ -143,8 +146,8 @@ func TestChatStreamsWithTheUsersContext(t *testing.T) {
 	if strings.Contains(msgs[0].Content, "Last Year's 10K") {
 		t.Error("the context lists a past race as upcoming")
 	}
-	if strings.Contains(msgs[0].Content, "Yesterday's run") {
-		t.Error("the context lists a past planned workout as current")
+	if strings.Contains(msgs[0].Content, "Long ago") {
+		t.Error("the context lists a workout planned before the adherence days")
 	}
 	if strings.Contains(msgs[0].Content, "Bob's flu") {
 		t.Error("alice's context has bob's health log")

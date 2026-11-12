@@ -619,6 +619,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/planned-workouts/{id}/link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Link a planned workout to the activity that completed it, or unlink it
+         * @description The user's say wins over automatic matching: with activityId the
+         *     workout is completed by that activity, without it by none. An activity
+         *     completes at most one planned workout (`activity-linked`).
+         */
+        put: operations["linkPlannedWorkout"];
+        post?: never;
+        /** Go back to automatic matching for a planned workout */
+        delete: operations["unsetPlannedWorkoutLink"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/plan-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plan settings */
+        get: operations["getPlanSettings"];
+        /** Change plan settings */
+        put: operations["putPlanSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/plan-proposals": {
         parameters: {
             query?: never;
@@ -1725,6 +1766,32 @@ export interface components {
             id: number;
             /** Format: int64 */
             planId: number;
+            /**
+             * @description auto when automatic matching decides its completion; manual
+             *     when the user linked it (activityId set) or unlinked it (none).
+             * @enum {string}
+             */
+            link: "auto" | "manual";
+            /**
+             * Format: int64
+             * @description The activity that completed it, if any.
+             */
+            activityId?: number;
+        };
+        PlannedWorkoutLinkInput: {
+            /**
+             * Format: int64
+             * @description The activity that completed it; leave out to unlink.
+             */
+            activityId?: number;
+        };
+        PlanSettings: {
+            /**
+             * @description Match planned workouts to activities automatically: the recorded
+             *     workout's name first, then the same day and sport with the closest
+             *     duration. Links the user made apply either way.
+             */
+            autoMatch: boolean;
         };
         /**
          * @description What the LLM replies when it plans (internal/plans, generated as a JSON
@@ -3421,6 +3488,102 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlannedWorkout"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    linkPlannedWorkout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PlannedWorkoutID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlannedWorkoutLinkInput"];
+            };
+        };
+        responses: {
+            /** @description The planned workout with its completion. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannedWorkout"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    unsetPlannedWorkoutLink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["PlannedWorkoutID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The planned workout with its completion. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlannedWorkout"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    getPlanSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanSettings"];
+                };
+            };
+            default: components["responses"]["Problem"];
+        };
+    };
+    putPlanSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanSettings"];
+            };
+        };
+        responses: {
+            /** @description The settings. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlanSettings"];
                 };
             };
             default: components["responses"]["Problem"];

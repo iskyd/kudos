@@ -5,6 +5,8 @@ import {
   useCreatePlanProposal,
   useDecidePlanProposal,
   useLatestPlanProposal,
+  usePlanSettings,
+  useSavePlanSettings,
 } from '@/api/plans'
 import { problemMessage } from '@/api/problem'
 import { Empty, QueryStatus } from '@/components/card'
@@ -62,7 +64,43 @@ export function PlansPage() {
         </Empty>
       )}
       {p && <Proposal proposal={p} />}
+      <Settings />
     </div>
+  )
+}
+
+function Settings() {
+  const settings = usePlanSettings()
+  const save = useSavePlanSettings()
+  return (
+    <section aria-labelledby="plan-settings-heading" className="flex flex-col gap-2">
+      <h2 id="plan-settings-heading" className="text-lg font-semibold">
+        Settings
+      </h2>
+      <QueryStatus query={settings} />
+      {settings.data && (
+        <label className="flex items-center gap-2 text-sm">
+          <input
+            type="checkbox"
+            checked={settings.data.autoMatch}
+            disabled={save.isPending}
+            onChange={(e) => {
+              save.mutate({ autoMatch: e.target.checked })
+            }}
+          />
+          Match planned workouts to activities automatically
+        </label>
+      )}
+      <p className="text-sm text-muted-foreground">
+        By the workout name the watch recorded, else the same day and sport with the closest
+        duration. Links you set on a planned workout always apply.
+      </p>
+      {save.isError && (
+        <p role="alert" className="text-sm text-destructive">
+          {problemMessage(save.error)}
+        </p>
+      )}
+    </section>
   )
 }
 

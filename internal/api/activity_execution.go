@@ -28,7 +28,7 @@ func (s *Server) GetActivityExecution(ctx context.Context, req GetActivityExecut
 	if err != nil {
 		return nil, err
 	}
-	steps, err := s.executeSteps(ctx, a.ID)
+	steps, err := s.executeSteps(ctx, sessionFrom(ctx).userID, a.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -43,8 +43,7 @@ func (s *Server) GetActivityExecution(ctx context.Context, req GetActivityExecut
 }
 
 // executeSteps groups the laps by workout step; nil when no lap ran a step.
-func (s *Server) executeSteps(ctx context.Context, id int64) (*[]StepExecution, error) {
-	userID := sessionFrom(ctx).userID
+func (s *Server) executeSteps(ctx context.Context, userID, id int64) (*[]StepExecution, error) {
 	w, err := s.q.GetRecordedWorkout(ctx, db.GetRecordedWorkoutParams{UserID: userID, ActivityID: id})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

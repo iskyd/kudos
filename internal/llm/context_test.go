@@ -72,6 +72,12 @@ func sample() AthleteContext {
 		Plan: []PlannedSummary{
 			{ID: 21, Day: date("2026-11-04"), Sport: "trail_running", Title: "Hills\n6 × 2 min"},
 			{ID: 20, Day: date("2026-11-03"), Sport: "running", Title: "Easy 45 min"},
+			{ID: 18, Day: date("2026-11-01"), Sport: "running", Title: "Long run", ActivityID: new(int64(12))},
+			{ID: 17, Day: date("2026-10-31"), Sport: "cycling", Title: "Spin"},
+		},
+		Adherence: &Adherence{
+			From: date("2026-10-19"), To: date("2026-11-01"), Planned: 6, Completed: 5, PlannedS: 18000, ActualS: 17100,
+			PlannedLoad: 300, ActualLoad: 312, LoadCompared: 4, StepsWithin: 12, StepsCompared: 15,
 		},
 		Health: []HealthDay{
 			{Day: date("2026-11-01"), HRV: new(58.4), RestingHR: new(49), SleepS: new(7*3600 + 1800.0)},
@@ -237,5 +243,10 @@ func TestBuildContextEdges(t *testing.T) {
 	}
 	if got := healthLogItems([]HealthEntry{{Kind: "other", Start: date("2026-01-01")}}); got[0] != "- other, since 2026-01-01 (ongoing) [day:2026-01-01]" {
 		t.Errorf("unknown kind = %q", got[0])
+	}
+	// Only missed workouts: no time, load or steps to compare.
+	missed := AthleteContext{Today: date("2026-11-02"), Adherence: &Adherence{From: date("2026-10-19"), To: date("2026-11-01"), Planned: 2}}
+	if got := planItems(missed); len(got) != 1 || got[0] != "- Adherence 2026-10-19 to 2026-11-01 [day:2026-10-19]: 0 of 2 planned workouts done (0%)" {
+		t.Errorf("only missed = %q", got)
 	}
 }

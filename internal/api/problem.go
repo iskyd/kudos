@@ -40,6 +40,7 @@ const (
 
 	KindProposalGenerating Kind = "proposal-generating"
 	KindProposalClosed     Kind = "proposal-closed"
+	KindActivityLinked     Kind = "activity-linked"
 )
 
 func (k Kind) status() int {
@@ -50,7 +51,8 @@ func (k Kind) status() int {
 		return http.StatusUnauthorized
 	case KindCSRF, KindCrossOrigin, KindRegistrationDisabled:
 		return http.StatusForbidden
-	case KindUsernameTaken, KindBackfillExists, KindBackfillRunning, KindLLMNotConfigured, KindProposalGenerating, KindProposalClosed:
+	case KindUsernameTaken, KindBackfillExists, KindBackfillRunning, KindLLMNotConfigured, KindProposalGenerating, KindProposalClosed,
+		KindActivityLinked:
 		return http.StatusConflict
 	case KindNotFound:
 		return http.StatusNotFound
@@ -109,6 +111,8 @@ func (k Kind) title() string {
 		return "A plan is being generated"
 	case KindProposalClosed:
 		return "Plan proposal closed"
+	case KindActivityLinked:
+		return "Activity already linked"
 	default:
 		return "Internal error"
 	}

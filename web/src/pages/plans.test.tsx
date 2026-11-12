@@ -1,7 +1,7 @@
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
-import type { PlanDecisions, PlannedWorkoutInput, PlanProposal } from '@/api/plans'
+import type { PlanDecisions, PlannedWorkoutInput, PlanProposal, PlanSettings } from '@/api/plans'
 import { ann, loggedInAs, problem, renderApp } from '@/test/render'
 import { server } from '@/test/server'
 
@@ -203,5 +203,30 @@ describe('PlansPage', () => {
     expect(await screen.findByText('A newer proposal replaced this one.')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Approve' })).not.toBeInTheDocument()
     expect(screen.getAllByText('Not decided')).toHaveLength(3)
+  })
+
+  it('turns automatic matching off and on', async () => {
+    const sent: PlanSettings[] = []
+    server.use(
+      http.put('/api/plan-settings', async ({ request }) => {
+        const body = (await request.json()) as PlanSettings
+        sent.push(body)
+        return body.autoMatch ? problem(500, 'internal', 'Internal error') : HttpResponse.json(body)
+      }),
+    )
+    renderApp('/plans')
+    const user = userEvent.setup()
+    const box = await screen.findByRole('checkbox', {
+      name: 'Match planned workouts to activities automatically',
+    })
+    expect(box).toBeChecked()
+    await user.click(box)
+    await vi.waitFor(() => {
+      expect(box).not.toBeChecked()
+    })
+    await user.click(box)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Internal error')
+    expect(box).not.toBeChecked()
+    expect(sent).toEqual([{ autoMatch: false }, { autoMatch: true }])
   })
 })

@@ -38,6 +38,7 @@ func TestWriteProblem(t *testing.T) {
 		{name: "llm not configured", err: &Error{Kind: KindLLMNotConfigured}, wantStatus: 409, wantType: "urn:kudos:problem:llm-not-configured", wantTitle: "No AI coach provider set up"},
 		{name: "proposal generating", err: &Error{Kind: KindProposalGenerating}, wantStatus: 409, wantType: "urn:kudos:problem:proposal-generating", wantTitle: "A plan is being generated"},
 		{name: "proposal closed", err: &Error{Kind: KindProposalClosed}, wantStatus: 409, wantType: "urn:kudos:problem:proposal-closed", wantTitle: "Plan proposal closed"},
+		{name: "activity linked", err: &Error{Kind: KindActivityLinked}, wantStatus: 409, wantType: "urn:kudos:problem:activity-linked", wantTitle: "Activity already linked"},
 		{name: "internal hides detail", err: &Error{Kind: KindInternal, Detail: "db password wrong"}, wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error"},
 		{name: "wrapped error keeps kind", err: fmt.Errorf("listing: %w", &Error{Kind: KindNotFound, Detail: "no such activity"}), wantStatus: 404, wantType: "urn:kudos:problem:not-found", wantTitle: "Not found", wantDetail: "no such activity"},
 		{name: "plain error is internal and logged", err: errors.New("db password wrong"), wantStatus: 500, wantType: "urn:kudos:problem:internal", wantTitle: "Internal error", wantLogged: true},

@@ -845,6 +845,80 @@ paths:
                 $ref: "#/components/schemas/PlannedWorkout"
         default:
           $ref: "#/components/responses/Problem"
+  /api/planned-workouts/{id}/link:
+    put:
+      operationId: linkPlannedWorkout
+      summary: Link a planned workout to the activity that completed it, or unlink it
+      description: |
+        The user's say wins over automatic matching: with activityId the
+        workout is completed by that activity, without it by none. An activity
+        completes at most one planned workout (`activity-linked`).
+      tags: [plans]
+      parameters:
+        - $ref: "#/components/parameters/PlannedWorkoutID"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlannedWorkoutLinkInput"
+      responses:
+        "200":
+          description: The planned workout with its completion.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlannedWorkout"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      operationId: unsetPlannedWorkoutLink
+      summary: Go back to automatic matching for a planned workout
+      tags: [plans]
+      parameters:
+        - $ref: "#/components/parameters/PlannedWorkoutID"
+      responses:
+        "200":
+          description: The planned workout with its completion.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlannedWorkout"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/plan-settings:
+    get:
+      operationId: getPlanSettings
+      summary: Plan settings
+      tags: [plans]
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanSettings"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      operationId: putPlanSettings
+      summary: Change plan settings
+      tags: [plans]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PlanSettings"
+      responses:
+        "200":
+          description: The settings.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PlanSettings"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/plan-proposals:
     post:
       operationId: createPlanProposal
@@ -2494,7 +2568,7 @@ components:
       allOf:
         - $ref: "#/components/schemas/PlannedWorkoutInput"
         - type: object
-          required: [id, planId]
+          required: [id, planId, link]
           properties:
             id:
               type: integer
@@ -2502,6 +2576,35 @@ components:
             planId:
               type: integer
               format: int64
+            link:
+              description: |
+                auto when automatic matching decides its completion; manual
+                when the user linked it (activityId set) or unlinked it (none).
+              type: string
+              enum: [auto, manual]
+            activityId:
+              description: The activity that completed it, if any.
+              type: integer
+              format: int64
+    PlannedWorkoutLinkInput:
+      type: object
+      additionalProperties: false
+      properties:
+        activityId:
+          description: The activity that completed it; leave out to unlink.
+          type: integer
+          format: int64
+    PlanSettings:
+      type: object
+      required: [autoMatch]
+      additionalProperties: false
+      properties:
+        autoMatch:
+          description: |
+            Match planned workouts to activities automatically: the recorded
+            workout's name first, then the same day and sport with the closest
+            duration. Links the user made apply either way.
+          type: boolean
     PlanDraft:
       description: |
         What the LLM replies when it plans (internal/plans, generated as a JSON

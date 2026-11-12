@@ -27,9 +27,10 @@ type step struct {
 	DurationType string   `json:"durationType"`
 	Duration     *float64 `json:"duration"`
 	Target       *struct {
-		Zone *int     `json:"zone"`
-		Low  *float64 `json:"low"`
-		High *float64 `json:"high"`
+		Metric string   `json:"metric"`
+		Zone   *int     `json:"zone"`
+		Low    *float64 `json:"low"`
+		High   *float64 `json:"high"`
 	} `json:"target"`
 	Count *int   `json:"count"`
 	Steps []step `json:"steps"`
