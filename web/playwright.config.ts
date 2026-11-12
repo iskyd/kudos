@@ -8,7 +8,9 @@ const fakeGarminURL = 'http://127.0.0.1:4174'
 export default defineConfig({
   testDir: './e2e',
   forbidOnly: !!process.env.CI,
-  use: { baseURL, trace: 'on-first-retry' },
+  // CI uploads playwright-report on failure: the HTML report carries each failed test's trace.
+  reporter: process.env.CI ? [['github'], ['html', { open: 'never' }]] : 'list',
+  use: { baseURL, trace: 'retain-on-failure' },
   projects: [
     {
       name: 'chromium',
