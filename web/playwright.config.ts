@@ -29,7 +29,9 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
     },
     {
-      command: 'npm run build && go run ../cmd/server',
+      // The log goes to a file that e2e/scan-logs.mjs checks after the run.
+      command:
+        'npm run build && mkdir -p e2e-results && go run ../cmd/server > e2e-results/server.log',
       url: `${baseURL}/healthz`,
       reuseExistingServer: !process.env.CI,
       timeout: 180_000,
@@ -39,6 +41,8 @@ export default defineConfig({
         // A fixed test-only key: the e2e database holds no real secrets.
         ENCRYPTION_KEY: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
         REGISTRATION_ENABLED: 'true',
+        // Debug logs too: the scan covers everything the server can log.
+        LOG_LEVEL: 'debug',
         GARMIN_API_URL: fakeGarminURL,
         // Map tiles from the fake host too: tests never fetch real tiles (they fail, the map still draws).
         MAP_TILE_URL: `${fakeGarminURL}/tiles/{z}/{x}/{y}.png`,

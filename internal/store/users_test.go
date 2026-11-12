@@ -62,6 +62,9 @@ func TestUpdateUserTimezoneIsolation(t *testing.T) {
 	if b.Timezone != "UTC" {
 		t.Fatalf("bob's timezone changed to %q", b.Timezone)
 	}
+	if tz, err := q.GetUserTimezone(t.Context(), bob.ID); err != nil || tz != "UTC" {
+		t.Fatalf("GetUserTimezone(bob) = %q, %v", tz, err)
+	}
 }
 
 func TestSessionsIsolation(t *testing.T) {
