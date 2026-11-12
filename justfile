@@ -83,4 +83,4 @@ seed user years="10":
 
 # Time the dashboard and activity page against seeded data, failing over 300 ms (CI runs it nightly).
 bench years="10":
-    KUDOS_BENCH_YEARS={{years}} go test ./internal/api -run '^$' -bench BenchmarkPages -benchtime 20x -timeout 2h
+    KUDOS_BENCH_YEARS={{years}} go test ./internal/api -run '^$' -v -bench BenchmarkPages -benchtime 20x -timeout 2h
