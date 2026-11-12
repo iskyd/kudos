@@ -177,6 +177,23 @@ func (q *Queries) DeletePlannedWorkout(ctx context.Context, arg DeletePlannedWor
 	return result.RowsAffected(), nil
 }
 
+const deletePlannedWorkoutLink = `-- name: DeletePlannedWorkoutLink :execrows
+DELETE FROM planned_workout_links WHERE user_id = $1 AND planned_workout_id = $2
+`
+
+type DeletePlannedWorkoutLinkParams struct {
+	UserID           int64
+	PlannedWorkoutID int64
+}
+
+func (q *Queries) DeletePlannedWorkoutLink(ctx context.Context, arg DeletePlannedWorkoutLinkParams) (int64, error) {
+	result, err := q.db.Exec(ctx, deletePlannedWorkoutLink, arg.UserID, arg.PlannedWorkoutID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const expirePlanProposals = `-- name: ExpirePlanProposals :exec
 UPDATE plan_proposals SET status = 'failed', failure = 'timeout'
 WHERE user_id = $1 AND status = 'generating' AND created_at < $2
@@ -405,6 +422,52 @@ func (q *Queries) ListPlanProposalItems(ctx context.Context, arg ListPlanProposa
 	return items, nil
 }
 
+const listPlannedWorkoutLinks = `-- name: ListPlannedWorkoutLinks :many
+SELECT user_id, planned_workout_id, activity_id, created_at FROM planned_workout_links
+WHERE user_id = $1
+    AND (planned_workout_id = ANY($2::bigint[]) OR activity_id = ANY($3::bigint[]))
+ORDER BY planned_workout_id
+LIMIT $4
+`
+
+type ListPlannedWorkoutLinksParams struct {
+	UserID            int64
+	PlannedWorkoutIds []int64
+	ActivityIds       []int64
+	MaxRows           int32
+}
+
+// The links of the given planned workouts, and those to the given activities.
+func (q *Queries) ListPlannedWorkoutLinks(ctx context.Context, arg ListPlannedWorkoutLinksParams) ([]PlannedWorkoutLink, error) {
+	rows, err := q.db.Query(ctx, listPlannedWorkoutLinks,
+		arg.UserID,
+		arg.PlannedWorkoutIds,
+		arg.ActivityIds,
+		arg.MaxRows,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PlannedWorkoutLink
+	for rows.Next() {
+		var i PlannedWorkoutLink
+		if err := rows.Scan(
+			&i.UserID,
+			&i.PlannedWorkoutID,
+			&i.ActivityID,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listPlannedWorkoutsBetween = `-- name: ListPlannedWorkoutsBetween :many
 SELECT id, user_id, plan_id, day, sport, title, description, steps, created_at FROM planned_workouts
 WHERE user_id = $1 AND day BETWEEN $2::date AND $3::date
@@ -455,6 +518,43 @@ func (q *Queries) ListPlannedWorkoutsBetween(ctx context.Context, arg ListPlanne
 	return items, nil
 }
 
+const listRecordedWorkoutNames = `-- name: ListRecordedWorkoutNames :many
+SELECT activity_id, name FROM recorded_workouts
+WHERE user_id = $1 AND activity_id = ANY($2::bigint[]) AND name IS NOT NULL
+LIMIT $3
+`
+
+type ListRecordedWorkoutNamesParams struct {
+	UserID      int64
+	ActivityIds []int64
+	MaxRows     int32
+}
+
+type ListRecordedWorkoutNamesRow struct {
+	ActivityID int64
+	Name       *string
+}
+
+func (q *Queries) ListRecordedWorkoutNames(ctx context.Context, arg ListRecordedWorkoutNamesParams) ([]ListRecordedWorkoutNamesRow, error) {
+	rows, err := q.db.Query(ctx, listRecordedWorkoutNames, arg.UserID, arg.ActivityIds, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListRecordedWorkoutNamesRow
+	for rows.Next() {
+		var i ListRecordedWorkoutNamesRow
+		if err := rows.Scan(&i.ActivityID, &i.Name); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const lockPlanProposal = `-- name: LockPlanProposal :one
 SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at FROM plan_proposals WHERE user_id = $1 AND id = $2 FOR UPDATE
 `
@@ -476,6 +576,34 @@ func (q *Queries) LockPlanProposal(ctx context.Context, arg LockPlanProposalPara
 		&i.FromDay,
 		&i.ToDay,
 		&i.PlanID,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const putPlannedWorkoutLink = `-- name: PutPlannedWorkoutLink :one
+INSERT INTO planned_workout_links (user_id, planned_workout_id, activity_id)
+VALUES ($1, $2, $3)
+ON CONFLICT (planned_workout_id) DO UPDATE SET activity_id = EXCLUDED.activity_id, created_at = now()
+WHERE planned_workout_links.user_id = EXCLUDED.user_id
+RETURNING user_id, planned_workout_id, activity_id, created_at
+`
+
+type PutPlannedWorkoutLinkParams struct {
+	UserID           int64
+	PlannedWorkoutID int64
+	ActivityID       *int64
+}
+
+// Links a planned workout to an activity, or with a null activity_id marks it
+// unlinked. The unique index rejects an activity linked to another one.
+func (q *Queries) PutPlannedWorkoutLink(ctx context.Context, arg PutPlannedWorkoutLinkParams) (PlannedWorkoutLink, error) {
+	row := q.db.QueryRow(ctx, putPlannedWorkoutLink, arg.UserID, arg.PlannedWorkoutID, arg.ActivityID)
+	var i PlannedWorkoutLink
+	err := row.Scan(
+		&i.UserID,
+		&i.PlannedWorkoutID,
+		&i.ActivityID,
 		&i.CreatedAt,
 	)
 	return i, err

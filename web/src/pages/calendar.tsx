@@ -168,7 +168,7 @@ function DayCell({
           to={`/planned/${String(w.id)}`}
           className="truncate rounded border border-dashed border-primary px-1 text-xs text-primary"
         >
-          Planned: {w.title}
+          {w.activityId === undefined ? 'Planned' : 'Done'}: {w.title}
         </Link>
       ))}
       {activities.map((a) => (

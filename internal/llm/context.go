@@ -26,7 +26,8 @@ type AthleteContext struct {
 	CheckIns   []CheckIn
 	Load       []LoadWeek
 	Activities []ActivitySummary
-	Plan       []PlannedSummary // from today
+	Plan       []PlannedSummary // the last two weeks and the coming ones
+	Adherence  *Adherence       // over the planned workouts before today; nil without any
 	Health     []HealthDay
 	Records    []Record
 }
@@ -95,11 +96,23 @@ type ActivitySummary struct {
 }
 
 // PlannedSummary is a planned workout; ID is how a plan draft keeps it.
+// ActivityID is the activity that completed it, if any.
 type PlannedSummary struct {
-	ID    int64
-	Day   time.Time
-	Sport string
-	Title string
+	ID         int64
+	Day        time.Time
+	Sport      string
+	Title      string
+	ActivityID *int64
+}
+
+// Adherence sums how the planned workouts from From to To went (plans.Adherence).
+type Adherence struct {
+	From, To                   time.Time
+	Planned, Completed         int
+	PlannedS, ActualS          float64 // completed workouts with a planned time
+	PlannedLoad, ActualLoad    float64 // completed workouts with both loads
+	LoadCompared               int
+	StepsWithin, StepsCompared int
 }
 
 // HealthDay is a day's recovery metrics.
@@ -161,7 +174,7 @@ func BuildContext(c AthleteContext, budget int) string {
 		{title: "Readiness and check-ins", items: readinessItems(c)},
 		{title: "Training load, last 6 weeks", items: loadItems(c.Load)},
 		{title: "Recent activities", items: activityItems(c.Activities)},
-		{title: "Current plan", items: planItems(c.Plan)},
+		{title: "Plan and adherence", items: planItems(c)},
 		{title: "Health trends", items: healthItems(c.Health)},
 		{title: "Personal records", items: recordItems(c.Records)},
 	}
@@ -383,15 +396,37 @@ func activityItems(acts []ActivitySummary) []string {
 	return items
 }
 
-func planItems(plan []PlannedSummary) []string {
-	ps := slices.Clone(plan)
+func planItems(c AthleteContext) []string {
+	var items []string
+	if a := c.Adherence; a != nil {
+		parts := []string{fmt.Sprintf("%d of %d planned workouts done (%.0f%%)", a.Completed, a.Planned, percent(float64(a.Completed), float64(a.Planned)))}
+		if a.PlannedS > 0 {
+			parts = append(parts, fmt.Sprintf("time %.0f%% of planned", percent(a.ActualS, a.PlannedS)))
+		}
+		if a.LoadCompared > 0 && a.PlannedLoad > 0 {
+			parts = append(parts, fmt.Sprintf("load %.0f%% of planned (%d workouts)", percent(a.ActualLoad, a.PlannedLoad), a.LoadCompared))
+		}
+		if a.StepsCompared > 0 {
+			parts = append(parts, fmt.Sprintf("%d of %d targeted steps within target", a.StepsWithin, a.StepsCompared))
+		}
+		items = append(items, fmt.Sprintf("- Adherence %s to %s %s: %s", day(a.From), day(a.To), RefDay(a.From), strings.Join(parts, "; ")))
+	}
+	ps := slices.Clone(c.Plan)
 	slices.SortStableFunc(ps, func(a, b PlannedSummary) int { return cmp.Or(a.Day.Compare(b.Day), cmp.Compare(a.ID, b.ID)) })
-	items := make([]string, len(ps))
-	for i, p := range ps {
-		items[i] = fmt.Sprintf("- %s %s: workout %d, %s, %s", day(p.Day), RefDay(p.Day), p.ID, strings.ReplaceAll(p.Sport, "_", " "), oneLine(p.Title))
+	for _, p := range ps {
+		item := fmt.Sprintf("- %s %s: workout %d, %s, %s", day(p.Day), RefDay(p.Day), p.ID, strings.ReplaceAll(p.Sport, "_", " "), oneLine(p.Title))
+		switch {
+		case p.ActivityID != nil:
+			item += ", done " + RefActivity(*p.ActivityID)
+		case p.Day.Before(c.Today):
+			item += ", missed"
+		}
+		items = append(items, item)
 	}
 	return items
 }
+
+func percent(part, whole float64) float64 { return part / whole * 100 }
 
 func healthItems(days []HealthDay) []string {
 	ds := slices.Clone(days)

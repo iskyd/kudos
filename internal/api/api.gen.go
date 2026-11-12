@@ -808,6 +808,24 @@ func (e PlanTargetMetric) Valid() bool {
 	}
 }
 
+// Defines values for PlannedWorkoutLink.
+const (
+	PlannedWorkoutLinkAuto   PlannedWorkoutLink = "auto"
+	PlannedWorkoutLinkManual PlannedWorkoutLink = "manual"
+)
+
+// Valid indicates whether the value is a known member of the PlannedWorkoutLink enum.
+func (e PlannedWorkoutLink) Valid() bool {
+	switch e {
+	case PlannedWorkoutLinkAuto:
+		return true
+	case PlannedWorkoutLinkManual:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for RacePriority.
 const (
 	RacePriorityA RacePriority = "A"
@@ -1988,6 +2006,14 @@ type PlanProposalItemAction string
 // PlanProposalItemStatus defines model for PlanProposalItem.Status.
 type PlanProposalItemStatus string
 
+// PlanSettings defines model for PlanSettings.
+type PlanSettings struct {
+	// AutoMatch Match planned workouts to activities automatically: the recorded
+	// workout's name first, then the same day and sport with the closest
+	// duration. Links the user made apply either way.
+	AutoMatch bool `json:"autoMatch"`
+}
+
 // PlanStep A step, or a repeat of steps. A repeat has count and steps and nothing
 // else, and holds at most one more level of repeats; any other step has a
 // durationType and, unless it is open (until the lap button), a duration.
@@ -2024,17 +2050,28 @@ type PlanTargetMetric string
 
 // PlannedWorkout defines model for PlannedWorkout.
 type PlannedWorkout struct {
+	// ActivityId The activity that completed it, if any.
+	ActivityId *int64 `json:"activityId,omitempty"`
+
 	// Day The local day it is planned for.
 	Day         openapi_types.Date `json:"day"`
 	Description *string            `json:"description,omitempty"`
 	Id          int64              `json:"id"`
-	PlanId      int64              `json:"planId"`
+
+	// Link auto when automatic matching decides its completion; manual
+	// when the user linked it (activityId set) or unlinked it (none).
+	Link   PlannedWorkoutLink `json:"link"`
+	PlanId int64              `json:"planId"`
 
 	// Sport A stored activity's sport; transition is a multisport leg between disciplines.
 	Sport ActivitySport `json:"sport"`
 	Steps []PlanStep    `json:"steps"`
 	Title string        `json:"title"`
 }
+
+// PlannedWorkoutLink auto when automatic matching decides its completion; manual
+// when the user linked it (activityId set) or unlinked it (none).
+type PlannedWorkoutLink string
 
 // PlannedWorkoutInput A planned workout. This schema and the ones it uses are also the JSON
 // Schema the LLM's workouts are validated against (internal/plans,
@@ -2048,6 +2085,12 @@ type PlannedWorkoutInput struct {
 	Sport ActivitySport `json:"sport"`
 	Steps []PlanStep    `json:"steps"`
 	Title string        `json:"title"`
+}
+
+// PlannedWorkoutLinkInput defines model for PlannedWorkoutLinkInput.
+type PlannedWorkoutLinkInput struct {
+	// ActivityId The activity that completed it; leave out to unlink.
+	ActivityId *int64 `json:"activityId,omitempty"`
 }
 
 // PowerInterval defines model for PowerInterval.
@@ -2917,6 +2960,12 @@ type UpdateMeJSONRequestBody = UpdateMeRequest
 // DecidePlanProposalJSONRequestBody defines body for DecidePlanProposal for application/json ContentType.
 type DecidePlanProposalJSONRequestBody = PlanDecisions
 
+// PutPlanSettingsJSONRequestBody defines body for PutPlanSettings for application/json ContentType.
+type PutPlanSettingsJSONRequestBody = PlanSettings
+
+// LinkPlannedWorkoutJSONRequestBody defines body for LinkPlannedWorkout for application/json ContentType.
+type LinkPlannedWorkoutJSONRequestBody = PlannedWorkoutLinkInput
+
 // CreateRaceJSONRequestBody defines body for CreateRace for application/json ContentType.
 type CreateRaceJSONRequestBody = RaceInput
 
@@ -3084,12 +3133,24 @@ type ServerInterface interface {
 	// DecidePlanProposal Approve or reject proposal items
 	// (POST /api/plan-proposals/{id}/decisions)
 	DecidePlanProposal(w http.ResponseWriter, r *http.Request, id int64)
+	// GetPlanSettings Plan settings
+	// (GET /api/plan-settings)
+	GetPlanSettings(w http.ResponseWriter, r *http.Request)
+	// PutPlanSettings Change plan settings
+	// (PUT /api/plan-settings)
+	PutPlanSettings(w http.ResponseWriter, r *http.Request)
 	// ListPlannedWorkouts Planned workouts for a range of days
 	// (GET /api/planned-workouts)
 	ListPlannedWorkouts(w http.ResponseWriter, r *http.Request, params ListPlannedWorkoutsParams)
 	// GetPlannedWorkout A planned workout with its steps
 	// (GET /api/planned-workouts/{id})
 	GetPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID)
+	// UnsetPlannedWorkoutLink Go back to automatic matching for a planned workout
+	// (DELETE /api/planned-workouts/{id}/link)
+	UnsetPlannedWorkoutLink(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID)
+	// LinkPlannedWorkout Link a planned workout to the activity that completed it, or unlink it
+	// (PUT /api/planned-workouts/{id}/link)
+	LinkPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID)
 	// ListRaces List races
 	// (GET /api/races)
 	ListRaces(w http.ResponseWriter, r *http.Request, params ListRacesParams)
@@ -3456,6 +3517,18 @@ func (_ Unimplemented) DecidePlanProposal(w http.ResponseWriter, r *http.Request
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetPlanSettings Plan settings
+// (GET /api/plan-settings)
+func (_ Unimplemented) GetPlanSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// PutPlanSettings Change plan settings
+// (PUT /api/plan-settings)
+func (_ Unimplemented) PutPlanSettings(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // ListPlannedWorkouts Planned workouts for a range of days
 // (GET /api/planned-workouts)
 func (_ Unimplemented) ListPlannedWorkouts(w http.ResponseWriter, r *http.Request, params ListPlannedWorkoutsParams) {
@@ -3465,6 +3538,18 @@ func (_ Unimplemented) ListPlannedWorkouts(w http.ResponseWriter, r *http.Reques
 // GetPlannedWorkout A planned workout with its steps
 // (GET /api/planned-workouts/{id})
 func (_ Unimplemented) GetPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// UnsetPlannedWorkoutLink Go back to automatic matching for a planned workout
+// (DELETE /api/planned-workouts/{id}/link)
+func (_ Unimplemented) UnsetPlannedWorkoutLink(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// LinkPlannedWorkout Link a planned workout to the activity that completed it, or unlink it
+// (PUT /api/planned-workouts/{id}/link)
+func (_ Unimplemented) LinkPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -5062,6 +5147,34 @@ func (siw *ServerInterfaceWrapper) DecidePlanProposal(w http.ResponseWriter, r *
 	handler.ServeHTTP(w, r)
 }
 
+// GetPlanSettings operation middleware
+func (siw *ServerInterfaceWrapper) GetPlanSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetPlanSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutPlanSettings operation middleware
+func (siw *ServerInterfaceWrapper) PutPlanSettings(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutPlanSettings(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListPlannedWorkouts operation middleware
 func (siw *ServerInterfaceWrapper) ListPlannedWorkouts(w http.ResponseWriter, r *http.Request) {
 
@@ -5125,6 +5238,58 @@ func (siw *ServerInterfaceWrapper) GetPlannedWorkout(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetPlannedWorkout(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnsetPlannedWorkoutLink operation middleware
+func (siw *ServerInterfaceWrapper) UnsetPlannedWorkoutLink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id PlannedWorkoutID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnsetPlannedWorkoutLink(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// LinkPlannedWorkout operation middleware
+func (siw *ServerInterfaceWrapper) LinkPlannedWorkout(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id PlannedWorkoutID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "int64", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.LinkPlannedWorkout(w, r, id)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -6007,6 +6172,18 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/api/planned-workouts/{id}", wrapper.GetPlannedWorkout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/api/planned-workouts/{id}/link", wrapper.UnsetPlannedWorkoutLink)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/planned-workouts/{id}/link", wrapper.LinkPlannedWorkout)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/api/plan-settings", wrapper.GetPlanSettings)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/api/plan-settings", wrapper.PutPlanSettings)
 	})
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/api/plan-proposals", wrapper.CreatePlanProposal)
@@ -8114,6 +8291,83 @@ func (response DecidePlanProposaldefaultApplicationProblemPlusJSONResponse) Visi
 	return err
 }
 
+type GetPlanSettingsRequestObject struct {
+}
+
+type GetPlanSettingsResponseObject interface {
+	VisitGetPlanSettingsResponse(w http.ResponseWriter) error
+}
+
+type GetPlanSettings200JSONResponse PlanSettings
+
+func (response GetPlanSettings200JSONResponse) VisitGetPlanSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetPlanSettingsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response GetPlanSettingsdefaultApplicationProblemPlusJSONResponse) VisitGetPlanSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPlanSettingsRequestObject struct {
+	Body *PutPlanSettingsJSONRequestBody
+}
+
+type PutPlanSettingsResponseObject interface {
+	VisitPutPlanSettingsResponse(w http.ResponseWriter) error
+}
+
+type PutPlanSettings200JSONResponse PlanSettings
+
+func (response PutPlanSettings200JSONResponse) VisitPutPlanSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type PutPlanSettingsdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response PutPlanSettingsdefaultApplicationProblemPlusJSONResponse) VisitPutPlanSettingsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ListPlannedWorkoutsRequestObject struct {
 	Params ListPlannedWorkoutsParams
 }
@@ -8181,6 +8435,85 @@ type GetPlannedWorkoutdefaultApplicationProblemPlusJSONResponse struct {
 }
 
 func (response GetPlannedWorkoutdefaultApplicationProblemPlusJSONResponse) VisitGetPlannedWorkoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnsetPlannedWorkoutLinkRequestObject struct {
+	Id PlannedWorkoutID `json:"id"`
+}
+
+type UnsetPlannedWorkoutLinkResponseObject interface {
+	VisitUnsetPlannedWorkoutLinkResponse(w http.ResponseWriter) error
+}
+
+type UnsetPlannedWorkoutLink200JSONResponse PlannedWorkout
+
+func (response UnsetPlannedWorkoutLink200JSONResponse) VisitUnsetPlannedWorkoutLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type UnsetPlannedWorkoutLinkdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response UnsetPlannedWorkoutLinkdefaultApplicationProblemPlusJSONResponse) VisitUnsetPlannedWorkoutLinkResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(response.StatusCode)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkPlannedWorkoutRequestObject struct {
+	Id   PlannedWorkoutID `json:"id"`
+	Body *LinkPlannedWorkoutJSONRequestBody
+}
+
+type LinkPlannedWorkoutResponseObject interface {
+	VisitLinkPlannedWorkoutResponse(w http.ResponseWriter) error
+}
+
+type LinkPlannedWorkout200JSONResponse PlannedWorkout
+
+func (response LinkPlannedWorkout200JSONResponse) VisitLinkPlannedWorkoutResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LinkPlannedWorkoutdefaultApplicationProblemPlusJSONResponse struct {
+	Body       Problem
+	StatusCode int
+}
+
+func (response LinkPlannedWorkoutdefaultApplicationProblemPlusJSONResponse) VisitLinkPlannedWorkoutResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response.Body); err != nil {
@@ -9022,12 +9355,24 @@ type StrictServerInterface interface {
 	// DecidePlanProposal Approve or reject proposal items
 	// (POST /api/plan-proposals/{id}/decisions)
 	DecidePlanProposal(ctx context.Context, request DecidePlanProposalRequestObject) (DecidePlanProposalResponseObject, error)
+	// GetPlanSettings Plan settings
+	// (GET /api/plan-settings)
+	GetPlanSettings(ctx context.Context, request GetPlanSettingsRequestObject) (GetPlanSettingsResponseObject, error)
+	// PutPlanSettings Change plan settings
+	// (PUT /api/plan-settings)
+	PutPlanSettings(ctx context.Context, request PutPlanSettingsRequestObject) (PutPlanSettingsResponseObject, error)
 	// ListPlannedWorkouts Planned workouts for a range of days
 	// (GET /api/planned-workouts)
 	ListPlannedWorkouts(ctx context.Context, request ListPlannedWorkoutsRequestObject) (ListPlannedWorkoutsResponseObject, error)
 	// GetPlannedWorkout A planned workout with its steps
 	// (GET /api/planned-workouts/{id})
 	GetPlannedWorkout(ctx context.Context, request GetPlannedWorkoutRequestObject) (GetPlannedWorkoutResponseObject, error)
+	// UnsetPlannedWorkoutLink Go back to automatic matching for a planned workout
+	// (DELETE /api/planned-workouts/{id}/link)
+	UnsetPlannedWorkoutLink(ctx context.Context, request UnsetPlannedWorkoutLinkRequestObject) (UnsetPlannedWorkoutLinkResponseObject, error)
+	// LinkPlannedWorkout Link a planned workout to the activity that completed it, or unlink it
+	// (PUT /api/planned-workouts/{id}/link)
+	LinkPlannedWorkout(ctx context.Context, request LinkPlannedWorkoutRequestObject) (LinkPlannedWorkoutResponseObject, error)
 	// ListRaces List races
 	// (GET /api/races)
 	ListRaces(ctx context.Context, request ListRacesRequestObject) (ListRacesResponseObject, error)
@@ -10538,6 +10883,61 @@ func (sh *strictHandler) DecidePlanProposal(w http.ResponseWriter, r *http.Reque
 	}
 }
 
+// GetPlanSettings operation middleware
+func (sh *strictHandler) GetPlanSettings(w http.ResponseWriter, r *http.Request) {
+	var request GetPlanSettingsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetPlanSettings(ctx, request.(GetPlanSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetPlanSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetPlanSettingsResponseObject); ok {
+		if err := validResponse.VisitGetPlanSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// PutPlanSettings operation middleware
+func (sh *strictHandler) PutPlanSettings(w http.ResponseWriter, r *http.Request) {
+	var request PutPlanSettingsRequestObject
+
+	var body PutPlanSettingsJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.PutPlanSettings(ctx, request.(PutPlanSettingsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PutPlanSettings")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(PutPlanSettingsResponseObject); ok {
+		if err := validResponse.VisitPutPlanSettingsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ListPlannedWorkouts operation middleware
 func (sh *strictHandler) ListPlannedWorkouts(w http.ResponseWriter, r *http.Request, params ListPlannedWorkoutsParams) {
 	var request ListPlannedWorkoutsRequestObject
@@ -10583,6 +10983,65 @@ func (sh *strictHandler) GetPlannedWorkout(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetPlannedWorkoutResponseObject); ok {
 		if err := validResponse.VisitGetPlannedWorkoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// UnsetPlannedWorkoutLink operation middleware
+func (sh *strictHandler) UnsetPlannedWorkoutLink(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID) {
+	var request UnsetPlannedWorkoutLinkRequestObject
+
+	request.Id = id
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.UnsetPlannedWorkoutLink(ctx, request.(UnsetPlannedWorkoutLinkRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "UnsetPlannedWorkoutLink")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(UnsetPlannedWorkoutLinkResponseObject); ok {
+		if err := validResponse.VisitUnsetPlannedWorkoutLinkResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// LinkPlannedWorkout operation middleware
+func (sh *strictHandler) LinkPlannedWorkout(w http.ResponseWriter, r *http.Request, id PlannedWorkoutID) {
+	var request LinkPlannedWorkoutRequestObject
+
+	request.Id = id
+
+	var body LinkPlannedWorkoutJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.LinkPlannedWorkout(ctx, request.(LinkPlannedWorkoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "LinkPlannedWorkout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LinkPlannedWorkoutResponseObject); ok {
+		if err := validResponse.VisitLinkPlannedWorkoutResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

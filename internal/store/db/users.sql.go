@@ -41,6 +41,17 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (CreateU
 	return i, err
 }
 
+const getAutoMatchWorkouts = `-- name: GetAutoMatchWorkouts :one
+SELECT auto_match_workouts FROM users WHERE id = $1
+`
+
+func (q *Queries) GetAutoMatchWorkouts(ctx context.Context, id int64) (bool, error) {
+	row := q.db.QueryRow(ctx, getAutoMatchWorkouts, id)
+	var auto_match_workouts bool
+	err := row.Scan(&auto_match_workouts)
+	return auto_match_workouts, err
+}
+
 const getUserCredentials = `-- name: GetUserCredentials :one
 SELECT id, username, password_hash, timezone FROM users WHERE username = $1
 `
@@ -74,6 +85,20 @@ func (q *Queries) GetUserTimezone(ctx context.Context, id int64) (string, error)
 	var timezone string
 	err := row.Scan(&timezone)
 	return timezone, err
+}
+
+const setAutoMatchWorkouts = `-- name: SetAutoMatchWorkouts :exec
+UPDATE users SET auto_match_workouts = $1 WHERE id = $2
+`
+
+type SetAutoMatchWorkoutsParams struct {
+	AutoMatch bool
+	ID        int64
+}
+
+func (q *Queries) SetAutoMatchWorkouts(ctx context.Context, arg SetAutoMatchWorkoutsParams) error {
+	_, err := q.db.Exec(ctx, setAutoMatchWorkouts, arg.AutoMatch, arg.ID)
+	return err
 }
 
 const updateUserTimezone = `-- name: UpdateUserTimezone :one

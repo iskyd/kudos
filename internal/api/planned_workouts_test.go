@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -86,4 +87,77 @@ func TestPlannedWorkouts(t *testing.T) {
 		wantProblem(t, alice.do(http.MethodGet, path, nil, nil), KindInvalidRequest)
 	}
 	wantProblem(t, alice.do(http.MethodGet, "/api/planned-workouts/999999", nil, nil), KindNotFound)
+}
+
+func TestPlannedWorkoutCompletion(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, q := newAPIOn(t, pool, true, nil)
+	me := alice.session(alice.do(http.MethodPost, "/api/auth/register", register("alice"), nil), http.StatusCreated)
+	bob := chatUser(t, pool, "bob")
+	easy, long := planWorkout(t, q, me.Id, "2026-11-10", "Easy"), planWorkout(t, q, me.Id, "2026-11-10", "Long")
+	// Both plan 1050 s of time steps: each run, the closer one first, completes one.
+	short, hour := run(t, alice, "2026-11-10T07:00", 5000, 1500), run(t, alice, "2026-11-10T18:00", 12000, 3600)
+	bobRun := run(t, bob, "2026-11-10T07:00", 5000, 1500)
+
+	get := func(id int64) PlannedWorkout {
+		t.Helper()
+		return decodeJSON[PlannedWorkout](t, alice.do(http.MethodGet, fmt.Sprintf("/api/planned-workouts/%d", id), nil, nil), http.StatusOK)
+	}
+	completedBy := func(w PlannedWorkout) int64 {
+		if w.ActivityId == nil {
+			return 0
+		}
+		return *w.ActivityId
+	}
+	// Two plans and two runs on one day: each run completes one, automatically.
+	if e, l := get(easy.ID), get(long.ID); completedBy(e)+completedBy(l) != short+hour || completedBy(e) == completedBy(l) || e.Link != PlannedWorkoutLinkAuto {
+		t.Fatalf("automatic: %+v / %+v", e, l)
+	}
+	day := decodeJSON[[]PlannedWorkout](t, alice.do(http.MethodGet, "/api/planned-workouts?from=2026-11-10&to=2026-11-10", nil, nil), http.StatusOK)
+	cal := decodeJSON[Calendar](t, alice.do(http.MethodGet, "/api/calendar?from=2026-11-10&to=2026-11-10", nil, nil), http.StatusOK)
+	if len(day) != 2 || day[0].ActivityId == nil || len(cal.PlannedWorkouts) != 2 || cal.PlannedWorkouts[1].ActivityId == nil {
+		t.Errorf("list %+v, calendar %+v", day, cal.PlannedWorkouts)
+	}
+
+	// The user's links win; the other workout takes what is left.
+	link := func(id int64, activityID *int64) *httptest.ResponseRecorder {
+		return alice.do(http.MethodPut, fmt.Sprintf("/api/planned-workouts/%d/link", id), PlannedWorkoutLinkInput{ActivityId: activityID}, nil)
+	}
+	got := decodeJSON[PlannedWorkout](t, link(easy.ID, &hour), http.StatusOK)
+	if got.Link != PlannedWorkoutLinkManual || completedBy(got) != hour || completedBy(get(long.ID)) != short {
+		t.Errorf("after linking: %+v, long %+v", got, get(long.ID))
+	}
+	wantProblem(t, link(long.ID, &hour), KindActivityLinked)
+	wantProblem(t, link(long.ID, &bobRun), KindNotFound)
+	wantProblem(t, link(999999, &short), KindNotFound)
+	wantProblem(t, bob.do(http.MethodPut, fmt.Sprintf("/api/planned-workouts/%d/link", long.ID), PlannedWorkoutLinkInput{ActivityId: &bobRun}, nil), KindNotFound)
+
+	// Unlinked, it stays without an activity even though one is free.
+	got = decodeJSON[PlannedWorkout](t, link(long.ID, nil), http.StatusOK)
+	if got.Link != PlannedWorkoutLinkManual || got.ActivityId != nil {
+		t.Errorf("unlinked %+v", got)
+	}
+	// Back to automatic matching.
+	got = decodeJSON[PlannedWorkout](t, alice.do(http.MethodDelete, fmt.Sprintf("/api/planned-workouts/%d/link", long.ID), nil, nil), http.StatusOK)
+	if got.Link != PlannedWorkoutLinkAuto || completedBy(got) != short {
+		t.Errorf("automatic again %+v", got)
+	}
+	wantProblem(t, bob.do(http.MethodDelete, fmt.Sprintf("/api/planned-workouts/%d/link", long.ID), nil, nil), KindNotFound)
+	if completedBy(get(long.ID)) != short {
+		t.Error("bob's unset reached alice")
+	}
+
+	// With automatic matching off only links count.
+	settings := decodeJSON[PlanSettings](t, alice.do(http.MethodGet, "/api/plan-settings", nil, nil), http.StatusOK)
+	if !settings.AutoMatch {
+		t.Error("automatic matching is off by default")
+	}
+	decodeJSON[PlanSettings](t, alice.do(http.MethodPut, "/api/plan-settings", PlanSettings{AutoMatch: false}, nil), http.StatusOK)
+	if e, l := get(easy.ID), get(long.ID); completedBy(e) != hour || l.ActivityId != nil {
+		t.Errorf("matching off: %+v / %+v", e, l)
+	}
+	if s := decodeJSON[PlanSettings](t, bob.do(http.MethodGet, "/api/plan-settings", nil, nil), http.StatusOK); !s.AutoMatch {
+		t.Error("alice's setting reached bob")
+	}
 }

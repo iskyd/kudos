@@ -213,3 +213,84 @@ func TestPlanProposals(t *testing.T) {
 		t.Errorf("bob's latest %+v, %v", p, err)
 	}
 }
+
+func TestPlannedWorkoutLinks(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	day := time.Date(2026, 11, 10, 0, 0, 0, 0, time.UTC)
+	steps := []byte(`[{"kind": "recovery", "durationType": "time", "duration": 1800}]`)
+	workout := func(userID int64) db.PlannedWorkout {
+		t.Helper()
+		plan, err := q.CreatePlan(ctx, userID)
+		check(t, err)
+		w, err := q.CreatePlannedWorkout(ctx, db.CreatePlannedWorkoutParams{UserID: userID, PlanID: plan.ID, Day: day, Sport: "running", Title: "Easy", Steps: steps})
+		check(t, err)
+		return w
+	}
+	activity := func(userID int64, source string) int64 {
+		t.Helper()
+		id, err := q.UpsertActivity(ctx, db.UpsertActivityParams{UserID: userID, Source: "manual", SourceActivityID: source, Sport: "running", Subtype: "outdoor", StartTime: day.Add(7 * time.Hour)})
+		check(t, err)
+		return id
+	}
+	first, second, bobs := workout(alice.ID), workout(alice.ID), workout(bob.ID)
+	run, bobRun := activity(alice.ID, "a"), activity(bob.ID, "b")
+
+	link, err := q.PutPlannedWorkoutLink(ctx, db.PutPlannedWorkoutLinkParams{UserID: alice.ID, PlannedWorkoutID: first.ID, ActivityID: &run})
+	if err != nil || *link.ActivityID != run {
+		t.Fatalf("link %+v, %v", link, err)
+	}
+	// An activity completes one planned workout; unlinking stores no activity.
+	if _, err := q.PutPlannedWorkoutLink(ctx, db.PutPlannedWorkoutLinkParams{UserID: alice.ID, PlannedWorkoutID: second.ID, ActivityID: &run}); err == nil {
+		t.Error("one activity linked twice")
+	}
+	check(t, func() error {
+		_, err := q.PutPlannedWorkoutLink(ctx, db.PutPlannedWorkoutLinkParams{UserID: alice.ID, PlannedWorkoutID: second.ID})
+		return err
+	}())
+	// Nobody links across users, either way.
+	for name, p := range map[string]db.PutPlannedWorkoutLinkParams{
+		"bob's activity":   {UserID: alice.ID, PlannedWorkoutID: first.ID, ActivityID: &bobRun},
+		"alice's workout":  {UserID: bob.ID, PlannedWorkoutID: first.ID, ActivityID: &bobRun},
+		"alice's activity": {UserID: bob.ID, PlannedWorkoutID: bobs.ID, ActivityID: &run},
+	} {
+		if l, err := q.PutPlannedWorkoutLink(ctx, p); err == nil {
+			t.Errorf("%s: linked %+v", name, l)
+		}
+	}
+	got, err := q.ListPlannedWorkoutLinks(ctx, db.ListPlannedWorkoutLinksParams{UserID: alice.ID, PlannedWorkoutIds: []int64{second.ID}, ActivityIds: []int64{run}, MaxRows: 10})
+	check(t, err)
+	if len(got) != 2 || got[0].PlannedWorkoutID != first.ID || *got[0].ActivityID != run || got[1].ActivityID != nil {
+		t.Errorf("links %+v", got)
+	}
+	if rows, err := q.ListPlannedWorkoutLinks(ctx, db.ListPlannedWorkoutLinksParams{UserID: bob.ID, PlannedWorkoutIds: []int64{first.ID, second.ID}, ActivityIds: []int64{run}, MaxRows: 10}); err != nil || len(rows) != 0 {
+		t.Errorf("bob lists %+v, %v", rows, err)
+	}
+	if n, err := q.DeletePlannedWorkoutLink(ctx, db.DeletePlannedWorkoutLinkParams{UserID: bob.ID, PlannedWorkoutID: first.ID}); err != nil || n != 0 {
+		t.Errorf("bob unset alice's link: %d, %v", n, err)
+	}
+	if n, err := q.DeletePlannedWorkoutLink(ctx, db.DeletePlannedWorkoutLinkParams{UserID: alice.ID, PlannedWorkoutID: first.ID}); err != nil || n != 1 {
+		t.Errorf("unset: %d, %v", n, err)
+	}
+
+	// Recorded workout names stay with their user.
+	check(t, q.UpsertRecordedWorkout(ctx, db.UpsertRecordedWorkoutParams{UserID: alice.ID, ActivityID: run, Name: new("Easy"), Steps: []byte(`[]`)}))
+	if names, err := q.ListRecordedWorkoutNames(ctx, db.ListRecordedWorkoutNamesParams{UserID: alice.ID, ActivityIds: []int64{run, bobRun}, MaxRows: 10}); err != nil || len(names) != 1 || *names[0].Name != "Easy" {
+		t.Errorf("names %+v, %v", names, err)
+	}
+	if names, err := q.ListRecordedWorkoutNames(ctx, db.ListRecordedWorkoutNamesParams{UserID: bob.ID, ActivityIds: []int64{run}, MaxRows: 10}); err != nil || len(names) != 0 {
+		t.Errorf("bob reads %+v, %v", names, err)
+	}
+
+	// The setting is per user.
+	check(t, q.SetAutoMatchWorkouts(ctx, db.SetAutoMatchWorkoutsParams{ID: alice.ID, AutoMatch: false}))
+	if a, err := q.GetAutoMatchWorkouts(ctx, alice.ID); err != nil || a {
+		t.Errorf("alice's setting %v, %v", a, err)
+	}
+	if b, err := q.GetAutoMatchWorkouts(ctx, bob.ID); err != nil || !b {
+		t.Errorf("bob's setting %v, %v", b, err)
+	}
+}

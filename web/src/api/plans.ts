@@ -100,3 +100,73 @@ export function useDecidePlanProposal(id: number) {
     },
   })
 }
+
+export type PlanSettings = components['schemas']['PlanSettings']
+export type PlannedWorkoutLinkInput = components['schemas']['PlannedWorkoutLinkInput']
+
+const planSettingsKey = ['plan-settings'] as const
+
+// usePlannedWorkoutLink sets the activity that completed a planned workout:
+// an activity ID, null for none (unlinked), or 'auto' to let matching decide.
+export function usePlannedWorkoutLink(id: number) {
+  const queryClient = useQueryClient()
+  const { csrfToken } = useCurrentUser()
+  return useMutation({
+    mutationFn: async (activityId: number | null | 'auto') => {
+      const opts = { params: { path: { id } }, headers: { 'X-CSRF-Token': csrfToken } }
+      const { data, error } =
+        activityId === 'auto'
+          ? await api.DELETE('/api/planned-workouts/{id}/link', opts)
+          : await api.PUT('/api/planned-workouts/{id}/link', {
+              ...opts,
+              body: activityId === null ? {} : { activityId },
+            })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    onSuccess: async (data) => {
+      queryClient.setQueryData(['planned-workout', id], data)
+      await Promise.all(
+        // The calendar is under analytics.
+        ['planned-workouts', 'analytics'].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      )
+    },
+  })
+}
+
+export function usePlanSettings() {
+  return useQuery({
+    queryKey: planSettingsKey,
+    queryFn: async () => {
+      const { data, error } = await api.GET('/api/plan-settings')
+      if (error) throw new ApiError(error)
+      return data
+    },
+  })
+}
+
+// useSavePlanSettings saves the settings; matching changes, so plans reload.
+export function useSavePlanSettings() {
+  const queryClient = useQueryClient()
+  const { csrfToken } = useCurrentUser()
+  return useMutation({
+    mutationFn: async (body: PlanSettings) => {
+      const { data, error } = await api.PUT('/api/plan-settings', {
+        body,
+        headers: { 'X-CSRF-Token': csrfToken },
+      })
+      if (error) throw new ApiError(error)
+      return data
+    },
+    onSuccess: async (data) => {
+      queryClient.setQueryData(planSettingsKey, data)
+      await Promise.all(
+        ['planned-workouts', 'planned-workout', 'analytics'].map((key) =>
+          queryClient.invalidateQueries({ queryKey: [key] }),
+        ),
+      )
+    },
+  })
+}

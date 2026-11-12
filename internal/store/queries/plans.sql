@@ -22,6 +22,31 @@ LIMIT @max_rows;
 UPDATE planned_workouts SET day = @day, sport = @sport, title = @title, description = @description, steps = @steps
 WHERE user_id = @user_id AND id = @id;
 
+-- name: PutPlannedWorkoutLink :one
+-- Links a planned workout to an activity, or with a null activity_id marks it
+-- unlinked. The unique index rejects an activity linked to another one.
+INSERT INTO planned_workout_links (user_id, planned_workout_id, activity_id)
+VALUES (@user_id, @planned_workout_id, sqlc.narg(activity_id))
+ON CONFLICT (planned_workout_id) DO UPDATE SET activity_id = EXCLUDED.activity_id, created_at = now()
+WHERE planned_workout_links.user_id = EXCLUDED.user_id
+RETURNING *;
+
+-- name: DeletePlannedWorkoutLink :execrows
+DELETE FROM planned_workout_links WHERE user_id = @user_id AND planned_workout_id = @planned_workout_id;
+
+-- name: ListPlannedWorkoutLinks :many
+-- The links of the given planned workouts, and those to the given activities.
+SELECT * FROM planned_workout_links
+WHERE user_id = @user_id
+    AND (planned_workout_id = ANY(@planned_workout_ids::bigint[]) OR activity_id = ANY(@activity_ids::bigint[]))
+ORDER BY planned_workout_id
+LIMIT @max_rows;
+
+-- name: ListRecordedWorkoutNames :many
+SELECT activity_id, name FROM recorded_workouts
+WHERE user_id = @user_id AND activity_id = ANY(@activity_ids::bigint[]) AND name IS NOT NULL
+LIMIT @max_rows;
+
 -- name: DeletePlannedWorkout :execrows
 DELETE FROM planned_workouts WHERE user_id = @user_id AND id = @id;
 

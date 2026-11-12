@@ -299,6 +299,13 @@ type PlannedWorkout struct {
 	CreatedAt   time.Time
 }
 
+type PlannedWorkoutLink struct {
+	UserID           int64
+	PlannedWorkoutID int64
+	ActivityID       *int64
+	CreatedAt        time.Time
+}
+
 type Race struct {
 	ID        int64
 	UserID    int64

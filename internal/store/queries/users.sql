@@ -13,3 +13,9 @@ RETURNING id, username, timezone, created_at;
 
 -- name: GetUserTimezone :one
 SELECT timezone FROM users WHERE id = $1;
+
+-- name: GetAutoMatchWorkouts :one
+SELECT auto_match_workouts FROM users WHERE id = $1;
+
+-- name: SetAutoMatchWorkouts :exec
+UPDATE users SET auto_match_workouts = @auto_match WHERE id = @id;
