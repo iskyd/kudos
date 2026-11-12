@@ -10,6 +10,7 @@ import {
 } from '@/api/plans'
 import { problemMessage } from '@/api/problem'
 import { Empty, QueryStatus } from '@/components/card'
+import { CoachText } from '@/components/coach-text'
 import { PlanSteps } from '@/components/plan-steps'
 import { Button } from '@/components/ui/button'
 import { formatDay } from '@/lib/format/date'
@@ -122,7 +123,7 @@ function Proposal({ proposal: p }: { proposal: PlanProposal }) {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 id="proposal-heading" className="text-lg font-semibold">
-            Proposal for {days}
+            {p.kind === 'adjustment' ? 'Adjustment' : 'Proposal'} for {days}
           </h2>
           {p.status === 'superseded' && (
             <p className="text-sm text-muted-foreground">A newer proposal replaced this one.</p>
@@ -150,6 +151,11 @@ function Proposal({ proposal: p }: { proposal: PlanProposal }) {
           </div>
         )}
       </div>
+      {p.rationale && (
+        <div aria-label="Why" className="text-sm">
+          <CoachText text={p.rationale} />
+        </div>
+      )}
       {decide.isError && (
         <p role="alert" className="text-sm text-destructive">
           {problemMessage(decide.error)}

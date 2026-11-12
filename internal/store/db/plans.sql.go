@@ -38,18 +38,24 @@ func (q *Queries) CreatePlan(ctx context.Context, userID int64) (Plan, error) {
 }
 
 const createPlanProposal = `-- name: CreatePlanProposal :one
-INSERT INTO plan_proposals (user_id, from_day, to_day) VALUES ($1, $2, $3) RETURNING id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at
+INSERT INTO plan_proposals (user_id, kind, from_day, to_day) VALUES ($1, $2, $3, $4) RETURNING id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at, kind, rationale, refs
 `
 
 type CreatePlanProposalParams struct {
 	UserID  int64
+	Kind    string
 	FromDay time.Time
 	ToDay   time.Time
 }
 
 // Fails with a unique violation while another proposal of the user is generating.
 func (q *Queries) CreatePlanProposal(ctx context.Context, arg CreatePlanProposalParams) (PlanProposal, error) {
-	row := q.db.QueryRow(ctx, createPlanProposal, arg.UserID, arg.FromDay, arg.ToDay)
+	row := q.db.QueryRow(ctx, createPlanProposal,
+		arg.UserID,
+		arg.Kind,
+		arg.FromDay,
+		arg.ToDay,
+	)
 	var i PlanProposal
 	err := row.Scan(
 		&i.ID,
@@ -61,6 +67,9 @@ func (q *Queries) CreatePlanProposal(ctx context.Context, arg CreatePlanProposal
 		&i.ToDay,
 		&i.PlanID,
 		&i.CreatedAt,
+		&i.Kind,
+		&i.Rationale,
+		&i.Refs,
 	)
 	return i, err
 }
@@ -227,13 +236,15 @@ func (q *Queries) FailPlanProposal(ctx context.Context, arg FailPlanProposalPara
 }
 
 const fillPlanProposal = `-- name: FillPlanProposal :execrows
-UPDATE plan_proposals SET status = $1, prompt_version = $2
-WHERE user_id = $3 AND id = $4 AND status = 'generating'
+UPDATE plan_proposals SET status = $1, prompt_version = $2, rationale = $3, refs = $4
+WHERE user_id = $5 AND id = $6 AND status = 'generating'
 `
 
 type FillPlanProposalParams struct {
 	Status        string
 	PromptVersion *string
+	Rationale     *string
+	Refs          []string
 	UserID        int64
 	ID            int64
 }
@@ -243,6 +254,8 @@ func (q *Queries) FillPlanProposal(ctx context.Context, arg FillPlanProposalPara
 	result, err := q.db.Exec(ctx, fillPlanProposal,
 		arg.Status,
 		arg.PromptVersion,
+		arg.Rationale,
+		arg.Refs,
 		arg.UserID,
 		arg.ID,
 	)
@@ -253,9 +266,15 @@ func (q *Queries) FillPlanProposal(ctx context.Context, arg FillPlanProposalPara
 }
 
 const getLatestPlanProposal = `-- name: GetLatestPlanProposal :one
-SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at FROM plan_proposals WHERE user_id = $1 ORDER BY id DESC LIMIT 1
+SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at, kind, rationale, refs FROM plan_proposals p
+WHERE p.user_id = $1
+    AND NOT (p.kind = 'adjustment' AND p.status = 'closed'
+        AND NOT EXISTS (SELECT 1 FROM plan_proposal_items i WHERE i.user_id = p.user_id AND i.proposal_id = p.id))
+ORDER BY p.id DESC
+LIMIT 1
 `
 
+// An adjustment that changed nothing is left out: the daily check found the plan fine.
 func (q *Queries) GetLatestPlanProposal(ctx context.Context, userID int64) (PlanProposal, error) {
 	row := q.db.QueryRow(ctx, getLatestPlanProposal, userID)
 	var i PlanProposal
@@ -269,12 +288,15 @@ func (q *Queries) GetLatestPlanProposal(ctx context.Context, userID int64) (Plan
 		&i.ToDay,
 		&i.PlanID,
 		&i.CreatedAt,
+		&i.Kind,
+		&i.Rationale,
+		&i.Refs,
 	)
 	return i, err
 }
 
 const getPlanProposal = `-- name: GetPlanProposal :one
-SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at FROM plan_proposals WHERE user_id = $1 AND id = $2
+SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at, kind, rationale, refs FROM plan_proposals WHERE user_id = $1 AND id = $2
 `
 
 type GetPlanProposalParams struct {
@@ -295,6 +317,9 @@ func (q *Queries) GetPlanProposal(ctx context.Context, arg GetPlanProposalParams
 		&i.ToDay,
 		&i.PlanID,
 		&i.CreatedAt,
+		&i.Kind,
+		&i.Rationale,
+		&i.Refs,
 	)
 	return i, err
 }
@@ -329,7 +354,10 @@ const listPlanCandidates = `-- name: ListPlanCandidates :many
 SELECT u.id AS user_id, u.timezone,
     coalesce(c.status = 'connected', false)::boolean AS garmin_connected,
     coalesce(c.last_sync_at, '0001-01-01 00:00:00+00')::timestamptz AS last_sync_at,
-    coalesce((SELECT max(pp.created_at) FROM plan_proposals pp WHERE pp.user_id = u.id), '0001-01-01 00:00:00+00')::timestamptz AS last_proposal
+    coalesce((SELECT max(pp.created_at) FROM plan_proposals pp WHERE pp.user_id = u.id AND pp.kind = 'plan'), '0001-01-01 00:00:00+00')::timestamptz AS last_proposal,
+    coalesce((SELECT max(pp.created_at) FROM plan_proposals pp WHERE pp.user_id = u.id AND pp.kind = 'adjustment'), '0001-01-01 00:00:00+00')::timestamptz AS last_adjustment,
+    coalesce((SELECT max(r.day) FROM coach_reports r WHERE r.user_id = u.id AND r.kind = 'daily_insight'), '0001-01-01')::date AS last_insight,
+    EXISTS (SELECT 1 FROM plan_proposals pp WHERE pp.user_id = u.id AND pp.status IN ('open', 'generating'))::boolean AS pending_proposal
 FROM users u
 JOIN llm_providers p ON p.user_id = u.id
 LEFT JOIN garmin_connections c ON c.user_id = u.id
@@ -349,11 +377,14 @@ type ListPlanCandidatesRow struct {
 	GarminConnected bool
 	LastSyncAt      time.Time
 	LastProposal    time.Time
+	LastAdjustment  time.Time
+	LastInsight     time.Time
+	PendingProposal bool
 }
 
-// The weekly scheduler's scan across users, like ListCoachCandidates: users
+// The plan scheduler's scan across users, like ListCoachCandidates: users
 // with an LLM provider and a plan, after after_id, with what decides whether
-// they are due a new proposal. Year 1 stands for never.
+// they are due a new plan or an adjustment. Year 1 stands for never.
 func (q *Queries) ListPlanCandidates(ctx context.Context, arg ListPlanCandidatesParams) ([]ListPlanCandidatesRow, error) {
 	rows, err := q.db.Query(ctx, listPlanCandidates, arg.AfterID, arg.MaxRows)
 	if err != nil {
@@ -369,6 +400,9 @@ func (q *Queries) ListPlanCandidates(ctx context.Context, arg ListPlanCandidates
 			&i.GarminConnected,
 			&i.LastSyncAt,
 			&i.LastProposal,
+			&i.LastAdjustment,
+			&i.LastInsight,
+			&i.PendingProposal,
 		); err != nil {
 			return nil, err
 		}
@@ -556,7 +590,7 @@ func (q *Queries) ListRecordedWorkoutNames(ctx context.Context, arg ListRecorded
 }
 
 const lockPlanProposal = `-- name: LockPlanProposal :one
-SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at FROM plan_proposals WHERE user_id = $1 AND id = $2 FOR UPDATE
+SELECT id, user_id, status, failure, prompt_version, from_day, to_day, plan_id, created_at, kind, rationale, refs FROM plan_proposals WHERE user_id = $1 AND id = $2 FOR UPDATE
 `
 
 type LockPlanProposalParams struct {
@@ -577,6 +611,9 @@ func (q *Queries) LockPlanProposal(ctx context.Context, arg LockPlanProposalPara
 		&i.ToDay,
 		&i.PlanID,
 		&i.CreatedAt,
+		&i.Kind,
+		&i.Rationale,
+		&i.Refs,
 	)
 	return i, err
 }

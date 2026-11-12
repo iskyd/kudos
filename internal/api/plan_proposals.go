@@ -83,8 +83,12 @@ func (s *Server) DecidePlanProposal(ctx context.Context, req DecidePlanProposalR
 // validated before they were stored.
 func (s *Server) planProposal(ctx context.Context, p db.PlanProposal) (PlanProposal, error) {
 	out := PlanProposal{
-		Id: p.ID, Status: PlanProposalStatus(p.Status), Failure: (*PlanProposalFailure)(p.Failure), CreatedAt: p.CreatedAt,
-		From: openapi_types.Date{Time: p.FromDay}, To: openapi_types.Date{Time: p.ToDay}, Items: []PlanProposalItem{},
+		Id: p.ID, Kind: PlanProposalKind(p.Kind), Status: PlanProposalStatus(p.Status), Failure: (*PlanProposalFailure)(p.Failure),
+		CreatedAt: p.CreatedAt, From: openapi_types.Date{Time: p.FromDay}, To: openapi_types.Date{Time: p.ToDay},
+		Rationale: p.Rationale, References: p.Refs, Items: []PlanProposalItem{},
+	}
+	if out.References == nil {
+		out.References = []Reference{}
 	}
 	items, err := s.q.ListPlanProposalItems(ctx, db.ListPlanProposalItemsParams{UserID: p.UserID, ProposalID: p.ID, MaxRows: maxProposalItems})
 	if err != nil {

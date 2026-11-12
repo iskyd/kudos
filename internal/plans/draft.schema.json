@@ -17,13 +17,26 @@
     },
     "PlanDraft": {
       "additionalProperties": false,
-      "description": "What the LLM replies when it plans (internal/plans, generated as a JSON\nSchema): the IDs of current workouts it keeps as they are, and every\nother workout of the planned days. Current workouts it neither keeps\nnor replaces with one on the same day and sport are proposed for removal.\n",
+      "description": "What the LLM replies when it plans (internal/plans, generated as a JSON\nSchema): the IDs of current workouts it keeps as they are, and every\nother workout of the planned days. Current workouts it neither keeps\nnor replaces with one on the same day and sport are proposed for removal.\nrationale says why, citing references, and references lists the ones\nit rests on; each must be one the context gave the model.\n",
       "properties": {
         "keep": {
           "items": {
             "type": "integer"
           },
           "maxItems": 50,
+          "type": "array"
+        },
+        "rationale": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "type": "string"
+        },
+        "references": {
+          "items": {
+            "$ref": "#/$defs/Reference"
+          },
+          "maxItems": 20,
+          "minItems": 1,
           "type": "array"
         },
         "workouts": {
@@ -36,7 +49,9 @@
       },
       "required": [
         "keep",
-        "workouts"
+        "workouts",
+        "rationale",
+        "references"
       ],
       "type": "object"
     },
@@ -161,6 +176,11 @@
         "steps"
       ],
       "type": "object"
+    },
+    "Reference": {
+      "description": "A context reference, to an activity or a day.",
+      "pattern": "^\\[(act:[0-9]+|day:[0-9]{4}-[0-9]{2}-[0-9]{2})\\]$",
+      "type": "string"
     }
   },
   "$ref": "#/$defs/PlanDraft",

@@ -30,6 +30,8 @@ const long: PlannedWorkoutInput = { ...easy, day: '2026-11-16', title: 'Long run
 
 const base: PlanProposal = {
   id: 4,
+  kind: 'plan',
+  references: [],
   status: 'open',
   createdAt: '2026-11-12T08:00:00Z',
   from: '2026-11-13',
@@ -38,6 +40,8 @@ const base: PlanProposal = {
 }
 const open: PlanProposal = {
   ...base,
+  rationale: 'Ease off after the hard session [act:12] and rest on [day:2026-11-15].',
+  references: ['[act:12]', '[day:2026-11-15]'],
   items: [
     { id: 1, action: 'change', status: 'pending', workoutId: 7, before: easy, after: tempo },
     { id: 2, action: 'remove', status: 'pending', workoutId: 8, before: ride },
@@ -114,9 +118,15 @@ describe('PlansPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows each change as a diff', async () => {
+  it('shows each change as a diff, with the reasons and their references', async () => {
     latest(open)
     renderApp('/plans')
+    expect(await screen.findByRole('heading', { name: /^Proposal for/ })).toBeInTheDocument()
+    const why = screen.getByLabelText('Why')
+    expect(within(why).getByRole('link', { name: 'activity 12' })).toHaveAttribute(
+      'href',
+      '/activities/12',
+    )
     const changed = await screen.findByRole('listitem', { name: 'Changed · 13 November 2026' })
     const before = within(changed).getByRole('group', { name: 'Before' })
     const after = within(changed).getByRole('group', { name: 'After' })
@@ -228,5 +238,15 @@ describe('PlansPage', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Internal error')
     expect(box).not.toBeChecked()
     expect(sent).toEqual([{ autoMatch: false }, { autoMatch: true }])
+  })
+
+  it('labels an adjustment of the coming week', async () => {
+    latest({ ...open, kind: 'adjustment', from: '2026-11-12', to: '2026-11-18' })
+    renderApp('/plans')
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Adjustment for 12 November 2026 to 18 November 2026',
+      }),
+    ).toBeInTheDocument()
   })
 })

@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/riverqueue/river"
 	"github.com/riverqueue/river/riverdriver/riverpgxv5"
@@ -146,9 +147,12 @@ func workouts(t *testing.T, q *db.Queries, userID int64) []string {
 	return out
 }
 
+// draftJSON builds a PlanDraft citing the injury every test context holds.
 func draftJSON(keep string, ws ...string) string {
-	return `{"keep": [` + keep + `], "workouts": [` + strings.Join(ws, ",") + `]}`
+	return `{"keep": [` + keep + `], "workouts": [` + strings.Join(ws, ",") + `], ` + reasons + `}`
 }
+
+const reasons = `"rationale": "Easy while the knee settles [day:2026-10-01].", "references": ["[day:2026-10-01]"]`
 
 func workoutJSON(on, sport, title string) string {
 	return `{"day": "` + on + `", "sport": "` + sport + `", "title": "` + title + `", "steps": ` + easySteps + `}`
@@ -231,7 +235,8 @@ func TestGenerateProposesWithoutChangingThePlan(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, items := get(t, q, p)
-	if got.Status != "open" || *got.PromptVersion != "plan.v2" || len(items) != 3 {
+	if got.Status != "open" || *got.PromptVersion != "plan.v3" || len(items) != 3 || *got.Rationale != "Easy while the knee settles [day:2026-10-01]." ||
+		len(got.Refs) != 1 || got.Refs[0] != "[day:2026-10-01]" || got.Kind != KindPlan {
 		t.Fatalf("proposal %+v, items %+v", got, items)
 	}
 	for i, want := range []struct {
@@ -285,7 +290,9 @@ func TestInvalidOutputNeverReachesAProposal(t *testing.T) {
 
 	for name, replies := range map[string][]string{
 		"not JSON":           {"Here is your plan: run a lot.", "Sorry."},
-		"schema":             {`{"workouts": []}`, `{"keep": [], "workouts": [{"day": "2026-11-14"}]}`},
+		"schema":             {`{"workouts": []}`, `{"keep": [], "workouts": [{"day": "2026-11-14"}], ` + reasons + `}`},
+		"no references":      {`{"keep": [], "workouts": []}`, `{"keep": [], "workouts": [], "rationale": "x", "references": []}`},
+		"made-up references": {strings.Replace(draftJSON(""), "[day:2026-10-01]\"]", "[act:42]\"]", 1), strings.Replace(draftJSON(""), "[day:2026-10-01]\"]", "[day:2026-11-05]\"]", 1)},
 		"outside the days":   {draftJSON("", workoutJSON("2026-11-12", "running", "Today")), draftJSON("", workoutJSON("2026-11-27", "running", "Later"))},
 		"unknown keep":       {draftJSON("999999"), draftJSON("999998")},
 		"a step's own rules": {draftJSON("", strings.Replace(workoutJSON("2026-11-14", "running", "x"), `"duration": 2700`, `"duration": 2700, "count": 3`, 1)), "no"},
@@ -598,5 +605,177 @@ func TestPeriodicAndRegister(t *testing.T) {
 	}
 	if (&Deps{}).now().IsZero() {
 		t.Error("clock")
+	}
+}
+
+// adjust starts an adjustment of the week from today, as the scheduler does.
+func adjust(t *testing.T, pool *pgxpool.Pool, userID int64) db.PlanProposal {
+	t.Helper()
+	var p db.PlanProposal
+	err := inTx(t.Context(), pool, func(tx pgx.Tx) error {
+		var err error
+		p, err = start(t.Context(), tx, newJobs(t, pool), userID, KindAdjustment, today)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func TestAdjustmentsArriveOnlyAsProposalsWithTheirReferences(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	q := db.New(pool)
+	alice, _ := testutil.TwoUsers(t, pool)
+	s := NewService(pool, newJobs(t, pool))
+	ctx := t.Context()
+	hard := planned(t, q, alice.ID, "2026-11-12", "running", "Intervals")
+	long := planned(t, q, alice.ID, "2026-11-15", "running", "Long run")
+	planned(t, q, alice.ID, "2026-11-19", "running", "Next week") // past the week checked
+	before := workouts(t, q, alice.ID)
+
+	p := adjust(t, pool, alice.ID)
+	if p.Kind != KindAdjustment || !p.FromDay.Equal(today) || !p.ToDay.Equal(day("2026-11-18")) {
+		t.Fatalf("adjustment %+v", p)
+	}
+	// The knee is why today's intervals become an easy run.
+	client := &scripted{replies: []string{draftJSON(id(long.ID), workoutJSON("2026-11-12", "running", "Easy instead"))}}
+	if err := work(newDeps(pool, &bytes.Buffer{}, client), p, 1); err != nil {
+		t.Fatal(err)
+	}
+	got, items := get(t, q, p)
+	if got.Status != "open" || *got.PromptVersion != "adjust.v1" || len(items) != 1 || items[0].Action != "change" || *items[0].WorkoutID != hard.ID {
+		t.Fatalf("proposal %+v, items %+v", got, items)
+	}
+	if *got.Rationale != "Easy while the knee settles [day:2026-10-01]." || len(got.Refs) != 1 || got.Refs[0] != "[day:2026-10-01]" {
+		t.Errorf("reasons %q %v", *got.Rationale, got.Refs)
+	}
+	// The model checked today and the six days after, from today's context.
+	req := client.got[0]
+	if !strings.Contains(req.Messages[0].Content, "from 2026-11-12 to 2026-11-18") || !strings.Contains(req.System, "Today is 2026-11-12.") {
+		t.Errorf("asked %+v", req)
+	}
+	// Nothing changed without approval.
+	if after := workouts(t, q, alice.ID); strings.Join(after, "|") != strings.Join(before, "|") {
+		t.Errorf("the plan changed: %v", after)
+	}
+	if err := s.Decide(ctx, alice.ID, p.ID, nil, []int64{items[0].ID}); err != nil {
+		t.Fatal(err)
+	}
+
+	// A check that changes nothing leaves no proposal for the user to see.
+	quiet := adjust(t, pool, alice.ID)
+	if err := work(newDeps(pool, &bytes.Buffer{}, &scripted{replies: []string{draftJSON(id(hard.ID) + "," + id(long.ID))}}), quiet, 1); err != nil {
+		t.Fatal(err)
+	}
+	if got, items := get(t, q, quiet); got.Status != "closed" || len(items) != 0 {
+		t.Errorf("quiet check %+v %+v", got, items)
+	}
+	if latest, err := q.GetLatestPlanProposal(ctx, alice.ID); err != nil || latest.ID != p.ID {
+		t.Errorf("latest %+v, %v", latest, err)
+	}
+
+	// Reasons resting on references the context does not hold never reach a proposal.
+	made := adjust(t, pool, alice.ID)
+	invented := strings.Replace(draftJSON("", workoutJSON("2026-11-12", "running", "Rest")), "[day:2026-10-01]\"]", "[act:4242]\"]", 1)
+	client = &scripted{replies: []string{invented, invented}}
+	if err := work(newDeps(pool, &bytes.Buffer{}, client), made, 1); err != nil {
+		t.Fatal(err)
+	}
+	if got, items := get(t, q, made); got.Status != "failed" || *got.Failure != FailedInvalidOutput || len(items) != 0 ||
+		!strings.Contains(client.got[1].Messages[2].Content, "references/0: [act:4242] is not a reference of the athlete context") {
+		t.Errorf("invented references: %+v %+v", got, items)
+	}
+}
+
+func TestAdjustDue(t *testing.T) {
+	t.Parallel()
+	rome, err := time.LoadLocation("Europe/Rome")
+	if err != nil {
+		t.Fatal(err)
+	}
+	thursday := func(h int) time.Time { return time.Date(2026, 11, 12, h, 0, 0, 0, rome) }
+	base := db.ListPlanCandidatesRow{Timezone: "Europe/Rome", LastInsight: day("2026-11-12")}
+	with := func(f func(*db.ListPlanCandidatesRow)) db.ListPlanCandidatesRow { c := base; f(&c); return c }
+	for _, tc := range []struct {
+		name string
+		c    db.ListPlanCandidatesRow
+		now  time.Time
+		want string
+	}{
+		{"after today's insight", base, thursday(7), "2026-11-12"},
+		{"before the morning", base, thursday(5), ""},
+		{"no insight today yet", with(func(c *db.ListPlanCandidatesRow) { c.LastInsight = day("2026-11-11") }), thursday(7), ""},
+		{"a proposal waits for the user", with(func(c *db.ListPlanCandidatesRow) { c.PendingProposal = true }), thursday(7), ""},
+		{"checked today", with(func(c *db.ListPlanCandidatesRow) { c.LastAdjustment = thursday(6) }), thursday(9), ""},
+		{"checked yesterday", with(func(c *db.ListPlanCandidatesRow) { c.LastAdjustment = thursday(6).AddDate(0, 0, -1) }), thursday(9), "2026-11-12"},
+		{"unknown zone counts as UTC", with(func(c *db.ListPlanCandidatesRow) { c.Timezone = "Mars/Olympus" }), time.Date(2026, 11, 12, 6, 0, 0, 0, time.UTC), "2026-11-12"},
+	} {
+		got := ""
+		if d := AdjustDue(tc.c, tc.now); d != nil {
+			got = d.Format(time.DateOnly)
+		}
+		if got != tc.want {
+			t.Errorf("%s: %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+func TestScheduleChecksTheWeekAfterTheInsight(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	q := db.New(pool)
+	ctx := t.Context()
+	alice, bob := testutil.TwoUsers(t, pool)
+	carol, err := q.CreateUser(ctx, db.CreateUserParams{Username: "carol", PasswordHash: "x", Timezone: "UTC"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := pool.Exec(ctx, "UPDATE users SET timezone = 'UTC'"); err != nil {
+		t.Fatal(err)
+	}
+	// All have a provider and a plan; alice and bob have today's insight; only
+	// alice has workouts in the coming week.
+	for _, u := range []int64{alice.ID, bob.ID, carol.ID} {
+		if _, err := q.PutLLMProvider(ctx, db.PutLLMProviderParams{UserID: u, Provider: "ollama", BaseUrl: "http://ollama.example.test", Model: "m"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	planned(t, q, alice.ID, "2026-11-14", "running", "Easy")
+	planned(t, q, bob.ID, "2026-11-25", "running", "Later")
+	planned(t, q, carol.ID, "2026-11-14", "running", "Easy")
+	for _, u := range []int64{alice.ID, bob.ID} {
+		if _, err := q.CreateCoachReport(ctx, db.CreateCoachReportParams{UserID: u, Kind: "daily_insight", Day: today, PromptVersion: "v", Content: "c"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	d := newDeps(pool, &bytes.Buffer{}, nil)
+	d.Now = func() time.Time { return time.Date(2026, 11, 12, 7, 0, 0, 0, time.UTC) } // Thursday
+	workers := river.NewWorkers()
+	d.Register(workers)
+	w := rivertest.NewWorker(t, riverpgxv5.New(pool), &river.Config{Workers: workers}, &ScheduleWorker{Deps: d})
+	for range 2 { // the second run finds today's check
+		tx, err := pool.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if res, err := w.Work(ctx, t, tx, ScheduleArgs{}, nil); err != nil || res.EventKind != river.EventKindJobCompleted {
+			t.Fatalf("Work: %+v, %v", res, err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// The check finishes, so the next run finds nothing pending.
+		if _, err := pool.Exec(ctx, "UPDATE plan_proposals SET status = 'closed' WHERE status = 'generating'"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var kinds []string
+	if err := pool.QueryRow(ctx, "SELECT coalesce(array_agg(user_id::text || ':' || kind ORDER BY id), '{}') FROM plan_proposals").Scan(&kinds); err != nil {
+		t.Fatal(err)
+	}
+	if len(kinds) != 1 || kinds[0] != id(alice.ID)+":adjustment" {
+		t.Errorf("proposals %v", kinds)
 	}
 }

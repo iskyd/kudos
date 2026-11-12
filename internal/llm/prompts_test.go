@@ -11,7 +11,7 @@ import (
 func TestRenderGolden(t *testing.T) {
 	t.Parallel()
 	in := PromptInput{Today: date("2026-11-02"), Context: BuildContext(sample(), 0), Schema: `{"type": "object"}`}
-	for _, m := range []Mode{ModeChat, ModeDailyInsight, ModeWeeklyReport, ModePlan} {
+	for _, m := range []Mode{ModeChat, ModeDailyInsight, ModeWeeklyReport, ModePlan, ModeAdjust} {
 		p, err := Render(m, in)
 		if err != nil {
 			t.Fatalf("%s: %v", m, err)
@@ -38,6 +38,9 @@ func TestRenderGolden(t *testing.T) {
 	if p, _ := Render(ModePlan, in); !strings.Contains(p.User, in.Schema) || !strings.Contains(p.User, "from 2026-11-03 to 2026-11-16") {
 		t.Errorf("plan prompt lacks the schema or its days:\n%s", p.User)
 	}
+	if p, _ := Render(ModeAdjust, in); !strings.Contains(p.User, in.Schema) || !strings.Contains(p.User, "from 2026-11-02 to 2026-11-08") {
+		t.Errorf("adjust prompt lacks the schema or its days:\n%s", p.User)
+	}
 }
 
 func TestRenderRejects(t *testing.T) {
@@ -46,8 +49,9 @@ func TestRenderRejects(t *testing.T) {
 		mode Mode
 		in   PromptInput
 	}{
-		"unknown mode":        {Mode("poem"), PromptInput{Context: "x"}},
-		"plan without schema": {ModePlan, PromptInput{Context: "x"}},
+		"unknown mode":          {Mode("poem"), PromptInput{Context: "x"}},
+		"plan without schema":   {ModePlan, PromptInput{Context: "x"}},
+		"adjust without schema": {ModeAdjust, PromptInput{Context: "x"}},
 	} {
 		if p, err := Render(tc.mode, tc.in); err == nil {
 			t.Errorf("%s: rendered %+v", name, p)
@@ -66,6 +70,8 @@ func TestReleasedPromptsNeverChange(t *testing.T) {
 		"weekly-report.v1.tmpl": "92532c2685bfc2e7707ca5de54dd50df32e86c87543c32b49648c14ed32e5d30",
 		"plan.v1.tmpl":          "39916f2b44205222069c269efc8ebd6661589181724e781e1de3370d2db3c43a",
 		"plan.v2.tmpl":          "be94423a93c25ac189d4f4349ab8b4558627b1602c200b5f390c243661f9abc0",
+		"plan.v3.tmpl":          "ced8822b618c416dced022ca813d7d4fceb63f0ce97e0845923a60555350548a",
+		"adjust.v1.tmpl":        "175bec3fc9248b667e70b21c6346f8edbcb3a2dc68c448cdb736e7cf673ec762",
 	}
 	files, err := fs.Glob(promptFiles, "prompts/*.tmpl")
 	if err != nil {

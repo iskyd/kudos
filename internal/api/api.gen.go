@@ -670,6 +670,24 @@ func (e PlanProposalFailure) Valid() bool {
 	}
 }
 
+// Defines values for PlanProposalKind.
+const (
+	Adjustment PlanProposalKind = "adjustment"
+	Plan       PlanProposalKind = "plan"
+)
+
+// Valid indicates whether the value is a known member of the PlanProposalKind enum.
+func (e PlanProposalKind) Valid() bool {
+	switch e {
+	case Adjustment:
+		return true
+	case Plan:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PlanProposalStatus.
 const (
 	PlanProposalStatusClosed     PlanProposalStatus = "closed"
@@ -1946,9 +1964,13 @@ type PlanDecisions struct {
 // Schema): the IDs of current workouts it keeps as they are, and every
 // other workout of the planned days. Current workouts it neither keeps
 // nor replaces with one on the same day and sport are proposed for removal.
+// rationale says why, citing references, and references lists the ones
+// it rests on; each must be one the context gave the model.
 type PlanDraft struct {
-	Keep     []int64               `json:"keep"`
-	Workouts []PlannedWorkoutInput `json:"workouts"`
+	Keep       []int64               `json:"keep"`
+	Rationale  string                `json:"rationale"`
+	References []Reference           `json:"references"`
+	Workouts   []PlannedWorkoutInput `json:"workouts"`
 }
 
 // PlanProposal defines model for PlanProposal.
@@ -1965,6 +1987,16 @@ type PlanProposal struct {
 	// Items The changes, by day; empty until it is open.
 	Items []PlanProposalItem `json:"items"`
 
+	// Kind plan: the coming two weeks, on demand or on Monday mornings;
+	// adjustment: the coming week, checked after the daily insight.
+	Kind PlanProposalKind `json:"kind"`
+
+	// Rationale The coach's reasons, citing references; set once it is filled in.
+	Rationale *string `json:"rationale,omitempty"`
+
+	// References The context references the reasons rest on.
+	References []Reference `json:"references"`
+
 	// Status generating until a job fills it in; then open with items to decide,
 	// closed once every item is decided (or when it proposed no change),
 	// failed when the model's plan stayed invalid or the provider failed,
@@ -1977,6 +2009,10 @@ type PlanProposal struct {
 
 // PlanProposalFailure Why it failed.
 type PlanProposalFailure string
+
+// PlanProposalKind plan: the coming two weeks, on demand or on Monday mornings;
+// adjustment: the coming week, checked after the daily insight.
+type PlanProposalKind string
 
 // PlanProposalStatus generating until a job fills it in; then open with items to decide,
 // closed once every item is decided (or when it proposed no change),
@@ -2257,6 +2293,9 @@ type Records struct {
 	// Since The first local day records cover; absent without activities.
 	Since *openapi_types.Date `json:"since,omitempty"`
 }
+
+// Reference A context reference, to an activity or a day.
+type Reference = string
 
 // RegisterRequest defines model for RegisterRequest.
 type RegisterRequest struct {

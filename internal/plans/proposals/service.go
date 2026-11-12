@@ -40,6 +40,12 @@ const (
 	maxItems = 500
 )
 
+// The kinds of proposal.
+const (
+	KindPlan       = "plan"       // the coming two weeks
+	KindAdjustment = "adjustment" // the coming week, after the daily insight
+)
+
 // The failures a proposal records.
 const (
 	FailedInvalidOutput = "invalid_output"
@@ -58,26 +64,33 @@ func NewService(pool *pgxpool.Pool, jobClient *jobs.Client) *Service {
 	return &Service{pool: pool, jobs: jobClient}
 }
 
-// Start creates a proposal for the days after today and queues its generation.
+// Start creates a plan for the days after today and queues its generation.
 func (s *Service) Start(ctx context.Context, userID int64, today time.Time) (db.PlanProposal, error) {
 	var p db.PlanProposal
 	err := inTx(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
-		p, err = start(ctx, tx, s.jobs, userID, today)
+		p, err = start(ctx, tx, s.jobs, userID, KindPlan, today)
 		return err
 	})
 	return p, err
 }
 
-// start creates a proposal and its job in tx.
-func start(ctx context.Context, tx pgx.Tx, jobClient *jobs.Client, userID int64, today time.Time) (db.PlanProposal, error) {
+// days are the local days a proposal of kind made on today covers.
+func days(kind string, today time.Time) (from, to time.Time) {
+	if kind == KindAdjustment {
+		return today, today.AddDate(0, 0, llm.AdjustDays-1)
+	}
+	return today.AddDate(0, 0, 1), today.AddDate(0, 0, llm.PlanDays)
+}
+
+// start creates a proposal of kind and its job in tx.
+func start(ctx context.Context, tx pgx.Tx, jobClient *jobs.Client, userID int64, kind string, today time.Time) (db.PlanProposal, error) {
 	q := db.New(tx)
 	if err := q.ExpirePlanProposals(ctx, db.ExpirePlanProposalsParams{UserID: userID, Before: time.Now().Add(-staleAfter)}); err != nil {
 		return db.PlanProposal{}, fmt.Errorf("expiring plan proposals: %w", err)
 	}
-	p, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{
-		UserID: userID, FromDay: today.AddDate(0, 0, 1), ToDay: today.AddDate(0, 0, llm.PlanDays),
-	})
+	from, to := days(kind, today)
+	p, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: userID, Kind: kind, FromDay: from, ToDay: to})
 	if pgErr := (*pgconn.PgError)(nil); errors.As(err, &pgErr) && pgErr.Code == "23505" {
 		return db.PlanProposal{}, ErrGenerating
 	}

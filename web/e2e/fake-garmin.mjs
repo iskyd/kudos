@@ -33,8 +33,14 @@ function plan(prompt) {
   const next = new Date(`${from}T00:00:00Z`)
   next.setUTCDate(next.getUTCDate() + 1)
   const steps = [{ kind: 'recovery', durationType: 'time', duration: 2700 }]
+  // The readiness line always cites today, the day before the plan starts.
+  const today = new Date(`${from}T00:00:00Z`)
+  today.setUTCDate(today.getUTCDate() - 1)
+  const ref = `[day:${today.toISOString().slice(0, 10)}]`
   return JSON.stringify({
     keep: [],
+    rationale: `Two easy days to start ${ref}.`,
+    references: [ref],
     workouts: [
       { day: from, sport: 'running', title: 'E2E easy run', steps },
       { day: next.toISOString().slice(0, 10), sport: 'running', title: 'E2E long run', steps },

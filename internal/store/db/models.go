@@ -274,6 +274,9 @@ type PlanProposal struct {
 	ToDay         time.Time
 	PlanID        *int64
 	CreatedAt     time.Time
+	Kind          string
+	Rationale     *string
+	Refs          []string
 }
 
 type PlanProposalItem struct {

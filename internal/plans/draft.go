@@ -27,10 +27,13 @@ type Workout struct {
 	Steps       json.RawMessage `json:"steps"`
 }
 
-// Draft is a PlanDraft: the current workouts the model keeps, and its others.
+// Draft is a PlanDraft: the current workouts the model keeps, its others, and
+// its reasons with the references they rest on.
 type Draft struct {
-	Keep     []int64   `json:"keep"`
-	Workouts []Workout `json:"workouts"`
+	Keep       []int64   `json:"keep"`
+	Workouts   []Workout `json:"workouts"`
+	Rationale  string    `json:"rationale"`
+	References []string  `json:"references"`
 }
 
 // Current is a planned workout already on one of the planned days.
@@ -41,9 +44,10 @@ type Current struct {
 
 // ValidateDraft checks the model's plan for the local days from to to against
 // the schema, then the rules it cannot say: each workout's steps, as in
-// ValidateWorkout, a day in the window, and kept IDs among current. Errors name
-// the place (workouts/2/steps/0) so the model can correct it.
-func ValidateDraft(doc []byte, from, to time.Time, current []int64) (Draft, error) {
+// ValidateWorkout, a day in the window, kept IDs among current, and references
+// that the context it was given (athleteContext) contains. Errors name the
+// place (workouts/2/steps/0) so the model can correct it.
+func ValidateDraft(doc []byte, from, to time.Time, current []int64, athleteContext string) (Draft, error) {
 	s, err := llm.CompileSchema("plan-draft", DraftSchema)
 	if err != nil {
 		return Draft{}, err
@@ -76,6 +80,11 @@ func ValidateDraft(doc []byte, from, to time.Time, current []int64) (Draft, erro
 	for i, id := range d.Keep {
 		if !slices.Contains(current, id) {
 			return Draft{}, fmt.Errorf("keep/%d: %d is not a workout of the current plan in these days", i, id)
+		}
+	}
+	for i, ref := range d.References {
+		if !strings.Contains(athleteContext, ref) {
+			return Draft{}, fmt.Errorf("references/%d: %s is not a reference of the athlete context", i, ref)
 		}
 	}
 	return d, nil

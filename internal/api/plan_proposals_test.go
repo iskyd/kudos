@@ -21,7 +21,7 @@ func TestCreatePlanProposal(t *testing.T) {
 	setLLM(t, alice, LLMProviderInput{Provider: Ollama, BaseUrl: &url, Model: "m"})
 	p := decodeJSON[PlanProposal](t, alice.do(http.MethodPost, "/api/plan-proposals", nil, nil), http.StatusAccepted)
 	tomorrow := time.Now().In(time.UTC).AddDate(0, 0, 1).Format(time.DateOnly) // the test users' timezone is UTC
-	if p.Status != PlanProposalStatusGenerating || p.From.Format(time.DateOnly) != tomorrow || p.To.Sub(p.From.Time) != 13*24*time.Hour || len(p.Items) != 0 {
+	if p.Status != PlanProposalStatusGenerating || p.Kind != Plan || p.References == nil || p.From.Format(time.DateOnly) != tomorrow || p.To.Sub(p.From.Time) != 13*24*time.Hour || len(p.Items) != 0 {
 		t.Errorf("created %+v", p)
 	}
 	wantProblem(t, alice.do(http.MethodPost, "/api/plan-proposals", nil, nil), KindProposalGenerating)
@@ -41,12 +41,14 @@ func TestDecidePlanProposal(t *testing.T) {
 
 	// An open proposal: change the 13th, add the 14th.
 	current := planWorkout(t, q, me.Id, "2026-11-13", "Easy")
-	stored, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: me.Id, FromDay: current.Day, ToDay: current.Day.AddDate(0, 0, 13)})
+	stored, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: me.Id, Kind: "plan", FromDay: current.Day, ToDay: current.Day.AddDate(0, 0, 13)})
 	if err != nil {
 		t.Fatal(err)
 	}
 	version := "plan.v2"
-	if _, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{UserID: me.Id, ID: stored.ID, Status: "open", PromptVersion: &version}); err != nil {
+	if _, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{
+		UserID: me.Id, ID: stored.ID, Status: "open", PromptVersion: &version, Rationale: new("Build up [day:2026-11-13]."), Refs: []string{"[day:2026-11-13]"},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	workout := func(day, title string) []byte {
@@ -62,7 +64,8 @@ func TestDecidePlanProposal(t *testing.T) {
 		}
 	}
 	p := decodeJSON[PlanProposal](t, alice.do(http.MethodGet, "/api/plan-proposals/latest", nil, nil), http.StatusOK)
-	if p.Status != PlanProposalStatusOpen || len(p.Items) != 2 {
+	if p.Status != PlanProposalStatusOpen || len(p.Items) != 2 || p.Kind != Plan || *p.Rationale != "Build up [day:2026-11-13]." ||
+		len(p.References) != 1 || p.References[0] != "[day:2026-11-13]" {
 		t.Fatalf("proposal %+v", p)
 	}
 	change, add := p.Items[0], p.Items[1]

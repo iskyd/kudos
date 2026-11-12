@@ -22,6 +22,8 @@ test('generate a plan, approve one change and reject the other', async ({ page }
   // The job fills the proposal in; the page polls until it does.
   const items = page.getByRole('listitem').filter({ hasText: /^Added · / })
   await expect(items).toHaveCount(2, { timeout: 30_000 })
+  // The coach's reasons come with links to what they rest on.
+  await expect(page.getByLabel('Why')).toContainText('Two easy days to start')
   const easy = items.filter({ hasText: 'E2E easy run' })
   const long = items.filter({ hasText: 'E2E long run' })
 

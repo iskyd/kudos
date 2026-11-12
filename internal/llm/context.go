@@ -96,14 +96,19 @@ type ActivitySummary struct {
 }
 
 // PlannedSummary is a planned workout; ID is how a plan draft keeps it.
-// ActivityID is the activity that completed it, if any.
+// ActivityID is the activity that completed it, if any, and Steps how that
+// activity's structured workout steps went against their targets.
 type PlannedSummary struct {
 	ID         int64
 	Day        time.Time
 	Sport      string
 	Title      string
 	ActivityID *int64
+	Steps      *StepCounts
 }
+
+// StepCounts counts executed steps by how they went against their targets.
+type StepCounts struct{ Within, Above, Below int }
 
 // Adherence sums how the planned workouts from From to To went (plans.Adherence).
 type Adherence struct {
@@ -418,6 +423,9 @@ func planItems(c AthleteContext) []string {
 		switch {
 		case p.ActivityID != nil:
 			item += ", done " + RefActivity(*p.ActivityID)
+			if st := p.Steps; st != nil && st.Within+st.Above+st.Below > 0 {
+				item += fmt.Sprintf("; steps against targets: %d within, %d above, %d below", st.Within, st.Above, st.Below)
+			}
 		case p.Day.Before(c.Today):
 			item += ", missed"
 		}

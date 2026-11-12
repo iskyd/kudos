@@ -98,7 +98,10 @@ func (w *GenerateWorker) Work(ctx context.Context, job *river.Job[GenerateArgs])
 	if err != nil {
 		return err
 	}
-	today := p.FromDay.AddDate(0, 0, -1)
+	mode, today := llm.ModePlan, p.FromDay.AddDate(0, 0, -1)
+	if p.Kind == KindAdjustment {
+		mode, today = llm.ModeAdjust, p.FromDay
+	}
 	c, err := w.Context(ctx, a.UserID, today)
 	if err != nil {
 		return err
@@ -111,15 +114,16 @@ func (w *GenerateWorker) Work(ctx context.Context, job *river.Job[GenerateArgs])
 	for i, c := range current {
 		ids[i] = c.ID
 	}
-	prompt, err := llm.Render(llm.ModePlan, llm.PromptInput{Today: today, Context: llm.BuildContext(c, contextTokens), Schema: string(plans.DraftSchema)})
+	athlete := llm.BuildContext(c, contextTokens)
+	prompt, err := llm.Render(mode, llm.PromptInput{Today: today, Context: athlete, Schema: string(plans.DraftSchema)})
 	if err != nil {
-		return fmt.Errorf("rendering the plan prompt: %w", err)
+		return fmt.Errorf("rendering the %s prompt: %w", mode, err)
 	}
 	var draft plans.Draft
 	_, err = llm.Structured(ctx, client, llm.Request{System: prompt.System, Messages: []llm.Message{{Role: "user", Content: prompt.User}}},
 		func(doc []byte) error {
 			var err error
-			draft, err = plans.ValidateDraft(doc, p.FromDay, p.ToDay, ids)
+			draft, err = plans.ValidateDraft(doc, p.FromDay, p.ToDay, ids, athlete)
 			return err
 		})
 	if errors.Is(err, llm.ErrInvalidOutput) {
@@ -136,10 +140,12 @@ func (w *GenerateWorker) Work(ctx context.Context, job *river.Job[GenerateArgs])
 	return inTx(ctx, w.Pool, func(tx pgx.Tx) error { return fill(ctx, db.New(tx), p, prompt.Version, draft) })
 }
 
-// fill stores the draft's changes to the current plan and opens the proposal,
-// superseding the open one; with no change it closes at once.
+// fill stores the draft's changes to the current plan with its reasons and
+// opens the proposal, superseding the open one; with no change it closes at once.
 func fill(ctx context.Context, q *db.Queries, p db.PlanProposal, version string, draft plans.Draft) error {
-	n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{UserID: p.UserID, ID: p.ID, Status: "open", PromptVersion: &version})
+	n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{
+		UserID: p.UserID, ID: p.ID, Status: "open", PromptVersion: &version, Rationale: &draft.Rationale, Refs: draft.References,
+	})
 	if err != nil {
 		return fmt.Errorf("opening the plan proposal: %w", err)
 	}
@@ -237,7 +243,26 @@ func WeeklyDue(c db.ListPlanCandidatesRow, now time.Time) *time.Time {
 	return nil
 }
 
-// ScheduleArgs queues the weekly proposals users are due.
+// AdjustDue returns the day c is due a check of its coming week at now: once a
+// day, after that day's daily insight was written, while no other proposal of
+// c is open or being generated, so a check never buries one waiting for the
+// user.
+func AdjustDue(c db.ListPlanCandidatesRow, now time.Time) *time.Time {
+	today, ok := reports.Morning(c.Timezone, c.GarminConnected, c.LastSyncAt, now)
+	if !ok || c.PendingProposal || c.LastInsight.Before(today) {
+		return nil
+	}
+	loc, err := time.LoadLocation(c.Timezone)
+	if err != nil {
+		loc = time.UTC // validated when set; this is only a guard
+	}
+	if c.LastAdjustment.Before(time.Date(today.Year(), today.Month(), today.Day(), 0, 0, 0, 0, loc)) {
+		return &today
+	}
+	return nil
+}
+
+// ScheduleArgs queues the plans and adjustments users are due.
 type ScheduleArgs struct{}
 
 // Kind implements river.JobArgs.
@@ -256,8 +281,9 @@ type ScheduleWorker struct {
 	*Deps
 }
 
-// Work regenerates the plan of every user with one, on Monday mornings. A user
-// whose proposal is generating already is skipped.
+// Work regenerates the plan of every user with one on Monday mornings, and
+// otherwise checks the coming week of those with workouts planned in it after
+// their daily insight. A user whose proposal is generating already is skipped.
 func (w *ScheduleWorker) Work(ctx context.Context, _ *river.Job[ScheduleArgs]) error {
 	jobs := river.ClientFromContext[pgx.Tx](ctx)
 	q := db.New(w.Pool)
@@ -269,16 +295,19 @@ func (w *ScheduleWorker) Work(ctx context.Context, _ *river.Job[ScheduleArgs]) e
 			return fmt.Errorf("listing plan candidates: %w", err)
 		}
 		for _, u := range users {
-			today := WeeklyDue(u, now)
+			kind, today, err := w.due(ctx, q, u, now)
+			if err != nil {
+				return err
+			}
 			if today == nil {
 				continue
 			}
-			err := inTx(ctx, w.Pool, func(tx pgx.Tx) error {
-				_, err := start(ctx, tx, jobs, u.UserID, *today)
+			err = inTx(ctx, w.Pool, func(tx pgx.Tx) error {
+				_, err := start(ctx, tx, jobs, u.UserID, kind, *today)
 				return err
 			})
 			if err != nil && !errors.Is(err, ErrGenerating) {
-				return fmt.Errorf("queueing the plan of user %d: %w", u.UserID, err)
+				return fmt.Errorf("queueing the %s of user %d: %w", kind, u.UserID, err)
 			}
 		}
 		if len(users) < candidatePage {
@@ -286,4 +315,25 @@ func (w *ScheduleWorker) Work(ctx context.Context, _ *river.Job[ScheduleArgs]) e
 		}
 		after = users[len(users)-1].UserID
 	}
+}
+
+// due is what u is due at now, if anything: a plan, else an adjustment when
+// workouts are planned in the coming week.
+func (w *ScheduleWorker) due(ctx context.Context, q *db.Queries, u db.ListPlanCandidatesRow, now time.Time) (string, *time.Time, error) {
+	if today := WeeklyDue(u, now); today != nil {
+		return KindPlan, today, nil
+	}
+	today := AdjustDue(u, now)
+	if today == nil {
+		return "", nil, nil
+	}
+	from, to := days(KindAdjustment, *today)
+	planned, err := q.ListPlannedWorkoutsBetween(ctx, db.ListPlannedWorkoutsBetweenParams{UserID: u.UserID, FromDay: from, ToDay: to, MaxRows: 1})
+	if err != nil {
+		return "", nil, fmt.Errorf("reading the coming week of user %d: %w", u.UserID, err)
+	}
+	if len(planned) == 0 {
+		return "", nil, nil
+	}
+	return KindAdjustment, today, nil
 }
