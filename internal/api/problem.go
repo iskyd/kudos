@@ -132,7 +132,12 @@ func (e *Error) Error() string { return string(e.Kind) + ": " + e.Detail }
 func writeProblem(w http.ResponseWriter, r *http.Request, logger *slog.Logger, err error) {
 	var e *Error
 	if !errors.As(err, &e) {
-		logger.ErrorContext(r.Context(), "request failed", "request_id", middleware.GetReqID(r.Context()), "error", err)
+		level := slog.LevelError
+		if r.Context().Err() != nil {
+			// The client went away (closed the tab, navigated): not a server error.
+			level = slog.LevelDebug
+		}
+		logger.Log(r.Context(), level, "request failed", "request_id", middleware.GetReqID(r.Context()), "error", err)
 		e = &Error{Kind: KindInternal}
 	}
 	if e.Kind.status() == http.StatusInternalServerError {
