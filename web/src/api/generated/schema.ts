@@ -1798,12 +1798,28 @@ export interface components {
          *     Schema): the IDs of current workouts it keeps as they are, and every
          *     other workout of the planned days. Current workouts it neither keeps
          *     nor replaces with one on the same day and sport are proposed for removal.
+         *     rationale says why, citing references, and references lists the ones
+         *     it rests on; each must be one the context gave the model.
          */
         PlanDraft: {
+            rationale: string;
+            references: components["schemas"]["Reference"][];
             keep: number[];
             workouts: components["schemas"]["PlannedWorkoutInput"][];
         };
+        /** @description A context reference, to an activity or a day. */
+        Reference: string;
         PlanProposal: {
+            /**
+             * @description plan: the coming two weeks, on demand or on Monday mornings;
+             *     adjustment: the coming week, checked after the daily insight.
+             * @enum {string}
+             */
+            kind: "plan" | "adjustment";
+            /** @description The coach's reasons, citing references; set once it is filled in. */
+            rationale?: string;
+            /** @description The context references the reasons rest on. */
+            references: components["schemas"]["Reference"][];
             /** Format: int64 */
             id: number;
             /**

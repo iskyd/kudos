@@ -2,7 +2,6 @@ package llm
 
 import (
 	"embed"
-	"errors"
 	"fmt"
 	"strings"
 	"text/template"
@@ -24,6 +23,7 @@ const (
 	ModeDailyInsight Mode = "daily-insight"
 	ModeWeeklyReport Mode = "weekly-report"
 	ModePlan         Mode = "plan"
+	ModeAdjust       Mode = "adjust"
 )
 
 // promptVersion names the template each mode uses now.
@@ -36,7 +36,9 @@ func promptVersion(m Mode) (string, error) {
 	case ModeWeeklyReport:
 		return "weekly-report.v1", nil
 	case ModePlan:
-		return "plan.v2", nil
+		return "plan.v3", nil
+	case ModeAdjust:
+		return "adjust.v1", nil
 	}
 	return "", fmt.Errorf("unknown prompt mode %q", m)
 }
@@ -45,7 +47,7 @@ func promptVersion(m Mode) (string, error) {
 type PromptInput struct {
 	Today   time.Time
 	Context string // from BuildContext
-	Schema  string // the JSON Schema the reply must match; plan prompts only
+	Schema  string // the JSON Schema the reply must match; plan and adjust prompts only
 }
 
 // PlanDays is how many days a plan covers, from the day after Today.
@@ -56,6 +58,17 @@ func (in PromptInput) PlanFrom() string { return in.Today.AddDate(0, 0, 1).Forma
 
 // PlanTo is the last day a plan covers.
 func (in PromptInput) PlanTo() string { return in.Today.AddDate(0, 0, PlanDays).Format(time.DateOnly) }
+
+// AdjustDays is how many days an adjustment covers, from Today.
+const AdjustDays = 7
+
+// AdjustFrom is the first day an adjustment covers.
+func (in PromptInput) AdjustFrom() string { return in.Today.Format(time.DateOnly) }
+
+// AdjustTo is the last day an adjustment covers.
+func (in PromptInput) AdjustTo() string {
+	return in.Today.AddDate(0, 0, AdjustDays-1).Format(time.DateOnly)
+}
 
 // Prompt is a rendered template.
 type Prompt struct {
@@ -70,8 +83,8 @@ func Render(m Mode, in PromptInput) (Prompt, error) {
 	if err != nil {
 		return Prompt{}, err
 	}
-	if m == ModePlan && in.Schema == "" {
-		return Prompt{}, errors.New("plan prompt without a schema")
+	if (m == ModePlan || m == ModeAdjust) && in.Schema == "" {
+		return Prompt{}, fmt.Errorf("%s prompt without a schema", m)
 	}
 	t, err := template.New("").Option("missingkey=error").
 		ParseFS(promptFiles, "prompts/rules.*.tmpl", "prompts/"+version+".tmpl")

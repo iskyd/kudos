@@ -110,7 +110,7 @@ func TestPlanProposals(t *testing.T) {
 	from, to := time.Date(2026, 11, 13, 0, 0, 0, 0, time.UTC), time.Date(2026, 11, 26, 0, 0, 0, 0, time.UTC)
 	create := func(userID int64) db.PlanProposal {
 		t.Helper()
-		p, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: userID, FromDay: from, ToDay: to})
+		p, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: userID, Kind: "plan", FromDay: from, ToDay: to})
 		check(t, err)
 		return p
 	}
@@ -119,7 +119,7 @@ func TestPlanProposals(t *testing.T) {
 		t.Fatalf("created %+v", old)
 	}
 	// One generating proposal per user.
-	if _, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: alice.ID, FromDay: from, ToDay: to}); err == nil {
+	if _, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: alice.ID, Kind: "adjustment", FromDay: from, ToDay: to}); err == nil {
 		t.Fatal("a second generating proposal")
 	}
 	bobs := create(bob.ID) // bob's does not count against alice
@@ -135,10 +135,12 @@ func TestPlanProposals(t *testing.T) {
 	invalid := "invalid_output"
 	check(t, q.FailPlanProposal(ctx, db.FailPlanProposalParams{UserID: bob.ID, ID: old.ID, Failure: &invalid}))
 	version := "plan.v2"
-	if n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{UserID: bob.ID, ID: old.ID, Status: "open", PromptVersion: &version}); err != nil || n != 0 {
+	if n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{UserID: bob.ID, ID: old.ID, Status: "open", PromptVersion: &version, Refs: []string{}}); err != nil || n != 0 {
 		t.Errorf("bob filled alice's proposal: %d, %v", n, err)
 	}
-	if n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{UserID: alice.ID, ID: old.ID, Status: "open", PromptVersion: &version}); err != nil || n != 1 {
+	if n, err := q.FillPlanProposal(ctx, db.FillPlanProposalParams{
+		UserID: alice.ID, ID: old.ID, Status: "open", PromptVersion: &version, Rationale: new("Why [day:2026-11-13]"), Refs: []string{"[day:2026-11-13]"},
+	}); err != nil || n != 1 {
 		t.Fatalf("fill: %d, %v", n, err)
 	}
 
@@ -194,6 +196,17 @@ func TestPlanProposals(t *testing.T) {
 	}
 	if p, err := q.GetLatestPlanProposal(ctx, alice.ID); err != nil || p.ID != newer.ID {
 		t.Errorf("latest %+v, %v", p, err)
+	}
+	if p, err := q.GetPlanProposal(ctx, db.GetPlanProposalParams{UserID: alice.ID, ID: old.ID}); err != nil || *p.Rationale != "Why [day:2026-11-13]" || p.Refs[0] != "[day:2026-11-13]" {
+		t.Errorf("reasons %+v, %v", p, err)
+	}
+	// An adjustment that changed nothing is not the latest.
+	check(t, q.FailPlanProposal(ctx, db.FailPlanProposalParams{UserID: alice.ID, ID: newer.ID, Failure: &invalid}))
+	quiet, err := q.CreatePlanProposal(ctx, db.CreatePlanProposalParams{UserID: alice.ID, Kind: "adjustment", FromDay: from, ToDay: to})
+	check(t, err)
+	check(t, q.SetPlanProposalStatus(ctx, db.SetPlanProposalStatusParams{UserID: alice.ID, ID: quiet.ID, Status: "closed"}))
+	if p, err := q.GetLatestPlanProposal(ctx, alice.ID); err != nil || p.ID != newer.ID {
+		t.Errorf("latest after a quiet check %+v, %v", p, err)
 	}
 	for _, read := range []func() error{
 		func() error {

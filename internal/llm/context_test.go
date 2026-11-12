@@ -72,7 +72,8 @@ func sample() AthleteContext {
 		Plan: []PlannedSummary{
 			{ID: 21, Day: date("2026-11-04"), Sport: "trail_running", Title: "Hills\n6 × 2 min"},
 			{ID: 20, Day: date("2026-11-03"), Sport: "running", Title: "Easy 45 min"},
-			{ID: 18, Day: date("2026-11-01"), Sport: "running", Title: "Long run", ActivityID: new(int64(12))},
+			{ID: 18, Day: date("2026-11-01"), Sport: "running", Title: "Long run", ActivityID: new(int64(12)), Steps: &StepCounts{Within: 2, Above: 8}},
+			{ID: 19, Day: date("2026-11-01"), Sport: "strength", Title: "Core", ActivityID: new(int64(13)), Steps: &StepCounts{}},
 			{ID: 17, Day: date("2026-10-31"), Sport: "cycling", Title: "Spin"},
 		},
 		Adherence: &Adherence{

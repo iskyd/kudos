@@ -2611,10 +2611,22 @@ components:
         Schema): the IDs of current workouts it keeps as they are, and every
         other workout of the planned days. Current workouts it neither keeps
         nor replaces with one on the same day and sport are proposed for removal.
+        rationale says why, citing references, and references lists the ones
+        it rests on; each must be one the context gave the model.
       type: object
-      required: [keep, workouts]
+      required: [keep, workouts, rationale, references]
       additionalProperties: false
       properties:
+        rationale:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        references:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            $ref: "#/components/schemas/Reference"
         keep:
           type: array
           maxItems: 50
@@ -2626,10 +2638,28 @@ components:
           maxItems: 50
           items:
             $ref: "#/components/schemas/PlannedWorkoutInput"
+    Reference:
+      description: A context reference, to an activity or a day.
+      type: string
+      pattern: '^\[(act:[0-9]+|day:[0-9]{4}-[0-9]{2}-[0-9]{2})\]$'
     PlanProposal:
       type: object
-      required: [id, status, createdAt, from, to, items]
+      required: [id, kind, status, createdAt, from, to, items, references]
       properties:
+        kind:
+          description: |
+            plan: the coming two weeks, on demand or on Monday mornings;
+            adjustment: the coming week, checked after the daily insight.
+          type: string
+          enum: [plan, adjustment]
+        rationale:
+          description: The coach's reasons, citing references; set once it is filled in.
+          type: string
+        references:
+          description: The context references the reasons rest on.
+          type: array
+          items:
+            $ref: "#/components/schemas/Reference"
         id:
           type: integer
           format: int64

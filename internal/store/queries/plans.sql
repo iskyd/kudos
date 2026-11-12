@@ -57,7 +57,7 @@ WHERE user_id = @user_id AND status = 'generating' AND created_at < @before;
 
 -- name: CreatePlanProposal :one
 -- Fails with a unique violation while another proposal of the user is generating.
-INSERT INTO plan_proposals (user_id, from_day, to_day) VALUES (@user_id, @from_day, @to_day) RETURNING *;
+INSERT INTO plan_proposals (user_id, kind, from_day, to_day) VALUES (@user_id, @kind, @from_day, @to_day) RETURNING *;
 
 -- name: GetPlanProposal :one
 SELECT * FROM plan_proposals WHERE user_id = @user_id AND id = @id;
@@ -66,7 +66,13 @@ SELECT * FROM plan_proposals WHERE user_id = @user_id AND id = @id;
 SELECT * FROM plan_proposals WHERE user_id = @user_id AND id = @id FOR UPDATE;
 
 -- name: GetLatestPlanProposal :one
-SELECT * FROM plan_proposals WHERE user_id = @user_id ORDER BY id DESC LIMIT 1;
+-- An adjustment that changed nothing is left out: the daily check found the plan fine.
+SELECT * FROM plan_proposals p
+WHERE p.user_id = @user_id
+    AND NOT (p.kind = 'adjustment' AND p.status = 'closed'
+        AND NOT EXISTS (SELECT 1 FROM plan_proposal_items i WHERE i.user_id = p.user_id AND i.proposal_id = p.id))
+ORDER BY p.id DESC
+LIMIT 1;
 
 -- name: FailPlanProposal :exec
 UPDATE plan_proposals SET status = 'failed', failure = @failure
@@ -79,7 +85,7 @@ UPDATE plan_proposals SET status = 'superseded' WHERE user_id = @user_id AND sta
 
 -- name: FillPlanProposal :execrows
 -- status is open, or closed when it proposes no change.
-UPDATE plan_proposals SET status = @status, prompt_version = @prompt_version
+UPDATE plan_proposals SET status = @status, prompt_version = @prompt_version, rationale = @rationale, refs = @refs
 WHERE user_id = @user_id AND id = @id AND status = 'generating';
 
 -- name: SetPlanProposalPlan :exec
@@ -108,13 +114,16 @@ WHERE user_id = @user_id AND proposal_id = @proposal_id AND id = @id AND status 
 SELECT count(*) FROM plan_proposal_items WHERE user_id = @user_id AND proposal_id = @proposal_id AND status = 'pending';
 
 -- name: ListPlanCandidates :many
--- The weekly scheduler's scan across users, like ListCoachCandidates: users
+-- The plan scheduler's scan across users, like ListCoachCandidates: users
 -- with an LLM provider and a plan, after after_id, with what decides whether
--- they are due a new proposal. Year 1 stands for never.
+-- they are due a new plan or an adjustment. Year 1 stands for never.
 SELECT u.id AS user_id, u.timezone,
     coalesce(c.status = 'connected', false)::boolean AS garmin_connected,
     coalesce(c.last_sync_at, '0001-01-01 00:00:00+00')::timestamptz AS last_sync_at,
-    coalesce((SELECT max(pp.created_at) FROM plan_proposals pp WHERE pp.user_id = u.id), '0001-01-01 00:00:00+00')::timestamptz AS last_proposal
+    coalesce((SELECT max(pp.created_at) FROM plan_proposals pp WHERE pp.user_id = u.id AND pp.kind = 'plan'), '0001-01-01 00:00:00+00')::timestamptz AS last_proposal,
+    coalesce((SELECT max(pp.created_at) FROM plan_proposals pp WHERE pp.user_id = u.id AND pp.kind = 'adjustment'), '0001-01-01 00:00:00+00')::timestamptz AS last_adjustment,
+    coalesce((SELECT max(r.day) FROM coach_reports r WHERE r.user_id = u.id AND r.kind = 'daily_insight'), '0001-01-01')::date AS last_insight,
+    EXISTS (SELECT 1 FROM plan_proposals pp WHERE pp.user_id = u.id AND pp.status IN ('open', 'generating'))::boolean AS pending_proposal
 FROM users u
 JOIN llm_providers p ON p.user_id = u.id
 LEFT JOIN garmin_connections c ON c.user_id = u.id

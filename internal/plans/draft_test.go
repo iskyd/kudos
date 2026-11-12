@@ -12,23 +12,30 @@ var (
 	to   = time.Date(2026, 11, 26, 0, 0, 0, 0, time.UTC)
 )
 
-// draft builds a PlanDraft document.
+// draft builds a PlanDraft document citing [day:2026-11-12].
 func draft(keep string, workouts ...string) string {
-	return `{"keep": [` + keep + `], "workouts": [` + strings.Join(workouts, ",") + `]}`
+	return `{"keep": [` + keep + `], "workouts": [` + strings.Join(workouts, ",") + `], ` + reasons + `}`
 }
+
+const (
+	reasons = `"rationale": "Easier after a hard week [day:2026-11-12].", "references": ["[day:2026-11-12]"]`
+	// athleteContext stands for the context the model was given.
+	athleteContext = "## Readiness\n- Readiness 2026-11-12 [day:2026-11-12]: 41\n- Run [act:7]"
+)
 
 func on(day, steps string) string { return strings.Replace(workout(steps), "2026-11-12", day, 1) }
 
 func TestValidateDraftAccepts(t *testing.T) {
 	t.Parallel()
-	d, err := ValidateDraft([]byte(draft("7", on("2026-11-13", recovery), on("2026-11-26", warmup+","+repeat(5, interval, recovery)))), from, to, []int64{7, 8})
+	d, err := ValidateDraft([]byte(draft("7", on("2026-11-13", recovery), on("2026-11-26", warmup+","+repeat(5, interval, recovery)))), from, to, []int64{7, 8}, athleteContext)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(d.Keep) != 1 || d.Keep[0] != 7 || len(d.Workouts) != 2 || d.Workouts[1].Day != "2026-11-26" || d.Workouts[0].Title != "Intervals" {
+	if len(d.Keep) != 1 || d.Keep[0] != 7 || len(d.Workouts) != 2 || d.Workouts[1].Day != "2026-11-26" || d.Workouts[0].Title != "Intervals" ||
+		d.Rationale != "Easier after a hard week [day:2026-11-12]." || len(d.References) != 1 || d.References[0] != "[day:2026-11-12]" {
 		t.Errorf("draft = %+v", d)
 	}
-	if _, err := ValidateDraft([]byte(draft("")), from, to, nil); err != nil {
+	if _, err := ValidateDraft([]byte(draft("")), from, to, nil, athleteContext); err != nil {
 		t.Errorf("an empty plan: %v", err)
 	}
 }
@@ -36,15 +43,19 @@ func TestValidateDraftAccepts(t *testing.T) {
 func TestValidateDraftRejects(t *testing.T) {
 	t.Parallel()
 	for name, tc := range map[string]struct{ doc, want string }{
-		"not JSON":        {`{"keep": [`, "not JSON"},
-		"no keep":         {`{"workouts": []}`, "does not match the schema"},
-		"bad workout":     {draft("", strings.Replace(on("2026-11-13", recovery), "running", "quidditch", 1)), "does not match the schema"},
-		"before the plan": {draft("", on("2026-11-12", recovery)), "workouts/0: day 2026-11-12 is not between 2026-11-13 and 2026-11-26"},
-		"after the plan":  {draft("", on("2026-11-13", recovery), on("2026-11-27", recovery)), "workouts/1: day 2026-11-27"},
-		"bad step":        {draft("", on("2026-11-13", recovery), on("2026-11-14", `{"kind": "interval", "durationType": "distance"}`)), "workouts/1/steps/0: a distance step needs a duration"},
-		"unknown keep":    {draft("7, 9"), "keep/1: 9 is not a workout of the current plan"},
+		"not JSON":          {`{"keep": [`, "not JSON"},
+		"no keep":           {`{"workouts": [], ` + reasons + `}`, "does not match the schema"},
+		"no references":     {`{"keep": [], "workouts": [], "rationale": "Because.", "references": []}`, "does not match the schema"},
+		"no rationale":      {`{"keep": [], "workouts": [], "references": ["[act:7]"]}`, "does not match the schema"},
+		"not a reference":   {`{"keep": [], "workouts": [], "rationale": "x", "references": ["act 7"]}`, "does not match the schema"},
+		"made-up reference": {strings.Replace(draft(""), `["[day:2026-11-12]"]`, `["[day:2026-11-12]", "[act:8]"]`, 1), "references/1: [act:8] is not a reference of the athlete context"},
+		"bad workout":       {draft("", strings.Replace(on("2026-11-13", recovery), "running", "quidditch", 1)), "does not match the schema"},
+		"before the plan":   {draft("", on("2026-11-12", recovery)), "workouts/0: day 2026-11-12 is not between 2026-11-13 and 2026-11-26"},
+		"after the plan":    {draft("", on("2026-11-13", recovery), on("2026-11-27", recovery)), "workouts/1: day 2026-11-27"},
+		"bad step":          {draft("", on("2026-11-13", recovery), on("2026-11-14", `{"kind": "interval", "durationType": "distance"}`)), "workouts/1/steps/0: a distance step needs a duration"},
+		"unknown keep":      {draft("7, 9"), "keep/1: 9 is not a workout of the current plan"},
 	} {
-		_, err := ValidateDraft([]byte(tc.doc), from, to, []int64{7})
+		_, err := ValidateDraft([]byte(tc.doc), from, to, []int64{7}, athleteContext)
 		if err == nil || !strings.Contains(err.Error(), tc.want) {
 			t.Errorf("%s: err = %v, want %q", name, err, tc.want)
 		}

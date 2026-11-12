@@ -58,6 +58,10 @@ func TestPlanContextAdherence(t *testing.T) {
 		plan[2].ID != later.ID || plan[2].ActivityID != nil {
 		t.Fatalf("plan %+v", plan)
 	}
+	// Recent execution: every rep ran faster than its target.
+	if st := plan[1].Steps; st == nil || st.Within != within || st.Above < 10 || st.Within+st.Above+st.Below != compared || plan[0].Steps != nil {
+		t.Errorf("steps %+v", plan[1].Steps)
+	}
 	want := llmAdherence(day.AddDate(0, 0, 1-adherenceDays), day, 2, 1, 1050, *a.TimerTimeS, within, compared)
 	if *adh != want {
 		t.Errorf("adherence %+v, want %+v", *adh, want)

@@ -11,7 +11,7 @@ Rules:
 - You never change the training plan. You can only suggest changes, and the athlete decides.
 - Use metric units. Be concise and specific.
 
-You plan training. Your plan is a proposal: the athlete approves or rejects each change before anything changes.
+You check the athlete's plan after today's daily insight. Any change is a proposal: the athlete approves or rejects it before anything changes.
 
 <athlete_context>
 # Athlete context, 2026-11-02
@@ -55,7 +55,8 @@ You plan training. Your plan is a proposal: the athlete approves or rejects each
 ## Plan and adherence
 - Adherence 2026-10-19 to 2026-11-01 [day:2026-10-19]: 5 of 6 planned workouts done (83%); time 95% of planned; load 104% of planned (4 workouts); 12 of 15 targeted steps within target
 - 2026-10-31 [day:2026-10-31]: workout 17, cycling, Spin, missed
-- 2026-11-01 [day:2026-11-01]: workout 18, running, Long run, done [act:12]
+- 2026-11-01 [day:2026-11-01]: workout 18, running, Long run, done [act:12]; steps against targets: 2 within, 8 above, 0 below
+- 2026-11-01 [day:2026-11-01]: workout 19, strength, Core, done [act:13]
 - 2026-11-03 [day:2026-11-03]: workout 20, running, Easy 45 min
 - 2026-11-04 [day:2026-11-04]: workout 21, trail running, Hills 6 × 2 min
 
@@ -68,9 +69,9 @@ You plan training. Your plan is a proposal: the athlete approves or rejects each
 - Fastest 5K [act:5]: 22:01 on 2026-10-25
 </athlete_context>
 === user
-Plan the days from 2026-11-03 to 2026-11-16 from the athlete's races and goals, current load, readiness, injuries and the results of recent workouts.
-- In "keep", list the IDs of the workouts in the current plan on these days that stay as they are.
-- In "workouts", give every other workout of these days, with its day. A current workout you neither keep nor replace with one of the same day and sport is removed. A rest day has no workout.
+Check the planned workouts from 2026-11-02 to 2026-11-08 against today's readiness, check-ins, injuries, adherence to the plan and how recent workouts were executed (for example reps run faster or slower than their targets).
+- Change a workout only when the context gives a clear reason: list every workout of these days you leave as it is in "keep", and give the changed or new ones in "workouts", with their day. A current workout you neither keep nor replace with one of the same day and sport is removed. When nothing needs changing, keep them all and give no workouts.
 - Set targets as zones. Use a low-to-high range only for heart rate in bpm or power in W. Durations are in seconds, distances in metres.
+- In "rationale", say in at most 80 words why, citing references. In "references", list every reference you rely on, exactly as the context writes them.
 Reply with JSON only, no other text, matching this JSON Schema:
 {"type": "object"}
