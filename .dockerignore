@@ -1,0 +1,16 @@
+# Only what the image build needs: sources, not dependencies, builds or local data.
+.git
+**/node_modules
+web/dist
+web/test-results
+web/playwright-report
+web/e2e-results
+bin
+.data
+data
+private
+exports
+coverage.out
+.env
+**/.env.*
+deploy/encryption_key

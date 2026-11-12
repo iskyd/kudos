@@ -4,7 +4,86 @@
 
 KudOS syncs your Garmin data, analyzes every activity at full resolution, tracks fitness, fatigue and readiness, and connects to the LLM of your choice for advice on training, rest and recovery. It runs on your own hardware, keeps your data on your network, and costs nothing: no subscriptions, no paid tiers, no features held back.
 
-> **Status: in development.** KudOS has not had its first release yet. Installation instructions will be added before v1.
+> **Status: pre-release.** v1.0.0 is not out yet; pre-release images are published for testing.
+
+---
+
+## Installation
+
+You need Docker with Compose v2 on a 64-bit Linux machine: amd64 or arm64 (a NAS, a mini PC, or a Raspberry Pi 4 or 5 with a 64-bit OS). KudOS runs two containers, the app and its database, and keeps everything in Docker volumes.
+
+1. Make a directory and fetch the compose file and settings template of the version you want ([releases](https://github.com/iskyd/kudos/releases)):
+
+   ```bash
+   mkdir kudos && cd kudos
+   VERSION=1.0.0
+   curl -fsSLO "https://raw.githubusercontent.com/iskyd/kudos/v$VERSION/deploy/docker-compose.yml"
+   curl -fsSL -o .env "https://raw.githubusercontent.com/iskyd/kudos/v$VERSION/deploy/.env.example"
+   ```
+
+2. Edit `.env`: set `KUDOS_VERSION` to that version and `POSTGRES_PASSWORD` to a new password (`openssl rand -hex 24`). Every other setting is documented in the file and has a working default.
+
+3. Create the encryption key, which protects the Garmin and AI provider keys you enter. The app runs as user 65532 and must be able to read it:
+
+   ```bash
+   (umask 077 && openssl rand -base64 32 > encryption_key)
+   sudo chown 65532:65532 encryption_key
+   ```
+
+   Keep a copy somewhere safe. Without it, the stored keys can't be decrypted and must be entered again; your training data is not affected.
+
+4. Start KudOS and open `http://<host>:8080`:
+
+   ```bash
+   docker compose up -d
+   ```
+
+   Database migrations run on every start. Create the accounts you need, then set `REGISTRATION_ENABLED=false` in `.env` and run `docker compose up -d` again to close registration.
+
+**Local AI coach (optional):** `docker compose --profile ollama up -d` also starts [Ollama](https://ollama.com). Pull a model with `docker compose exec ollama ollama pull <model>`, then choose Ollama in Settings › AI coach with the base URL `http://ollama:11434/v1`.
+
+**HTTPS:** KudOS serves plain HTTP on your LAN. Behind a reverse proxy that terminates TLS and sends `X-Forwarded-Proto: https`, the session cookie is marked `Secure`.
+
+## Backups
+
+Everything worth keeping is in four places:
+
+- the `kudos_db` volume: the database;
+- the `kudos_data` volume: your original activity files;
+- `encryption_key` and `.env` in your KudOS directory.
+
+Back up the two volumes together, with the app stopped so they match:
+
+```bash
+docker compose stop
+for v in db data; do
+  docker run --rm -v "kudos_$v:/volume" -v "$PWD/backups:/backups" timescale/timescaledb:2.31.0-pg18 \
+    tar czf "/backups/$v-$(date +%F).tar.gz" -C /volume .
+done
+docker compose start
+```
+
+To restore, stop KudOS with `docker compose down`, then unpack each archive into its empty volume and start again:
+
+```bash
+docker compose down
+docker volume rm kudos_db kudos_data
+for v in db data; do
+  docker run --rm -v "kudos_$v:/volume" -v "$PWD/backups:/backups" timescale/timescaledb:2.31.0-pg18 \
+    tar xzf "/backups/$v-<date>.tar.gz" -C /volume
+done
+docker compose up -d
+```
+
+Any host-level backup of the Docker volumes works too.
+
+## Upgrading
+
+1. Read the release notes and back up (see above).
+2. Fetch the new version's `docker-compose.yml` as in installation step 1, and set `KUDOS_VERSION` in `.env`.
+3. Run `docker compose pull && docker compose up -d`. The new version migrates the database when it starts.
+
+There is no downgrade: to go back, restore the backup taken before the upgrade.
 
 ---
 
