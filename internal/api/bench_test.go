@@ -92,12 +92,19 @@ func BenchmarkPages(b *testing.B) {
 		b.Run(page.name, func(b *testing.B) {
 			pc := *c
 			pc.t = b
+			spent := make([]time.Duration, len(page.paths))
 			for b.Loop() {
-				for _, p := range page.paths {
+				for i, p := range page.paths {
+					start := time.Now()
 					if rec := pc.do(http.MethodGet, p, nil, nil); rec.Code != http.StatusOK {
 						b.Fatalf("%s: %d %s", p, rec.Code, rec.Body)
 					}
+					spent[i] += time.Since(start)
 				}
+			}
+			// Each request's share, to find what to speed up when the page is slow.
+			for i, p := range page.paths {
+				b.Logf("%8s %s", (spent[i] / time.Duration(b.N)).Round(time.Millisecond/10), p)
 			}
 			if per := b.Elapsed() / time.Duration(b.N); per > pageBudget {
 				b.Errorf("%s page took %s, over %s", page.name, per, pageBudget)
