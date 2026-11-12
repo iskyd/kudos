@@ -74,6 +74,7 @@ pnpm-debug.log*
 web/coverage/
 # Playwright
 web/test-results/
+web/e2e-results/
 web/playwright-report/
 web/blob-report/
 web/playwright/.cache/

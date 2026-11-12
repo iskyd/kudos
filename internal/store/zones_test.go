@@ -216,3 +216,28 @@ func TestZoneSuggestionsIsolationAndConfirm(t *testing.T) {
 		t.Errorf("dismissed %d: %v", n, err)
 	}
 }
+
+func TestSuggestEstimateIsolation(t *testing.T) {
+	t.Parallel()
+	pool := pg.NewDB(t)
+	alice, bob := testutil.TwoUsers(t, pool)
+	q := db.New(pool)
+	ctx := t.Context()
+	run := importActivity(t, q, alice.ID, "estimate", nil)
+	d := date(t, "2026-10-15")
+	check(t, q.SuggestEstimate(ctx, db.SuggestEstimateParams{UserID: alice.ID, Sport: "running", EffectiveFrom: d, ThresholdSpeedMS: ptr[float32](4), ActivityID: &run}))
+
+	// Bob's estimate on the same day is his own suggestion; he cannot cite Alice's activity.
+	check(t, q.SuggestEstimate(ctx, db.SuggestEstimateParams{UserID: bob.ID, Sport: "running", EffectiveFrom: d, ThresholdSpeedMS: ptr[float32](3)}))
+	var pgErr *pgconn.PgError
+	if err := q.SuggestEstimate(ctx, db.SuggestEstimateParams{UserID: bob.ID, Sport: "cycling", EffectiveFrom: d, FtpW: ptr[int16](250), ActivityID: &run}); !errors.As(err, &pgErr) || pgErr.Code != "23503" {
+		t.Errorf("bob cites alice's activity: %v, want a foreign key violation", err)
+	}
+	for u, want := range map[int64]float32{alice.ID: 4, bob.ID: 3} {
+		s, err := q.GetZoneSuggestionAt(ctx, db.GetZoneSuggestionAtParams{UserID: u, Sport: "running", Day: d})
+		check(t, err)
+		if s.UserID != u || *s.ThresholdSpeedMS != want {
+			t.Errorf("user %d's suggestion = %+v", u, s)
+		}
+	}
+}

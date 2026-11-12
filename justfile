@@ -34,6 +34,12 @@ coverage:
 E2E_DB_PORT := env("KUDOS_E2E_DB_PORT", "5433")
 
 # Fuzz the FIT, GPX and TCX decoders briefly (CI runs this on every pull request).
+# Known vulnerabilities: Go code paths that reach one (govulncheck), and the
+# npm packages that ship in the web build. Dev tooling never reaches users.
+audit:
+    go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+    npm --prefix web audit --omit=dev
+
 # Runs are bounded by executions, not time: a -fuzztime duration can end in a
 # spurious "context deadline exceeded" from a race in Go's fuzz coordinator.
 fuzz execs="1000000":
@@ -49,7 +55,10 @@ e2e:
     compose="docker compose -p kudos-e2e -f deploy/compose.dev.yml"
     trap "$compose down -v" EXIT
     $compose up -d --wait
+    # A log left from an earlier run must not pass the scan.
+    rm -f web/e2e-results/server.log
     DATABASE_URL=postgres://kudos:kudos@127.0.0.1:{{E2E_DB_PORT}}/kudos?sslmode=disable npm --prefix web run test:e2e
+    node web/e2e/scan-logs.mjs web/e2e-results/server.log
 
 # Build the frontend, then the server binary (embedding it) into bin/.
 build:
