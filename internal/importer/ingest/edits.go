@@ -115,6 +115,21 @@ var (
 	maxTime = time.Date(9999, 1, 1, 0, 0, 0, 0, time.UTC)
 )
 
+// sampleSlack widens an activity's span when bounding its samples: devices
+// record a little outside their session, and a day still lets Postgres skip
+// all but one or two of the streams' 7-day chunks.
+const sampleSlack = 24 * time.Hour
+
+// span bounds the stored samples of a: without bounds, every stream read
+// probes every chunk of the hypertable, ten years of them on the activity page.
+func span(a db.Activity) (from, to time.Time) {
+	to = maxTime
+	if a.ElapsedTimeS != nil {
+		to = a.StartTime.Add(time.Duration(*a.ElapsedTimeS*float64(time.Second)) + sampleSlack)
+	}
+	return a.StartTime.Add(-sampleSlack), to
+}
+
 // Segment is a stretch of one activity's stored samples, [From, To).
 type Segment struct {
 	ActivityID int64
@@ -134,11 +149,12 @@ type View struct {
 // view builds the activity's view from its edits, oldest first.
 func view(ctx context.Context, q *db.Queries, a db.Activity, edits []Edit) (View, error) {
 	var v View
+	from, to := span(a)
 	if a.SplitOf != nil {
 		// The second part of a split reads its parent's samples from its own start.
-		v.Segments = []Segment{{ActivityID: *a.SplitOf, From: a.StartTime, To: maxTime}}
+		v.Segments = []Segment{{ActivityID: *a.SplitOf, From: a.StartTime, To: to}}
 	} else {
-		v.Segments = []Segment{{ActivityID: a.ID, From: minTime, To: maxTime}}
+		v.Segments = []Segment{{ActivityID: a.ID, From: from, To: to}}
 	}
 	var trim *Edit
 	for i, e := range edits {
@@ -148,7 +164,8 @@ func view(ctx context.Context, q *db.Queries, a db.Activity, edits []Edit) (View
 			if err != nil {
 				return View{}, fmt.Errorf("reading merged activity: %w", err)
 			}
-			v.Segments = append(v.Segments, Segment{ActivityID: b.ID, From: minTime, To: maxTime})
+			from, to := span(b)
+			v.Segments = append(v.Segments, Segment{ActivityID: b.ID, From: from, To: to})
 			if b.StartTime.Before(a.StartTime) {
 				slices.Reverse(v.Segments)
 			}

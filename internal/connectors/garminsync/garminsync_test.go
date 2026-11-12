@@ -63,6 +63,7 @@ type fakeGarmin struct {
 	lists     int
 	downloads map[string]int
 	reMint    string // when set, the first call renews the session's token
+	hang      string // a download that waits for the context, once: the server stopping mid-download
 }
 
 func (f *fakeGarmin) ID() string { return "garmin" }
@@ -81,10 +82,17 @@ func (f *fakeGarmin) FetchActivities(_ context.Context, s *connectors.Session, _
 	return f.acts, f.listErr
 }
 
-func (f *fakeGarmin) DownloadActivityFile(_ context.Context, _ *connectors.Session, id string) (connectors.File, error) {
+func (f *fakeGarmin) DownloadActivityFile(ctx context.Context, _ *connectors.Session, id string) (connectors.File, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.downloads[id]++
+	if id == f.hang {
+		f.hang = ""
+		f.mu.Unlock()
+		<-ctx.Done()
+		f.mu.Lock()
+		return connectors.File{}, ctx.Err()
+	}
 	if err := f.errs[id]; err != nil {
 		delete(f.errs, id)
 		return connectors.File{}, err
@@ -330,6 +338,42 @@ func TestInterruptAndResume(t *testing.T) {
 	if n := e.count(t, "SELECT count(*) FROM garmin_activity_imports WHERE user_id = $1"); n != 3 {
 		t.Errorf("%d imports, want 3", n)
 	}
+}
+
+func TestRestartMidDownload(t *testing.T) {
+	t.Parallel()
+	e := newEnv(t)
+	e.fake.hang = "2"
+	// The server stops while activity 2 downloads: the job's context ends.
+	ctx, stop := context.WithCancel(t.Context())
+	go func() {
+		for e.downloadsOf("2") == 0 {
+			time.Sleep(time.Millisecond)
+		}
+		stop()
+	}()
+	if err := e.worker.Work(ctx, &river.Job[BackfillArgs]{Args: BackfillArgs{UserID: e.alice}}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("stopped run: %v", err)
+	}
+	// The stop is not the activity's failure: River runs the job again after the restart.
+	if p := e.progress(t); p.Backfill.Status != "running" || p.Activities.Failed != 0 {
+		t.Fatalf("after the stop: %+v", p)
+	}
+	if err := e.work(t); err != nil {
+		t.Fatal(err)
+	}
+	if p := e.progress(t); p.Backfill.Status != "done" || p.Activities.Done != 2 || e.activities(t) != 2 || e.metrics(t) != 2 {
+		t.Errorf("after the restart: %+v", p)
+	}
+	if n := e.fake.downloads["1"]; n != 1 {
+		t.Errorf("activity 1 downloaded %d times, want once", n)
+	}
+}
+
+func (e *env) downloadsOf(id string) int {
+	e.fake.mu.Lock()
+	defer e.fake.mu.Unlock()
+	return e.fake.downloads[id]
 }
 
 func TestRateLimitPause(t *testing.T) {
