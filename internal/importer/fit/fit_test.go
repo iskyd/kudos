@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"testing"
 	"time"
 
@@ -349,6 +350,35 @@ func TestDecodeErrors(t *testing.T) {
 	}
 	if _, err := Decode(bytes.NewReader([]byte("not a fit file"))); err == nil || errors.Is(err, ErrNoSession) {
 		t.Errorf("garbage: error = %v, want a decoding error", err)
+	}
+}
+
+// Garmin serves some original files whose trailing CRC does not match their
+// contents, although every message decodes. They import as recorded; a file cut
+// short still fails.
+func TestDecodeChecksum(t *testing.T) {
+	t.Parallel()
+	data, err := os.ReadFile(filepath.Join(corpus, "half_marathon.fit"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := Decode(bytes.NewReader(data))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	badCRC := bytes.Clone(data)
+	badCRC[len(badCRC)-1] ^= 0xff
+	got, err := Decode(bytes.NewReader(badCRC))
+	if err != nil {
+		t.Fatalf("file with a wrong CRC: %v", err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Error("file with a wrong CRC decodes differently from the original")
+	}
+
+	if _, err := Decode(bytes.NewReader(data[:len(data)-10])); err == nil {
+		t.Error("truncated file decoded without error")
 	}
 }
 
