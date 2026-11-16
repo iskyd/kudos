@@ -24,7 +24,9 @@ var ErrNoSession = errors.New("fit: no session in file")
 // multisport file yields its legs and transitions, which the caller links in a group.
 // Unknown and proprietary messages are ignored.
 func Decode(r io.Reader) ([]importer.Activity, error) {
-	fit, err := decoder.New(r).Decode()
+	// Garmin keeps and serves some files whose CRC is wrong although every message
+	// decodes; source data is trusted as recorded. A file cut short still fails.
+	fit, err := decoder.New(r, decoder.WithIgnoreChecksum()).Decode()
 	if err != nil {
 		return nil, fmt.Errorf("decoding fit: %w", err)
 	}
